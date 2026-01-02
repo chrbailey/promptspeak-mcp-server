@@ -1,0 +1,45 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.03",
+  "version": 1,
+  "hash": "dd814889476848fa",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "Name the two songs that went viral on TikTok by the artist who (from 2016 to 2021) played drums in a band that won \"Best Holy Local Band\" in the Phoenix New Times Best of Phoenix 2006.",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Media & Entertainment",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "MUST reference: 2016 to 2021) played drums in a band that won \"Best Holy Local Band\" in the Phoenix New Times Best of Phoenix 2006"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 2 requirements",
+  "requirements": [
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2016",
+    "2021",
+    "2006",
+    "Can't",
+    "Handle",
+    "Change"
+  ],
+  "source_reference": "2016 to 2021) played drums in a band that won \"Best Holy Local Band\" in the Phoenix New Times Best of Phoenix 2006",
+  "created_at": "2025-12-25T10:14:00.926Z",
+  "source_data": {
+    "problem": "Name the two songs that went viral on TikTok by the artist who (from 2016 to 2021) played drums in a band that won \"Best Holy Local Band\" in the Phoenix New Times Best of Phoenix 2006.",
+    "problem_category": "Media & Entertainment",
+    "answer": "I Can't Handle Change (2010), Christmas Kids (2010)",
+    "answer_type": "Set Answer"
+  }
+}

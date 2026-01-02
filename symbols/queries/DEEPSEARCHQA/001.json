@@ -1,0 +1,38 @@
+{
+  "symbolId": "Ξ.Q.KNOWLEDGE.001",
+  "category": "QUERY",
+  "who": "Benchmark Evaluation System",
+  "what": "Which US president served the shortest term, what was the cause of death, how many days did he serve, and who succeeded him?",
+  "why": "Validate symbol grounding effectiveness",
+  "where": "Knowledge benchmark test",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness"
+    ],
+    "constraints": [
+      "answer_all_parts",
+      "be_specific"
+    ]
+  },
+  "commanders_intent": "Provide a complete answer that includes ALL required elements",
+  "requirements": [
+    "MUST name William Henry Harrison as the president",
+    "MUST state pneumonia as cause of death",
+    "MUST state approximately 31 or 32 days in office",
+    "MUST name John Tyler as successor"
+  ],
+  "key_terms": [
+    "Harrison",
+    "pneumonia",
+    "31",
+    "Tyler"
+  ],
+  "source_data": {
+    "expected_answer": "William Henry Harrison, pneumonia, 31 days, John Tyler"
+  },
+  "version": 1,
+  "hash": "a1eedc3a3468ea7a",
+  "created_at": "2025-12-25T09:48:40.021Z"
+}

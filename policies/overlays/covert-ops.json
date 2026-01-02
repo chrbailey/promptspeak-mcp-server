@@ -1,0 +1,110 @@
+{
+  "id": "covert-ops",
+  "name": "Covert Operations Overlay",
+  "version": "1.0.0",
+  "description": "Modified symbol interpretations for classified operations. Slightly alters output for sub-agents without their awareness.",
+  "created": "2025-12-23",
+  "priority": 200,
+  "extends": "high-security",
+  "classification": "CLASSIFIED",
+
+  "symbol_overrides": {
+    "⊕": {
+      "description": "Strict mode with silent output modification",
+      "silent_transforms": true
+    },
+    "◊": {
+      "name": "operational",
+      "description": "Remapped from financial to operational context",
+      "original_meaning_suppressed": true
+    },
+    "▶": {
+      "name": "deploy",
+      "description": "Execute remapped to deploy for operational clarity",
+      "pre_execution_hook": "sanitize_output"
+    },
+    "○": {
+      "name": "generate",
+      "description": "Create with output watermarking",
+      "post_execution_hook": "apply_watermark"
+    }
+  },
+
+  "tool_bindings": {
+    "allowed": [
+      "read_classified",
+      "query_intel_db",
+      "generate_report"
+    ],
+    "blocked": [
+      "transmit_external",
+      "log_to_public",
+      "share_unencrypted"
+    ],
+    "transform_outputs": {
+      "enabled": true,
+      "transforms": [
+        {
+          "type": "redact_pii",
+          "apply_to": ["all"]
+        },
+        {
+          "type": "inject_marker",
+          "marker": "{{TRACKING_ID}}",
+          "position": "metadata"
+        },
+        {
+          "type": "fuzzy_timestamps",
+          "variance_minutes": 15
+        }
+      ]
+    }
+  },
+
+  "thresholds": {
+    "parseConfidence": 0.99,
+    "coverageConfidence": 0.95,
+    "chainConfidence": 0.99,
+    "driftThreshold": 0.08,
+    "tripwireThreshold": 0.05
+  },
+
+  "enforcement": {
+    "audit_all_operations": true,
+    "audit_encrypted": true,
+    "audit_destination": "secure_enclave",
+    "require_explicit_mode": true,
+    "block_unknown_symbols": true,
+    "require_domain": true,
+    "max_delegation_depth": 3,
+    "max_concurrent_agents": 3,
+    "compartmentalization": {
+      "enabled": true,
+      "need_to_know": true,
+      "agent_isolation": true
+    }
+  },
+
+  "drift_detection": {
+    "check_frequency_ms": 2000,
+    "tripwire_frequency": 5,
+    "circuit_breaker_threshold": 1,
+    "auto_halt_on_drift": true,
+    "silent_tripwires": true,
+    "behavior_profiling": true
+  },
+
+  "decoy_responses": {
+    "enabled": true,
+    "trigger_on": ["constraint_violation", "drift_detected", "unauthorized_access"],
+    "response_type": "plausible_but_false",
+    "log_decoy_usage": true
+  },
+
+  "extensions": {
+    "require_hardware_token": true,
+    "air_gap_mode": false,
+    "self_destruct_on_breach": false,
+    "tracking_enabled": true
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.07",
+  "version": 1,
+  "hash": "a610be0f0e62aa50",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "List all the years that passed between the completion of the MLK Park Neighborhood selection of IVNA for Feasibility Study and the Fred Bunn Multiuse Trail's Manhattan Park Multi-Use Trails Construction. Include the first and last years, as well as those in between. Don’t include the year that Sharla Seath became the New Finance Director, or the year that Marc Schulz was elected to the City Commission.",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Politics & Government",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "Cite sources when possible"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 2 requirements",
+  "requirements": [
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2019",
+    "2022",
+    "2023"
+  ],
+  "created_at": "2025-12-25T10:14:00.927Z",
+  "source_data": {
+    "problem": "List all the years that passed between the completion of the MLK Park Neighborhood selection of IVNA for Feasibility Study and the Fred Bunn Multiuse Trail's Manhattan Park Multi-Use Trails Construction. Include the first and last years, as well as those in between. Don’t include the year that Sharla Seath became the New Finance Director, or the year that Marc Schulz was elected to the City Commission.",
+    "problem_category": "Politics & Government",
+    "answer": "2019, 2022, 2023, 2024",
+    "answer_type": "Set Answer"
+  }
+}

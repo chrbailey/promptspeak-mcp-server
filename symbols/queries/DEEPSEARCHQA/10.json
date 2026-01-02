@@ -1,0 +1,47 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.10",
+  "version": 1,
+  "hash": "68c8d28bf26c7b1b",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "According to the NHS England Statistical Release Breastfeeding Initiation & Breastfeeding Prevalence 6-8 weeks (Quarter 1 2015/16), which 5 trusts with under 500 maternities achieved the lowest breastfeeding initiation rate? Order them from lowest rate to highest.",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Health",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "MUST reference: NHS England Statistical Release Breastfeeding Initiation & Breastfeeding Prevalence 6-8 weeks (Quarter 1 2015/16)"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 3 requirements",
+  "requirements": [
+    "MUST answer: According to the NHS England Statistical Release Breastfeeding Initiation & Breastfeeding Prevalence 6-8 weeks (Quarter 1 2015/16), which 5 trusts with under 500 maternities achieved the lowest breastfeeding initiation rate",
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2015",
+    "6",
+    "8",
+    "1",
+    "South",
+    "Tyneside",
+    "Foundation"
+  ],
+  "source_reference": "NHS England Statistical Release Breastfeeding Initiation & Breastfeeding Prevalence 6-8 weeks (Quarter 1 2015/16)",
+  "created_at": "2025-12-25T10:14:00.928Z",
+  "source_data": {
+    "problem": "According to the NHS England Statistical Release Breastfeeding Initiation & Breastfeeding Prevalence 6-8 weeks (Quarter 1 2015/16), which 5 trusts with under 500 maternities achieved the lowest breastfeeding initiation rate? Order them from lowest rate to highest.",
+    "problem_category": "Health",
+    "answer": "South Tyneside NHS Foundation Trust, George Eliot Hospital NHS Trust, Gateshead Health NHS Foundation Trust, Isle Of Wight NHS Trust, Wye Valley NHS Trust",
+    "answer_type": "Set Answer"
+  }
+}

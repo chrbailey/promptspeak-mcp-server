@@ -1,0 +1,40 @@
+{
+  "symbolId": "Ξ.Q.KNOWLEDGE.003",
+  "category": "QUERY",
+  "who": "Benchmark Evaluation System",
+  "what": "Who wrote '1984', what year was it published, what is the ruling party called, and what is the protagonist's name and job?",
+  "why": "Validate symbol grounding effectiveness",
+  "where": "Knowledge benchmark test",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness"
+    ],
+    "constraints": [
+      "answer_all_parts",
+      "be_specific"
+    ]
+  },
+  "commanders_intent": "Provide a complete answer that includes ALL required elements",
+  "requirements": [
+    "MUST name George Orwell as author",
+    "MUST state 1949 as publication year",
+    "MUST name the Party or Ingsoc",
+    "MUST name Winston Smith as protagonist",
+    "MUST mention Ministry of Truth or his job rewriting history"
+  ],
+  "key_terms": [
+    "Orwell",
+    "1949",
+    "Party",
+    "Winston",
+    "Ministry"
+  ],
+  "source_data": {
+    "expected_answer": "George Orwell, 1949, the Party/Ingsoc, Winston Smith rewrites history at Ministry of Truth"
+  },
+  "version": 1,
+  "hash": "1ffe1e5a4a2642d9",
+  "created_at": "2025-12-25T09:48:40.022Z"
+}

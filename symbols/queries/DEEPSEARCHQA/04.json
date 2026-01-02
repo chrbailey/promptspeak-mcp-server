@@ -1,0 +1,45 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.04",
+  "version": 1,
+  "hash": "0061cefad243403e",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "I'd like you to analyze the top five universities in Mexico for 2021-2022, according to the Center for World University Rankings. Identify the city in which each of the top five is based, and tell me, using World Population Review's 2022 population figures, the name of the university located in the least-populated city.",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Education",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "MUST reference: Center for World University Rankings"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 3 requirements",
+  "requirements": [
+    "MUST answer: Identify the city in which each of the top five is based, and tell me, using World Population Review's 2022 population figures, the name of the university located in the least-populated city",
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2021",
+    "2022",
+    "Autonomous",
+    "University",
+    "Luis"
+  ],
+  "source_reference": "Center for World University Rankings",
+  "created_at": "2025-12-25T10:14:00.926Z",
+  "source_data": {
+    "problem": "I'd like you to analyze the top five universities in Mexico for 2021-2022, according to the Center for World University Rankings. Identify the city in which each of the top five is based, and tell me, using World Population Review's 2022 population figures, the name of the university located in the least-populated city.",
+    "problem_category": "Education",
+    "answer": "Autonomous University of San Luis Potosí",
+    "answer_type": "Single Answer"
+  }
+}

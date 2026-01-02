@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-12-25T09:48:40.022Z",
+  "symbols": {
+    "Ξ.Q.KNOWLEDGE.001": {
+      "path": "queries/DEEPSEARCHQA/001.json",
+      "category": "QUERY",
+      "version": 1,
+      "hash": "a1eedc3a3468ea7a",
+      "created_at": "2025-12-25T09:48:40.021Z"
+    },
+    "Ξ.Q.KNOWLEDGE.002": {
+      "path": "queries/DEEPSEARCHQA/002.json",
+      "category": "QUERY",
+      "version": 1,
+      "hash": "1a957be9af360cb0",
+      "created_at": "2025-12-25T09:48:40.022Z"
+    },
+    "Ξ.Q.KNOWLEDGE.003": {
+      "path": "queries/DEEPSEARCHQA/003.json",
+      "category": "QUERY",
+      "version": 1,
+      "hash": "1ffe1e5a4a2642d9",
+      "created_at": "2025-12-25T09:48:40.022Z"
+    }
+  },
+  "stats": {
+    "total_symbols": 3,
+    "by_category": {
+      "QUERY": 3
+    }
+  }
+}

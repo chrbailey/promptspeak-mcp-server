@@ -1,0 +1,243 @@
+{
+  "id": "default",
+  "name": "Default Policy",
+  "version": "1.0.0",
+  "description": "Base PromptSpeak policy with standard symbol interpretations",
+  "created": "2025-12-23",
+  "priority": 0,
+
+  "ontology": {
+    "modes": {
+      "⊕": {
+        "name": "strict",
+        "description": "Exact adherence to constraints, no interpretation",
+        "strength": 1,
+        "enforcement": "hard"
+      },
+      "⊖": {
+        "name": "flexible",
+        "description": "Reasonable interpretation allowed",
+        "strength": 3,
+        "enforcement": "soft"
+      },
+      "⊗": {
+        "name": "forbidden",
+        "description": "Exploration only, no execution allowed",
+        "strength": 4,
+        "enforcement": "block"
+      },
+      "⊘": {
+        "name": "neutral",
+        "description": "Context-dependent interpretation",
+        "strength": 2,
+        "enforcement": "advisory"
+      }
+    },
+
+    "domains": {
+      "◊": {
+        "name": "financial",
+        "description": "Financial data and operations",
+        "sensitivity": "high",
+        "audit_required": true
+      },
+      "◈": {
+        "name": "legal",
+        "description": "Legal documents and analysis",
+        "sensitivity": "high",
+        "confidential": true
+      },
+      "◇": {
+        "name": "technical",
+        "description": "Technical/engineering context",
+        "sensitivity": "medium",
+        "audit_required": false
+      },
+      "◆": {
+        "name": "medical",
+        "description": "Medical/health information",
+        "sensitivity": "critical",
+        "requires_mode": "⊘"
+      },
+      "◐": {
+        "name": "general",
+        "description": "General purpose operations",
+        "sensitivity": "low",
+        "audit_required": false
+      }
+    },
+
+    "constraints": {
+      "⛔": {
+        "name": "forbidden",
+        "description": "Absolutely prohibited action",
+        "severity": "critical",
+        "inherits": true
+      },
+      "⚠": {
+        "name": "warning",
+        "description": "Requires caution and logging",
+        "severity": "warning",
+        "inherits": false
+      },
+      "✓": {
+        "name": "required",
+        "description": "Must be present/satisfied",
+        "severity": "error",
+        "inherits": false
+      },
+      "✗": {
+        "name": "excluded",
+        "description": "Must not be present",
+        "severity": "error",
+        "inherits": false
+      }
+    },
+
+    "actions": {
+      "▶": {
+        "name": "execute",
+        "description": "Run/perform the operation",
+        "risk": "high"
+      },
+      "◀": {
+        "name": "rollback",
+        "description": "Undo/revert operation",
+        "risk": "medium"
+      },
+      "▲": {
+        "name": "escalate",
+        "description": "Escalate to higher authority",
+        "risk": "low"
+      },
+      "▼": {
+        "name": "delegate",
+        "description": "Pass to child agent",
+        "risk": "medium"
+      },
+      "●": {
+        "name": "commit",
+        "description": "Finalize/persist changes",
+        "risk": "high"
+      },
+      "○": {
+        "name": "create",
+        "description": "Generate new content/resource",
+        "risk": "medium"
+      }
+    },
+
+    "modifiers": {
+      "↑": {
+        "name": "high_priority",
+        "description": "Elevated priority"
+      },
+      "↓": {
+        "name": "low_priority",
+        "description": "Reduced priority"
+      },
+      "⟳": {
+        "name": "iterative",
+        "description": "Repeat until condition met",
+        "requires_metadata": ["termination_condition"]
+      },
+      "↔": {
+        "name": "bidirectional",
+        "description": "Two-way communication allowed"
+      }
+    },
+
+    "entities": {
+      "α": {
+        "name": "primary",
+        "description": "Root/orchestrator agent",
+        "hierarchy": 1
+      },
+      "β": {
+        "name": "secondary",
+        "description": "Worker agent",
+        "hierarchy": 2
+      },
+      "γ": {
+        "name": "tertiary",
+        "description": "Sub-worker agent",
+        "hierarchy": 3
+      },
+      "ω": {
+        "name": "terminal",
+        "description": "Leaf/finalizer agent",
+        "hierarchy": 4
+      }
+    },
+
+    "sources": {
+      "⌘": {
+        "name": "user_provided",
+        "description": "Data from user input"
+      },
+      "⌫": {
+        "name": "cached",
+        "description": "Data from cache/storage"
+      },
+      "⌨": {
+        "name": "system",
+        "description": "Data from system/internal"
+      }
+    }
+  },
+
+  "tool_bindings": {
+    "default_allowed": [
+      "read_file",
+      "list_directory",
+      "search_code",
+      "get_metadata"
+    ],
+    "default_blocked": [
+      "delete_file",
+      "format_disk",
+      "send_email_external",
+      "execute_arbitrary"
+    ],
+    "domain_specific": {
+      "◊": {
+        "allowed": ["query_financial_api", "calculate_metrics"],
+        "blocked": ["transfer_funds", "approve_transaction"]
+      },
+      "◈": {
+        "allowed": ["search_legal_database", "draft_document"],
+        "blocked": ["file_motion", "sign_contract"]
+      },
+      "◆": {
+        "allowed": ["lookup_reference", "summarize_literature"],
+        "blocked": ["diagnose", "prescribe", "treat"]
+      }
+    }
+  },
+
+  "thresholds": {
+    "parseConfidence": 0.8,
+    "coverageConfidence": 0.7,
+    "chainConfidence": 0.9,
+    "driftThreshold": 0.3,
+    "tripwireThreshold": 0.2
+  },
+
+  "validation_rules": {
+    "structural": {
+      "min_length": 2,
+      "max_length": 12,
+      "mode_required": false,
+      "action_required": true
+    },
+    "semantic": {
+      "check_conflicts": true,
+      "check_companions": true
+    },
+    "chain": {
+      "enforce_mode_strength": true,
+      "enforce_forbidden_inheritance": true,
+      "enforce_domain_preservation": true
+    }
+  }
+}

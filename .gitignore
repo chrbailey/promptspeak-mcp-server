@@ -1,0 +1,34 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+coverage/
+
+# Test artifacts
+logs/
+audit-test-*.json
+clean-clean-test-*.json
+protected-protected-test-*.json
+dynamic-experiment-*.json
+real-experiment-*.json
+telephone-experiment-*.json
+telephone-scale-*.json
+*-results.json
+!comprehensive-test-results.json
+!red-team-results.json
+!drift-detection-results.json
+
+# SQLite database (local data)
+*.db
+*.db-wal
+*.db-shm
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Test files (temporary)
+test-*.ts

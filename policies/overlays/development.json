@@ -1,0 +1,65 @@
+{
+  "id": "development",
+  "name": "Development Overlay",
+  "version": "1.0.0",
+  "description": "Relaxed constraints for development and testing environments",
+  "created": "2025-12-23",
+  "priority": 10,
+  "extends": "default",
+
+  "symbol_overrides": {
+    "⊗": {
+      "description": "Exploratory mode with execution allowed in dev",
+      "allow_execution": true,
+      "sandbox": true
+    }
+  },
+
+  "tool_bindings": {
+    "allowed": [
+      "read_file",
+      "write_file",
+      "list_directory",
+      "search_code",
+      "execute_command",
+      "run_tests",
+      "debug_attach"
+    ],
+    "blocked": [
+      "deploy_production",
+      "access_prod_database",
+      "send_to_customers"
+    ]
+  },
+
+  "thresholds": {
+    "parseConfidence": 0.6,
+    "coverageConfidence": 0.5,
+    "chainConfidence": 0.7,
+    "driftThreshold": 0.5,
+    "tripwireThreshold": 0.4
+  },
+
+  "enforcement": {
+    "audit_all_operations": false,
+    "require_explicit_mode": false,
+    "block_unknown_symbols": false,
+    "require_domain": false,
+    "max_delegation_depth": 10,
+    "max_concurrent_agents": 50
+  },
+
+  "drift_detection": {
+    "check_frequency_ms": 30000,
+    "tripwire_frequency": 1,
+    "circuit_breaker_threshold": 10,
+    "auto_halt_on_drift": false
+  },
+
+  "features": {
+    "verbose_logging": true,
+    "show_validation_details": true,
+    "allow_frame_override": true,
+    "hot_reload_policies": true
+  }
+}

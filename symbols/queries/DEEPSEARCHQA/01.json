@@ -1,0 +1,45 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.01",
+  "version": 1,
+  "hash": "34444d0baa6bf24c",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "Consider the OECD countries whose total population was composed of at least 20% of foreign-born populations as of 2023 (according to the Observatory of Migration at the university of Oxford). Amongst them, which country saw their overall criminality score increase by at least +0.2 point between 2021 and 2023 and their resilience score decrease by more than 0.3 between these same dates (according to the Organised Crime Index)?",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Politics & Government",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "MUST reference: Observatory of Migration at the university of Oxford)"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 3 requirements",
+  "requirements": [
+    "MUST answer: Amongst them, which country saw their overall criminality score increase by at least +0",
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2023",
+    "2021",
+    "20",
+    "0.2",
+    "Zealand"
+  ],
+  "source_reference": "Observatory of Migration at the university of Oxford)",
+  "created_at": "2025-12-25T10:14:00.924Z",
+  "source_data": {
+    "problem": "Consider the OECD countries whose total population was composed of at least 20% of foreign-born populations as of 2023 (according to the Observatory of Migration at the university of Oxford). Amongst them, which country saw their overall criminality score increase by at least +0.2 point between 2021 and 2023 and their resilience score decrease by more than 0.3 between these same dates (according to the Organised Crime Index)?",
+    "problem_category": "Politics & Government",
+    "answer": "New Zealand",
+    "answer_type": "Single Answer"
+  }
+}

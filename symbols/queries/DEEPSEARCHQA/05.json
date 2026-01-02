@@ -1,0 +1,45 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.05",
+  "version": 1,
+  "hash": "7496e59af4228f43",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "Of the countries that were part of the top 10 countries with the lowest GPI scores in both 2022 and 2023 (according to Vision of Humanity), which countries had a reported gun homicide rate of less than 0.20 per 100,000 population in both 2022 and 2023 (according to World Population Review)? Only provide the country names.",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Geography",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "MUST reference: Vision of Humanity)"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 2 requirements",
+  "requirements": [
+    "MUST answer: Of the countries that were part of the top 10 countries with the lowest GPI scores in both 2022 and 2023 (according to Vision of Humanity), which countries had a reported gun homicide rate of less than 0",
+    "MUST answer: Only provide the country names"
+  ],
+  "key_terms": [
+    "2022",
+    "2023",
+    "10",
+    "Austria",
+    "Switzerland",
+    "Singapore"
+  ],
+  "source_reference": "Vision of Humanity)",
+  "created_at": "2025-12-25T10:14:00.926Z",
+  "source_data": {
+    "problem": "Of the countries that were part of the top 10 countries with the lowest GPI scores in both 2022 and 2023 (according to Vision of Humanity), which countries had a reported gun homicide rate of less than 0.20 per 100,000 population in both 2022 and 2023 (according to World Population Review)? Only provide the country names.",
+    "problem_category": "Geography",
+    "answer": "Austria, Switzerland, Singapore",
+    "answer_type": "Set Answer"
+  }
+}

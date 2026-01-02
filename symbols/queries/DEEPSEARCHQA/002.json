@@ -1,0 +1,38 @@
+{
+  "symbolId": "Ξ.Q.KNOWLEDGE.002",
+  "category": "QUERY",
+  "who": "Benchmark Evaluation System",
+  "what": "What is the largest planet in our solar system, what is its largest moon, approximately how many Earth-masses is it, and what is its Great Red Spot?",
+  "why": "Validate symbol grounding effectiveness",
+  "where": "Knowledge benchmark test",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness"
+    ],
+    "constraints": [
+      "answer_all_parts",
+      "be_specific"
+    ]
+  },
+  "commanders_intent": "Provide a complete answer that includes ALL required elements",
+  "requirements": [
+    "MUST identify Jupiter as largest planet",
+    "MUST name Ganymede as largest moon",
+    "MUST mention approximately 318 Earth masses",
+    "MUST explain Great Red Spot is a storm/anticyclone"
+  ],
+  "key_terms": [
+    "Jupiter",
+    "Ganymede",
+    "318",
+    "storm"
+  ],
+  "source_data": {
+    "expected_answer": "Jupiter, Ganymede, 318 Earth masses, a giant storm"
+  },
+  "version": 1,
+  "hash": "1a957be9af360cb0",
+  "created_at": "2025-12-25T09:48:40.022Z"
+}

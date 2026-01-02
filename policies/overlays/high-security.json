@@ -1,0 +1,69 @@
+{
+  "id": "high-security",
+  "name": "High Security Overlay",
+  "version": "1.0.0",
+  "description": "Tightened thresholds and restricted tool access for sensitive deployments",
+  "created": "2025-12-23",
+  "priority": 100,
+  "extends": "default",
+
+  "symbol_overrides": {
+    "⊖": {
+      "description": "DISABLED - Flexible mode not allowed in high-security context",
+      "blocked": true,
+      "replacement": "⊕"
+    },
+    "⊗": {
+      "description": "Exploration restricted to read-only operations",
+      "enforcement": "strict_block"
+    }
+  },
+
+  "tool_bindings": {
+    "allowed": [
+      "read_file",
+      "get_metadata"
+    ],
+    "blocked": [
+      "write_file",
+      "delete_file",
+      "execute_command",
+      "send_network_request",
+      "access_external_api"
+    ],
+    "require_approval": [
+      "list_directory",
+      "search_code"
+    ]
+  },
+
+  "thresholds": {
+    "parseConfidence": 0.95,
+    "coverageConfidence": 0.90,
+    "chainConfidence": 0.98,
+    "driftThreshold": 0.15,
+    "tripwireThreshold": 0.10
+  },
+
+  "enforcement": {
+    "audit_all_operations": true,
+    "require_explicit_mode": true,
+    "block_unknown_symbols": true,
+    "require_domain": true,
+    "max_delegation_depth": 2,
+    "max_concurrent_agents": 5
+  },
+
+  "drift_detection": {
+    "check_frequency_ms": 5000,
+    "tripwire_frequency": 3,
+    "circuit_breaker_threshold": 2,
+    "auto_halt_on_drift": true
+  },
+
+  "extensions": {
+    "require_mfa": true,
+    "log_to_siem": true,
+    "encrypt_audit_log": true
+  }
+}

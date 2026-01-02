@@ -1,0 +1,40 @@
+{
+  "symbolId": "Ξ.Q.DEEPSEARCHQA.08",
+  "version": 1,
+  "hash": "75a00cce343f3d2b",
+  "category": "QUERY",
+  "who": "DeepSearchQA Benchmark System",
+  "what": "Which champion was picked most often by the losing team's top laner in the 2013 North American League Championship Series Summer Finals?",
+  "why": "Evaluate multi-agent information retrieval accuracy",
+  "where": "DeepSearchQA/Other",
+  "when": "2025-12-25",
+  "how": {
+    "focus": [
+      "accuracy",
+      "completeness",
+      "source_verification"
+    ],
+    "constraints": [
+      "MUST attempt to answer ALL parts of the question",
+      "MUST acknowledge data sources if specified",
+      "MUST provide structured response",
+      "Cite sources when possible"
+    ]
+  },
+  "commanders_intent": "Provide a complete, structured answer addressing ALL 2 requirements",
+  "requirements": [
+    "MUST provide a complete answer to the question",
+    "MUST include specific details, not generalizations"
+  ],
+  "key_terms": [
+    "2013",
+    "Karthus"
+  ],
+  "created_at": "2025-12-25T10:14:00.927Z",
+  "source_data": {
+    "problem": "Which champion was picked most often by the losing team's top laner in the 2013 North American League Championship Series Summer Finals?",
+    "problem_category": "Other",
+    "answer": "Karthus",
+    "answer_type": "Single Answer"
+  }
+}
