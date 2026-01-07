@@ -21,6 +21,17 @@ import type {
   IntentBinding,
 } from './intent-types.js';
 import { intentManager } from './intent-manager.js';
+import { LRUCache, ONE_HOUR_MS } from './lru-cache.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHE CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Maximum number of agents to store before LRU eviction */
+const MAX_AGENTS = 2000;
+
+/** TTL for inactive agents: 1 hour */
+const AGENT_TTL_MS = ONE_HOUR_MS;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AGENT REGISTRY CLASS
@@ -28,9 +39,23 @@ import { intentManager } from './intent-manager.js';
 
 /**
  * Manages the registry of available agents.
+ * Uses LRU cache to prevent unbounded memory growth from inactive agents.
  */
 export class AgentRegistry {
-  private agents: Map<string, AgentRegistration> = new Map();
+  private agents: LRUCache<AgentRegistration>;
+
+  constructor() {
+    this.agents = new LRUCache<AgentRegistration>({
+      maxSize: MAX_AGENTS,
+      ttlMs: AGENT_TTL_MS,
+      onEvict: (key, value) => {
+        const agent = value as AgentRegistration;
+        // Unbind agent from any Intent when evicted
+        intentManager.unbindAgent(agent.agent_id);
+        console.log(`[AgentRegistry] Evicting inactive agent: ${agent.agent_id}`);
+      },
+    });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // AGENT LIFECYCLE
@@ -79,7 +104,7 @@ export class AgentRegistry {
    * List all agents, optionally filtered by role or status.
    */
   listAgents(filters?: { role?: AgentRole; status?: AgentStatus }): AgentRegistration[] {
-    let agents = Array.from(this.agents.values());
+    let agents = this.agents.values();
 
     if (filters?.role) {
       agents = agents.filter(a => a.role === filters.role);
@@ -94,6 +119,7 @@ export class AgentRegistry {
 
   /**
    * Update agent status.
+   * Also extends the TTL to prevent eviction of active agents.
    */
   updateStatus(agentId: string, status: AgentStatus): boolean {
     const agent = this.agents.get(agentId);
@@ -104,17 +130,25 @@ export class AgentRegistry {
       agent.metrics.last_active = new Date().toISOString();
     }
 
+    // Extend TTL for active agents
+    this.agents.touch(agentId);
+
     return true;
   }
 
   /**
    * Record agent heartbeat.
+   * Also extends the TTL to prevent eviction of active agents.
    */
   heartbeat(agentId: string): boolean {
     const agent = this.agents.get(agentId);
     if (!agent) return false;
 
     agent.last_heartbeat = new Date().toISOString();
+
+    // Extend TTL on heartbeat
+    this.agents.touch(agentId);
+
     return true;
   }
 
@@ -136,7 +170,7 @@ export class AgentRegistry {
    * Find agents with specific capabilities.
    */
   findByCapability(capability: string): AgentRegistration[] {
-    return Array.from(this.agents.values()).filter(a =>
+    return this.agents.filter(a =>
       a.capabilities.some(c => c.toLowerCase().includes(capability.toLowerCase()))
     );
   }
@@ -145,7 +179,7 @@ export class AgentRegistry {
    * Find idle agents that can take on a new task.
    */
   findAvailable(requiredCapabilities?: string[]): AgentRegistration[] {
-    let available = Array.from(this.agents.values()).filter(
+    let available = this.agents.filter(
       a => a.status === 'idle' || a.status === 'completed'
     );
 
@@ -214,6 +248,28 @@ export class AgentRegistry {
   }
 
   /**
+   * Get cache statistics for monitoring.
+   */
+  getCacheStats(): { size: number; maxSize: number; ttlMs: number } {
+    return this.agents.stats();
+  }
+
+  /**
+   * Cleanup expired entries from cache.
+   * Returns the number of entries evicted.
+   */
+  cleanup(): number {
+    return this.agents.cleanup();
+  }
+
+  /**
+   * Touch an agent to extend its TTL (call on activity).
+   */
+  touchAgent(agentId: string): boolean {
+    return this.agents.touch(agentId);
+  }
+
+  /**
    * Get registry statistics.
    */
   getStats(): {
@@ -222,7 +278,7 @@ export class AgentRegistry {
     byStatus: Record<AgentStatus, number>;
     avgSuccessRate: number;
   } {
-    const agents = Array.from(this.agents.values());
+    const agents = this.agents.values();
 
     const byRole: Record<AgentRole, number> = {
       coordinator: 0,
@@ -295,9 +351,7 @@ export class AgentRegistry {
    * Get all agents bound to a specific Intent.
    */
   getAgentsByIntent(intentId: string): AgentRegistration[] {
-    return Array.from(this.agents.values()).filter(
-      a => a.current_binding?.intent_id === intentId
-    );
+    return this.agents.filter(a => a.current_binding?.intent_id === intentId);
   }
 }
 

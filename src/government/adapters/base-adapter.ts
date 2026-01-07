@@ -8,6 +8,7 @@
  *   - Rate limiting (sliding window algorithm)
  *   - Caching (LRU with TTL)
  *   - Retry with exponential backoff
+ *   - Circuit breaker pattern (prevents cascading failures)
  *   - Error handling and logging
  *
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -190,7 +191,52 @@ export type AdapterErrorCode =
   | 'INVALID_RESPONSE'
   | 'SERVER_ERROR'
   | 'VALIDATION_ERROR'
+  | 'CIRCUIT_OPEN'
   | 'UNKNOWN';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CIRCUIT BREAKER TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Circuit breaker state tracking.
+ */
+export interface CircuitBreakerState {
+  /** Current state of the circuit breaker */
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  /** Number of consecutive failures */
+  failureCount: number;
+  /** Number of successes in HALF_OPEN state */
+  successCount: number;
+  /** Timestamp of last failure */
+  lastFailureTime: number;
+  /** Timestamp of last state change */
+  lastStateChange: number;
+}
+
+/**
+ * Circuit breaker configuration.
+ */
+export interface CircuitBreakerConfig {
+  /** Number of consecutive failures before opening the circuit */
+  failureThreshold: number;
+  /** Number of successes in HALF_OPEN before closing the circuit */
+  successThreshold: number;
+  /** Duration to stay in OPEN state before trying HALF_OPEN (milliseconds) */
+  openDurationMs: number;
+  /** Error codes that should trigger the circuit breaker */
+  monitoredErrors: string[];
+}
+
+/**
+ * Default circuit breaker configuration.
+ */
+export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
+  failureThreshold: 5,
+  successThreshold: 2,
+  openDurationMs: 60000, // 1 minute
+  monitoredErrors: ['SERVER_ERROR', 'NETWORK_ERROR', 'TIMEOUT'],
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RATE LIMITER (SLIDING WINDOW)
@@ -467,6 +513,28 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
   };
   private totalResponseTime: number = 0;
 
+  /**
+   * Circuit breaker configuration.
+   * Can be overridden by subclasses.
+   */
+  protected readonly circuitBreakerConfig: CircuitBreakerConfig = {
+    failureThreshold: 5,
+    successThreshold: 2,
+    openDurationMs: 60000, // 1 minute
+    monitoredErrors: ['SERVER_ERROR', 'NETWORK_ERROR', 'TIMEOUT'],
+  };
+
+  /**
+   * Circuit breaker state.
+   */
+  protected circuitBreaker: CircuitBreakerState = {
+    state: 'CLOSED',
+    failureCount: 0,
+    successCount: 0,
+    lastFailureTime: 0,
+    lastStateChange: Date.now(),
+  };
+
   constructor(protected config: TConfig) {
     this.rateLimiter = new SlidingWindowRateLimiter(config.rateLimit);
     this.cache = new LRUCache(config.cache);
@@ -504,8 +572,93 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
     paramsList: Record<string, unknown>[]
   ): Promise<BatchLookupResult<TRecord>>;
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // CIRCUIT BREAKER METHODS
+  // ═══════════════════════════════════════════════════════════════════════════════
+
   /**
-   * Make an HTTP request with rate limiting, caching, and retry logic.
+   * Check the circuit breaker state before making a request.
+   * Throws AdapterError with CIRCUIT_OPEN code if circuit is open.
+   * Transitions from OPEN to HALF_OPEN if enough time has passed.
+   */
+  protected checkCircuitBreaker(): void {
+    if (this.circuitBreaker.state === 'OPEN') {
+      const now = Date.now();
+      if (now - this.circuitBreaker.lastStateChange >= this.circuitBreakerConfig.openDurationMs) {
+        // Transition to HALF_OPEN
+        this.circuitBreaker.state = 'HALF_OPEN';
+        this.circuitBreaker.successCount = 0;
+        this.circuitBreaker.lastStateChange = now;
+        console.log(`[${this.getAdapterName()}] Circuit breaker: OPEN -> HALF_OPEN`);
+      } else {
+        throw new AdapterError(
+          `Circuit breaker is OPEN - ${this.getAdapterName()} temporarily unavailable`,
+          'CIRCUIT_OPEN',
+          503,
+          false
+        );
+      }
+    }
+  }
+
+  /**
+   * Record a successful request for circuit breaker state management.
+   * In HALF_OPEN state, transitions to CLOSED after enough successes.
+   * In CLOSED state, resets the failure count.
+   */
+  protected recordSuccess(): void {
+    if (this.circuitBreaker.state === 'HALF_OPEN') {
+      this.circuitBreaker.successCount++;
+      if (this.circuitBreaker.successCount >= this.circuitBreakerConfig.successThreshold) {
+        this.circuitBreaker.state = 'CLOSED';
+        this.circuitBreaker.failureCount = 0;
+        this.circuitBreaker.lastStateChange = Date.now();
+        console.log(`[${this.getAdapterName()}] Circuit breaker: HALF_OPEN -> CLOSED`);
+      }
+    } else if (this.circuitBreaker.state === 'CLOSED') {
+      this.circuitBreaker.failureCount = 0; // Reset on success
+    }
+  }
+
+  /**
+   * Record a failed request for circuit breaker state management.
+   * Only counts failures for monitored error codes.
+   * In HALF_OPEN state, immediately transitions back to OPEN.
+   * In CLOSED state, transitions to OPEN after threshold is reached.
+   */
+  protected recordFailure(errorCode: string): void {
+    if (!this.circuitBreakerConfig.monitoredErrors.includes(errorCode)) {
+      return; // Don't count non-monitored errors
+    }
+
+    this.circuitBreaker.failureCount++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+
+    if (this.circuitBreaker.state === 'HALF_OPEN') {
+      // Any failure in HALF_OPEN goes back to OPEN
+      this.circuitBreaker.state = 'OPEN';
+      this.circuitBreaker.lastStateChange = Date.now();
+      console.log(`[${this.getAdapterName()}] Circuit breaker: HALF_OPEN -> OPEN`);
+    } else if (this.circuitBreaker.failureCount >= this.circuitBreakerConfig.failureThreshold) {
+      this.circuitBreaker.state = 'OPEN';
+      this.circuitBreaker.lastStateChange = Date.now();
+      console.log(`[${this.getAdapterName()}] Circuit breaker: CLOSED -> OPEN (${this.circuitBreaker.failureCount} failures)`);
+    }
+  }
+
+  /**
+   * Get the current circuit breaker status for monitoring.
+   */
+  public getCircuitBreakerStatus(): CircuitBreakerState {
+    return { ...this.circuitBreaker };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // REQUEST METHODS
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Make an HTTP request with rate limiting, caching, circuit breaker, and retry logic.
    */
   protected async makeRequest<T>(
     endpoint: string,
@@ -529,6 +682,9 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
       this.stats.cacheMisses++;
     }
 
+    // Check circuit breaker before making request
+    this.checkCircuitBreaker();
+
     // Wait for rate limit if necessary
     await this.waitForRateLimit();
 
@@ -546,6 +702,7 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
         this.rateLimiter.recordRequest();
         this.stats.successfulRequests++;
         this.recordResponseTime(Date.now() - startTime);
+        this.recordSuccess(); // Update circuit breaker
 
         // Cache the result
         if (cacheKey) {
@@ -574,6 +731,12 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
     }
 
     this.stats.failedRequests++;
+
+    // Update circuit breaker with failure
+    if (lastError instanceof AdapterError) {
+      this.recordFailure(lastError.code);
+    }
+
     throw lastError;
   }
 

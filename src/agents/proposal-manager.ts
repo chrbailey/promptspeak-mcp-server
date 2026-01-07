@@ -20,7 +20,16 @@ import type {
 import { DEFAULT_RESOURCE_LIMITS } from './types.js';
 import { getAgentRegistry } from './registry.js';
 import { getWebhookDispatcher } from '../notifications/webhook-dispatcher.js';
-import { recordAgentAuditEvent } from './database.js';
+import {
+  recordAgentAuditEvent,
+  createProposal as dbCreateProposal,
+  getProposal as dbGetProposal,
+  getProposalByHoldId as dbGetProposalByHoldId,
+  updateProposalState as dbUpdateProposalState,
+  listProposals as dbListProposals,
+  loadAllProposals as dbLoadAllProposals,
+  deleteExpiredProposals as dbDeleteExpiredProposals,
+} from './database.js';
 import { getTemplateForSourceType } from './templates/index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -80,8 +89,65 @@ function generateProposalId(): string {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class AgentProposalManager {
+  // In-memory cache for fast access (DB is source of truth)
   private proposals: Map<string, AgentProposal> = new Map();
   private proposalsByHold: Map<string, string> = new Map(); // holdId -> proposalId
+  private initialized: boolean = false;
+
+  /**
+   * Load proposals from the database into memory cache.
+   * Should be called on initialization.
+   */
+  loadFromDatabase(): void {
+    if (this.initialized) return;
+
+    try {
+      const proposals = dbLoadAllProposals();
+      for (const proposal of proposals) {
+        this.proposals.set(proposal.proposalId, proposal);
+        if (proposal.holdId) {
+          this.proposalsByHold.set(proposal.holdId, proposal.proposalId);
+        }
+      }
+      this.initialized = true;
+      console.log(`Loaded ${proposals.length} proposals from database`);
+    } catch (error) {
+      // Database may not be initialized yet, that's okay
+      console.warn('Could not load proposals from database:', error);
+    }
+  }
+
+  /**
+   * Sync a proposal to both the in-memory cache and database.
+   */
+  private syncToDatabase(proposal: AgentProposal): void {
+    // Update in-memory cache
+    this.proposals.set(proposal.proposalId, proposal);
+    if (proposal.holdId) {
+      this.proposalsByHold.set(proposal.holdId, proposal.proposalId);
+    }
+
+    // Persist to database
+    try {
+      // Check if proposal exists in DB
+      const existing = dbGetProposal(proposal.proposalId);
+      if (existing) {
+        // Update existing
+        dbUpdateProposalState(proposal.proposalId, proposal.state, {
+          holdId: proposal.holdId,
+          decision: proposal.decision,
+          approvedBy: proposal.decision?.decidedBy,
+          approvedAt: proposal.decision?.decidedAt,
+          rejectionReason: proposal.state === 'rejected' ? proposal.decision?.reason : undefined,
+        });
+      } else {
+        // Insert new
+        dbCreateProposal(proposal);
+      }
+    } catch (error) {
+      console.error('Failed to sync proposal to database:', error);
+    }
+  }
 
   /**
    * Generate a proposal for a new agent based on a data source.
@@ -132,8 +198,8 @@ export class AgentProposalManager {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
     };
 
-    // 7. Store proposal
-    this.proposals.set(proposal.proposalId, proposal);
+    // 7. Store proposal (both in-memory and database)
+    this.syncToDatabase(proposal);
 
     // 8. Queue for approval if required
     if (agentDefinition.requiresApproval || riskAssessment.recommendedApprovalLevel !== 'auto') {
@@ -146,6 +212,8 @@ export class AgentProposalManager {
         decidedAt: new Date().toISOString(),
         reason: 'Auto-approved: Low risk agent',
       };
+      // Update database with approved state
+      this.syncToDatabase(proposal);
     }
 
     // 9. Audit
@@ -587,6 +655,9 @@ export class AgentProposalManager {
     proposal.holdId = holdRequest.holdId;
     this.proposalsByHold.set(holdRequest.holdId, proposal.proposalId);
 
+    // Update database with hold ID
+    this.syncToDatabase(proposal);
+
     // Send webhook notifications
     const dispatcher = getWebhookDispatcher();
     await dispatcher.sendApprovalRequest(proposal);
@@ -615,45 +686,99 @@ export class AgentProposalManager {
 
   /**
    * Get a proposal by ID.
+   * First checks in-memory cache, then falls back to database.
    */
   getProposal(proposalId: string): AgentProposal | null {
-    return this.proposals.get(proposalId) || null;
+    // Check cache first
+    const cached = this.proposals.get(proposalId);
+    if (cached) return cached;
+
+    // Fall back to database
+    try {
+      const proposal = dbGetProposal(proposalId);
+      if (proposal) {
+        // Update cache
+        this.proposals.set(proposal.proposalId, proposal);
+        if (proposal.holdId) {
+          this.proposalsByHold.set(proposal.holdId, proposal.proposalId);
+        }
+        return proposal;
+      }
+    } catch (error) {
+      console.warn('Failed to get proposal from database:', error);
+    }
+
+    return null;
   }
 
   /**
    * Get proposal by hold ID.
+   * First checks in-memory cache, then falls back to database.
    */
   getProposalByHold(holdId: string): AgentProposal | null {
+    // Check cache first
     const proposalId = this.proposalsByHold.get(holdId);
-    if (!proposalId) return null;
-    return this.getProposal(proposalId);
+    if (proposalId) {
+      return this.getProposal(proposalId);
+    }
+
+    // Fall back to database
+    try {
+      const proposal = dbGetProposalByHoldId(holdId);
+      if (proposal) {
+        // Update cache
+        this.proposals.set(proposal.proposalId, proposal);
+        this.proposalsByHold.set(holdId, proposal.proposalId);
+        return proposal;
+      }
+    } catch (error) {
+      console.warn('Failed to get proposal by hold ID from database:', error);
+    }
+
+    return null;
   }
 
   /**
    * List proposals with optional filters.
+   * Uses database as source of truth for accurate listing.
    */
   listProposals(filters?: {
     state?: AgentProposal['state'];
     campaignId?: string;
     limit?: number;
   }): AgentProposal[] {
-    let proposals = Array.from(this.proposals.values());
+    // Use database as source of truth for listing
+    try {
+      const proposals = dbListProposals(filters);
+      // Update cache with fetched proposals
+      for (const proposal of proposals) {
+        this.proposals.set(proposal.proposalId, proposal);
+        if (proposal.holdId) {
+          this.proposalsByHold.set(proposal.holdId, proposal.proposalId);
+        }
+      }
+      return proposals;
+    } catch (error) {
+      console.warn('Failed to list proposals from database, using cache:', error);
+      // Fall back to cache
+      let proposals = Array.from(this.proposals.values());
 
-    if (filters?.state) {
-      proposals = proposals.filter(p => p.state === filters.state);
+      if (filters?.state) {
+        proposals = proposals.filter(p => p.state === filters.state);
+      }
+      if (filters?.campaignId) {
+        proposals = proposals.filter(p => p.campaignId === filters.campaignId);
+      }
+
+      // Sort by creation date (newest first)
+      proposals.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      if (filters?.limit) {
+        proposals = proposals.slice(0, filters.limit);
+      }
+
+      return proposals;
     }
-    if (filters?.campaignId) {
-      proposals = proposals.filter(p => p.campaignId === filters.campaignId);
-    }
-
-    // Sort by creation date (newest first)
-    proposals.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    if (filters?.limit) {
-      proposals = proposals.slice(0, filters.limit);
-    }
-
-    return proposals;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -681,6 +806,7 @@ export class AgentProposalManager {
     // Check expiration
     if (new Date(proposal.expiresAt) < new Date()) {
       proposal.state = 'expired';
+      this.syncToDatabase(proposal);
       throw new Error('Proposal has expired');
     }
 
@@ -698,6 +824,9 @@ export class AgentProposalManager {
       reason,
       modifiedConfig: modifications,
     };
+
+    // Persist to database
+    this.syncToDatabase(proposal);
 
     // Approve the hold if exists
     if (proposal.holdId && holdManager) {
@@ -754,6 +883,9 @@ export class AgentProposalManager {
       reason,
     };
 
+    // Persist to database
+    this.syncToDatabase(proposal);
+
     // Reject the hold if exists
     if (proposal.holdId && holdManager) {
       holdManager.rejectHold(proposal.holdId, rejectedBy, reason);
@@ -774,25 +906,50 @@ export class AgentProposalManager {
 
   /**
    * Expire stale proposals.
+   * Uses database to mark expired proposals and syncs to cache.
    */
   expireStaleProposals(): number {
-    const now = new Date();
-    let expired = 0;
+    // First, use database function to mark expired proposals
+    try {
+      const dbExpired = dbDeleteExpiredProposals();
 
-    for (const proposal of this.proposals.values()) {
-      if (proposal.state === 'pending' && new Date(proposal.expiresAt) < now) {
-        proposal.state = 'expired';
-        expired++;
+      // Also update in-memory cache
+      const now = new Date();
+      for (const proposal of this.proposals.values()) {
+        if (proposal.state === 'pending' && new Date(proposal.expiresAt) < now) {
+          proposal.state = 'expired';
 
-        recordAgentAuditEvent({
-          eventType: 'PROPOSAL_EXPIRED',
-          proposalId: proposal.proposalId,
-          agentId: proposal.agentDefinition.agentId,
-        });
+          recordAgentAuditEvent({
+            eventType: 'PROPOSAL_EXPIRED',
+            proposalId: proposal.proposalId,
+            agentId: proposal.agentDefinition.agentId,
+          });
+        }
       }
-    }
 
-    return expired;
+      return dbExpired;
+    } catch (error) {
+      console.warn('Failed to expire proposals in database, using cache:', error);
+
+      // Fall back to cache-only expiration
+      const now = new Date();
+      let expired = 0;
+
+      for (const proposal of this.proposals.values()) {
+        if (proposal.state === 'pending' && new Date(proposal.expiresAt) < now) {
+          proposal.state = 'expired';
+          expired++;
+
+          recordAgentAuditEvent({
+            eventType: 'PROPOSAL_EXPIRED',
+            proposalId: proposal.proposalId,
+            agentId: proposal.agentDefinition.agentId,
+          });
+        }
+      }
+
+      return expired;
+    }
   }
 }
 
@@ -804,20 +961,26 @@ let managerInstance: AgentProposalManager | null = null;
 
 /**
  * Initialize the proposal manager.
+ * Loads existing proposals from the database.
  */
 export function initializeProposalManager(): AgentProposalManager {
   if (!managerInstance) {
     managerInstance = new AgentProposalManager();
+    // Load proposals from database on initialization
+    managerInstance.loadFromDatabase();
   }
   return managerInstance;
 }
 
 /**
  * Get the proposal manager instance.
+ * If not initialized, creates a new instance and loads from database.
  */
 export function getProposalManager(): AgentProposalManager {
   if (!managerInstance) {
     managerInstance = new AgentProposalManager();
+    // Load proposals from database
+    managerInstance.loadFromDatabase();
   }
   return managerInstance;
 }

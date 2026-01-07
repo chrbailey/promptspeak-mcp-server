@@ -21,6 +21,23 @@ import type {
   BindAgentResponse,
   Constraint,
 } from './intent-types.js';
+import { LRUCache, TWENTY_FOUR_HOURS_MS, TWELVE_HOURS_MS } from './lru-cache.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHE CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Maximum number of intents to store before LRU eviction */
+const MAX_INTENTS = 1000;
+
+/** Maximum number of bindings to store before LRU eviction */
+const MAX_BINDINGS = 5000;
+
+/** TTL for intents: 24 hours */
+const INTENT_TTL_MS = TWENTY_FOUR_HOURS_MS;
+
+/** TTL for bindings: 12 hours */
+const BINDING_TTL_MS = TWELVE_HOURS_MS;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTENT MANAGER CLASS
@@ -28,11 +45,39 @@ import type {
 
 /**
  * Manages Commander's Intent lifecycle.
+ * Uses LRU caches for intents and bindings to prevent unbounded memory growth.
  */
 export class IntentManager {
-  private intents: Map<string, IntentSymbol> = new Map();
-  private bindings: Map<string, IntentBinding> = new Map();
+  private intents: LRUCache<IntentSymbol>;
+  private bindings: LRUCache<IntentBinding>;
   private bindingsByAgent: Map<string, string> = new Map(); // agent_id -> binding_id
+  private bindingLocks: Map<string, Promise<void>> = new Map(); // Concurrency locks for binding operations
+
+  constructor() {
+    // Initialize LRU caches with size limits and TTL
+    this.intents = new LRUCache<IntentSymbol>({
+      maxSize: MAX_INTENTS,
+      ttlMs: INTENT_TTL_MS,
+      onEvict: (key, value) => {
+        // Clean up any bindings associated with evicted intents
+        const intent = value as IntentSymbol;
+        console.log(`[IntentManager] Evicting intent: ${intent.symbol_id}`);
+      },
+    });
+
+    this.bindings = new LRUCache<IntentBinding>({
+      maxSize: MAX_BINDINGS,
+      ttlMs: BINDING_TTL_MS,
+      onEvict: (key, value) => {
+        const binding = value as IntentBinding;
+        // Clean up bindingsByAgent reference when binding is evicted
+        if (binding.status === 'active') {
+          this.bindingsByAgent.delete(binding.agent_id);
+        }
+        console.log(`[IntentManager] Evicting binding: ${binding.binding_id}`);
+      },
+    });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // INTENT LIFECYCLE
@@ -110,11 +155,35 @@ export class IntentManager {
    * List all Intents, optionally filtered by namespace.
    */
   listIntents(namespace?: string): IntentSymbol[] {
-    const all = Array.from(this.intents.values());
+    const all = this.intents.values();
     if (namespace) {
       return all.filter(i => i.namespace === namespace);
     }
     return all;
+  }
+
+  /**
+   * Get cache statistics for monitoring.
+   */
+  getCacheStats(): {
+    intents: { size: number; maxSize: number; ttlMs: number };
+    bindings: { size: number; maxSize: number; ttlMs: number };
+  } {
+    return {
+      intents: this.intents.stats(),
+      bindings: this.bindings.stats(),
+    };
+  }
+
+  /**
+   * Cleanup expired entries from caches.
+   * Returns the number of entries evicted.
+   */
+  cleanup(): { intents: number; bindings: number } {
+    return {
+      intents: this.intents.cleanup(),
+      bindings: this.bindings.cleanup(),
+    };
   }
 
   /**
@@ -164,16 +233,43 @@ export class IntentManager {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
+   * Acquire a lock for a given key to prevent concurrent operations.
+   * Returns a release function that must be called when done.
+   */
+  private async acquireLock(key: string): Promise<() => void> {
+    // Wait for any existing lock on this key
+    while (this.bindingLocks.has(key)) {
+      await this.bindingLocks.get(key);
+    }
+
+    // Create new lock
+    let releaseLock!: () => void;
+    const lockPromise = new Promise<void>(resolve => {
+      releaseLock = resolve;
+    });
+    this.bindingLocks.set(key, lockPromise);
+
+    // Return release function
+    return () => {
+      this.bindingLocks.delete(key);
+      releaseLock();
+    };
+  }
+
+  /**
    * Bind an agent to an Intent.
+   * Uses locking to prevent TOCTOU race conditions when checking for existing bindings.
    */
   async bindAgent(request: BindAgentRequest): Promise<BindAgentResponse> {
+    const release = await this.acquireLock(`bind:${request.agent_id}`);
+
     try {
       const intent = this.intents.get(request.intent_id);
       if (!intent) {
         return { success: false, error: `Intent not found: ${request.intent_id}` };
       }
 
-      // Check for existing binding
+      // Check for existing binding (now protected by lock)
       const existingBindingId = this.bindingsByAgent.get(request.agent_id);
       if (existingBindingId) {
         const existingBinding = this.bindings.get(existingBindingId);
@@ -212,6 +308,8 @@ export class IntentManager {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      release();
     }
   }
 
@@ -226,18 +324,25 @@ export class IntentManager {
 
   /**
    * Unbind an agent from its Intent.
+   * Uses the same lock as bindAgent to prevent race conditions between bind and unbind.
    */
-  unbindAgent(agentId: string): boolean {
-    const bindingId = this.bindingsByAgent.get(agentId);
-    if (!bindingId) return false;
+  async unbindAgent(agentId: string): Promise<boolean> {
+    const release = await this.acquireLock(`bind:${agentId}`);
 
-    const binding = this.bindings.get(bindingId);
-    if (binding) {
-      binding.status = 'revoked';
+    try {
+      const bindingId = this.bindingsByAgent.get(agentId);
+      if (!bindingId) return false;
+
+      const binding = this.bindings.get(bindingId);
+      if (binding) {
+        binding.status = 'revoked';
+      }
+
+      this.bindingsByAgent.delete(agentId);
+      return true;
+    } finally {
+      release();
     }
-
-    this.bindingsByAgent.delete(agentId);
-    return true;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -199,6 +199,9 @@ function createTables(db: Database.Database): void {
       expires_at TEXT NOT NULL,
       hold_id TEXT,
       decision TEXT,
+      approved_at TEXT,
+      approved_by TEXT,
+      rejection_reason TEXT,
 
       FOREIGN KEY (campaign_id) REFERENCES acquisition_campaigns(campaign_id),
       CONSTRAINT valid_proposal_id CHECK (proposal_id LIKE 'prop_%')
@@ -1091,4 +1094,219 @@ export function queryAgentAuditLog(filters: {
     timestamp: row.timestamp as string,
     details: JSON.parse((row.details as string) || '{}'),
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROPOSAL OPERATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Create a new proposal in the database.
+ */
+export function createProposal(proposal: AgentProposal): void {
+  const db = getAgentDatabase();
+  const stmt = db.prepare(`
+    INSERT INTO agent_proposals (
+      proposal_id, campaign_id, agent_definition, justification,
+      risk_assessment, resource_estimate, data_access_summary,
+      state, created_at, expires_at, hold_id, decision
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(
+    proposal.proposalId,
+    proposal.campaignId || null,
+    JSON.stringify(proposal.agentDefinition),
+    JSON.stringify(proposal.justification),
+    JSON.stringify(proposal.riskAssessment),
+    JSON.stringify(proposal.resourceEstimate),
+    JSON.stringify(proposal.dataAccessSummary),
+    proposal.state,
+    proposal.createdAt,
+    proposal.expiresAt,
+    proposal.holdId || null,
+    proposal.decision ? JSON.stringify(proposal.decision) : null
+  );
+}
+
+/**
+ * Get a proposal by ID.
+ */
+export function getProposal(proposalId: string): AgentProposal | null {
+  const db = getAgentDatabase();
+  const stmt = db.prepare(`SELECT * FROM agent_proposals WHERE proposal_id = ?`);
+  const row = stmt.get(proposalId) as Record<string, unknown> | undefined;
+
+  if (!row) return null;
+
+  return rowToProposal(row);
+}
+
+/**
+ * Get a proposal by hold ID.
+ */
+export function getProposalByHoldId(holdId: string): AgentProposal | null {
+  const db = getAgentDatabase();
+  const stmt = db.prepare(`SELECT * FROM agent_proposals WHERE hold_id = ?`);
+  const row = stmt.get(holdId) as Record<string, unknown> | undefined;
+
+  if (!row) return null;
+
+  return rowToProposal(row);
+}
+
+/**
+ * Update proposal state and optionally set approval/rejection details.
+ */
+export function updateProposalState(
+  proposalId: string,
+  state: AgentProposal['state'],
+  options?: {
+    approvedBy?: string;
+    approvedAt?: string;
+    rejectionReason?: string;
+    holdId?: string;
+    decision?: AgentProposal['decision'];
+  }
+): boolean {
+  const db = getAgentDatabase();
+  const setClauses: string[] = ['state = ?'];
+  const values: unknown[] = [state];
+
+  if (options?.approvedBy !== undefined) {
+    setClauses.push('approved_by = ?');
+    values.push(options.approvedBy);
+  }
+  if (options?.approvedAt !== undefined) {
+    setClauses.push('approved_at = ?');
+    values.push(options.approvedAt);
+  }
+  if (options?.rejectionReason !== undefined) {
+    setClauses.push('rejection_reason = ?');
+    values.push(options.rejectionReason);
+  }
+  if (options?.holdId !== undefined) {
+    setClauses.push('hold_id = ?');
+    values.push(options.holdId);
+  }
+  if (options?.decision !== undefined) {
+    setClauses.push('decision = ?');
+    values.push(JSON.stringify(options.decision));
+  }
+
+  values.push(proposalId);
+
+  const stmt = db.prepare(`
+    UPDATE agent_proposals
+    SET ${setClauses.join(', ')}
+    WHERE proposal_id = ?
+  `);
+
+  const result = stmt.run(...values);
+  return result.changes > 0;
+}
+
+/**
+ * List pending proposals.
+ */
+export function listPendingProposals(): AgentProposal[] {
+  const db = getAgentDatabase();
+  const stmt = db.prepare(`
+    SELECT * FROM agent_proposals
+    WHERE state = 'pending'
+    ORDER BY created_at DESC
+  `);
+  const rows = stmt.all() as Record<string, unknown>[];
+  return rows.map(rowToProposal);
+}
+
+/**
+ * List proposals with optional filters.
+ */
+export function listProposals(filters?: {
+  state?: AgentProposal['state'];
+  campaignId?: string;
+  limit?: number;
+}): AgentProposal[] {
+  const db = getAgentDatabase();
+  let query = 'SELECT * FROM agent_proposals WHERE 1=1';
+  const params: unknown[] = [];
+
+  if (filters?.state) {
+    query += ' AND state = ?';
+    params.push(filters.state);
+  }
+  if (filters?.campaignId) {
+    query += ' AND campaign_id = ?';
+    params.push(filters.campaignId);
+  }
+
+  query += ' ORDER BY created_at DESC';
+
+  if (filters?.limit) {
+    query += ' LIMIT ?';
+    params.push(filters.limit);
+  }
+
+  const stmt = db.prepare(query);
+  const rows = stmt.all(...params) as Record<string, unknown>[];
+  return rows.map(rowToProposal);
+}
+
+/**
+ * Delete expired proposals and return the count of deleted proposals.
+ */
+export function deleteExpiredProposals(): number {
+  const db = getAgentDatabase();
+
+  // First mark expired proposals
+  const markStmt = db.prepare(`
+    UPDATE agent_proposals
+    SET state = 'expired'
+    WHERE state = 'pending' AND expires_at < datetime('now')
+  `);
+  const markResult = markStmt.run();
+
+  // Optionally, delete old expired proposals (older than 30 days)
+  const deleteStmt = db.prepare(`
+    DELETE FROM agent_proposals
+    WHERE state = 'expired' AND expires_at < datetime('now', '-30 days')
+  `);
+  deleteStmt.run();
+
+  return markResult.changes;
+}
+
+/**
+ * Load all active proposals (pending, approved but not yet completed).
+ */
+export function loadAllProposals(): AgentProposal[] {
+  const db = getAgentDatabase();
+  const stmt = db.prepare(`
+    SELECT * FROM agent_proposals
+    ORDER BY created_at DESC
+  `);
+  const rows = stmt.all() as Record<string, unknown>[];
+  return rows.map(rowToProposal);
+}
+
+/**
+ * Convert a database row to an AgentProposal object.
+ */
+function rowToProposal(row: Record<string, unknown>): AgentProposal {
+  const proposal: AgentProposal = {
+    proposalId: row.proposal_id as string,
+    agentDefinition: JSON.parse(row.agent_definition as string),
+    campaignId: row.campaign_id as string | undefined,
+    justification: JSON.parse(row.justification as string),
+    riskAssessment: JSON.parse(row.risk_assessment as string),
+    resourceEstimate: JSON.parse(row.resource_estimate as string),
+    dataAccessSummary: JSON.parse(row.data_access_summary as string),
+    state: row.state as AgentProposal['state'],
+    createdAt: row.created_at as string,
+    expiresAt: row.expires_at as string,
+    holdId: row.hold_id as string | undefined,
+    decision: row.decision ? JSON.parse(row.decision as string) : undefined,
+  };
+
+  return proposal;
 }

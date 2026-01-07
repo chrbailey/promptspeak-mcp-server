@@ -13,10 +13,12 @@
  * - ps_agent_bind - Bind agent to Intent
  * - ps_mission_create - Create a mission
  * - ps_mission_status - Get mission status
+ * - ps_mission_control - Control mission lifecycle
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
+import { z } from 'zod';
 import type {
   CreateIntentRequest,
   CreateIntentResponse,
@@ -32,6 +34,195 @@ import type {
 import { intentManager } from './intent-manager.js';
 import { agentRegistry } from './agent-registry.js';
 import { missionManager } from './mission.js';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZOD VALIDATION SCHEMAS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Helper to format Zod validation errors into a readable string.
+ */
+function formatZodError(error: z.ZodError): string {
+  return error.errors
+    .map((e) => `${e.path.join('.')}: ${e.message}`)
+    .join(', ');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared Sub-Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ConstraintSchema = z.object({
+  id: z.string().min(1, 'Constraint id is required'),
+  description: z.string().min(1, 'Constraint description is required'),
+  severity: z.enum(['advisory', 'required', 'critical']),
+  condition: z.string().optional(),
+  on_violation: z.enum(['warn', 'block', 'escalate', 'terminate']),
+});
+
+const SuccessCriterionSchema = z.object({
+  id: z.string().min(1, 'Success criterion id is required'),
+  description: z.string().min(1, 'Success criterion description is required'),
+  metric: z.string().optional(),
+  threshold: z.number().optional(),
+  operator: z.enum(['gt', 'gte', 'lt', 'lte', 'eq', 'neq']).optional(),
+  weight: z.number().min(0).max(1).optional(),
+  required: z.boolean(),
+});
+
+const FailureModeSchema = z.object({
+  id: z.string().min(1, 'Failure mode id is required'),
+  description: z.string().min(1, 'Failure mode description is required'),
+  detection: z.string().min(1, 'Failure mode detection is required'),
+  mitigation: z.string().min(1, 'Failure mode mitigation is required'),
+  fallback: z.string().optional(),
+  recoverable: z.boolean(),
+});
+
+const EndStateSchema = z.object({
+  success: z.array(z.string()).min(1, 'At least one success condition is required'),
+  failure: z.array(z.string()).min(1, 'At least one failure condition is required'),
+  partial_success: z.array(z.string()).optional(),
+  timeout: z.string().optional(),
+});
+
+const ContextSchema = z.object({
+  background: z.string().optional(),
+  assumptions: z.array(z.string()).optional(),
+  domain_hints: z.array(z.string()).optional(),
+});
+
+const ScopeRestrictionsSchema = z.object({
+  applicable_constraints: z.array(z.string()).optional(),
+  additional_constraints: z.array(ConstraintSchema).optional(),
+  autonomy_override: z.enum(['strict', 'guided', 'autonomous', 'exploratory']).optional(),
+});
+
+const AgentRoleSchema = z.enum(['coordinator', 'specialist', 'support', 'terminal']);
+
+const AutonomyLevelSchema = z.enum(['strict', 'guided', 'autonomous', 'exploratory']);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intent Create Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CreateIntentSchema = z.object({
+  mission_id: z.string().min(1, 'Mission ID is required').max(100, 'Mission ID must be <= 100 characters'),
+  objective: z.string().min(10, 'Objective must be at least 10 characters').max(5000, 'Objective must be <= 5000 characters'),
+  end_state: EndStateSchema,
+  red_lines: z.array(z.string()).min(1, 'At least one red line is required'),
+  autonomy_level: AutonomyLevelSchema.optional().default('guided'),
+  constraints: z.array(ConstraintSchema).optional(),
+  success_criteria: z.array(SuccessCriterionSchema).optional(),
+  failure_modes: z.array(FailureModeSchema).optional(),
+  priority_order: z.array(z.string()).optional(),
+  acceptable_tradeoffs: z.array(z.string()).optional(),
+  context: ContextSchema.optional(),
+  created_by: z.string().min(1, 'Creator identifier is required'),
+  expires_at: z.string().optional(),
+  namespace: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intent Get Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const IntentGetSchema = z.object({
+  intent_id: z.string().min(1, 'Intent ID is required'),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intent Consult Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ConsultOptionSchema = z.object({
+  id: z.string().min(1, 'Option id is required'),
+  description: z.string().min(1, 'Option description is required'),
+  pros: z.array(z.string()).optional(),
+  cons: z.array(z.string()).optional(),
+});
+
+const IntentConsultSchema = z.object({
+  agent_id: z.string().min(1, 'Agent ID is required'),
+  intent_id: z.string().min(1, 'Intent ID is required'),
+  situation: z.string().min(1, 'Situation description is required'),
+  options: z.array(ConsultOptionSchema).min(1, 'At least one option is required'),
+  urgency: z.enum(['low', 'medium', 'high', 'critical']).optional().default('medium'),
+  context: z.record(z.unknown()).optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent Register Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AgentRegisterSchema = z.object({
+  agent_id: z.string().min(1, 'Agent ID is required').max(100, 'Agent ID must be <= 100 characters'),
+  name: z.string().min(1, 'Agent name is required').max(200, 'Agent name must be <= 200 characters'),
+  role: AgentRoleSchema,
+  capabilities: z.array(z.string()).min(1, 'At least one capability is required'),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent Bind Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AgentBindSchema = z.object({
+  intent_id: z.string().min(1, 'Intent ID is required'),
+  agent_id: z.string().min(1, 'Agent ID is required'),
+  bound_by: z.string().min(1, 'Bound by identifier is required'),
+  scope_restrictions: ScopeRestrictionsSchema.optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mission Create Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AgentAssignmentSchema = z.object({
+  agent_id: z.string().min(1, 'Agent ID is required'),
+  role: AgentRoleSchema,
+});
+
+const MissionCreateSchema = z.object({
+  name: z.string().min(1, 'Mission name is required').max(200, 'Mission name must be <= 200 characters'),
+  description: z.string().min(1, 'Mission description is required').max(5000, 'Mission description must be <= 5000 characters'),
+  intent_id: z.string().min(1, 'Intent ID is required'),
+  agent_assignments: z.array(AgentAssignmentSchema).optional(),
+  estimated_duration: z.string().optional(),
+  created_by: z.string().min(1, 'Creator identifier is required'),
+  namespace: z.string().optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mission Status Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MissionStatusSchema = z.object({
+  mission_id: z.string().min(1, 'Mission ID is required'),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mission Control Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MissionControlSchema = z.object({
+  mission_id: z.string().min(1, 'Mission ID is required'),
+  action: z.enum(['start', 'pause', 'resume', 'complete', 'abort']),
+  success: z.boolean().optional(),
+  reason: z.string().optional(),
+}).refine(
+  (data) => {
+    // If action is 'abort', reason should be provided
+    if (data.action === 'abort' && !data.reason) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Reason is required when action is "abort"',
+    path: ['reason'],
+  }
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS
@@ -372,22 +563,33 @@ export const multiAgentToolDefinitions = [
  * Handle ps_intent_create
  */
 export async function handleIntentCreate(args: Record<string, unknown>): Promise<CreateIntentResponse> {
+  // Validate input with Zod
+  const parseResult = CreateIntentSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  // Use validated data
+  const validated = parseResult.data;
   const request: CreateIntentRequest = {
-    mission_id: args.mission_id as string,
-    objective: args.objective as string,
-    end_state: args.end_state as CreateIntentRequest['end_state'],
-    constraints: args.constraints as CreateIntentRequest['constraints'],
-    red_lines: args.red_lines as string[],
-    autonomy_level: (args.autonomy_level as AutonomyLevel) || 'guided',
-    created_by: args.created_by as string,
-    success_criteria: args.success_criteria as CreateIntentRequest['success_criteria'],
-    failure_modes: args.failure_modes as CreateIntentRequest['failure_modes'],
-    priority_order: args.priority_order as string[],
-    acceptable_tradeoffs: args.acceptable_tradeoffs as string[],
-    context: args.context as CreateIntentRequest['context'],
-    expires_at: args.expires_at as string,
-    namespace: args.namespace as string,
-    tags: args.tags as string[],
+    mission_id: validated.mission_id,
+    objective: validated.objective,
+    end_state: validated.end_state,
+    constraints: validated.constraints,
+    red_lines: validated.red_lines,
+    autonomy_level: validated.autonomy_level as AutonomyLevel,
+    created_by: validated.created_by,
+    success_criteria: validated.success_criteria,
+    failure_modes: validated.failure_modes,
+    priority_order: validated.priority_order,
+    acceptable_tradeoffs: validated.acceptable_tradeoffs,
+    context: validated.context,
+    expires_at: validated.expires_at,
+    namespace: validated.namespace,
+    tags: validated.tags,
   };
 
   return intentManager.createIntent(request);
@@ -397,11 +599,20 @@ export async function handleIntentCreate(args: Record<string, unknown>): Promise
  * Handle ps_intent_get
  */
 export function handleIntentGet(args: Record<string, unknown>): Record<string, unknown> {
-  const intentId = args.intent_id as string;
-  const intent = intentManager.getIntent(intentId);
+  // Validate input with Zod
+  const parseResult = IntentGetSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { intent_id } = parseResult.data;
+  const intent = intentManager.getIntent(intent_id);
 
   if (!intent) {
-    return { success: false, error: `Intent not found: ${intentId}` };
+    return { success: false, error: `Intent not found: ${intent_id}` };
   }
 
   return { success: true, intent };
@@ -412,14 +623,24 @@ export function handleIntentGet(args: Record<string, unknown>): Record<string, u
  */
 export async function handleIntentConsult(
   args: Record<string, unknown>
-): Promise<IntentConsultationResult> {
+): Promise<IntentConsultationResult | { success: false; error: string }> {
+  // Validate input with Zod
+  const parseResult = IntentConsultSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const validated = parseResult.data;
   const request: IntentConsultationRequest = {
-    agent_id: args.agent_id as string,
-    intent_id: args.intent_id as string,
-    situation: args.situation as string,
-    options: args.options as IntentConsultationRequest['options'],
-    urgency: args.urgency as IntentConsultationRequest['urgency'],
-    context: args.context as Record<string, unknown>,
+    agent_id: validated.agent_id,
+    intent_id: validated.intent_id,
+    situation: validated.situation,
+    options: validated.options,
+    urgency: validated.urgency,
+    context: validated.context,
   };
 
   return intentManager.consultIntent(request);
@@ -429,12 +650,23 @@ export async function handleIntentConsult(
  * Handle ps_agent_register
  */
 export function handleAgentRegister(args: Record<string, unknown>): Record<string, unknown> {
+  // Validate input with Zod
+  const parseResult = AgentRegisterSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { agent_id, name, role, capabilities } = parseResult.data;
+
   try {
     const registration = agentRegistry.register(
-      args.agent_id as string,
-      args.name as string,
-      args.role as AgentRole,
-      args.capabilities as string[]
+      agent_id,
+      name,
+      role as AgentRole,
+      capabilities
     );
 
     return { success: true, agent: registration };
@@ -450,11 +682,21 @@ export function handleAgentRegister(args: Record<string, unknown>): Record<strin
  * Handle ps_agent_bind
  */
 export async function handleAgentBind(args: Record<string, unknown>): Promise<BindAgentResponse> {
+  // Validate input with Zod
+  const parseResult = AgentBindSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const validated = parseResult.data;
   const request: BindAgentRequest = {
-    intent_id: args.intent_id as string,
-    agent_id: args.agent_id as string,
-    bound_by: args.bound_by as string,
-    scope_restrictions: args.scope_restrictions as BindAgentRequest['scope_restrictions'],
+    intent_id: validated.intent_id,
+    agent_id: validated.agent_id,
+    bound_by: validated.bound_by,
+    scope_restrictions: validated.scope_restrictions as BindAgentRequest['scope_restrictions'],
   };
 
   const result = await intentManager.bindAgent(request);
@@ -476,14 +718,24 @@ export async function handleAgentBind(args: Record<string, unknown>): Promise<Bi
 export async function handleMissionCreate(
   args: Record<string, unknown>
 ): Promise<CreateMissionResponse> {
+  // Validate input with Zod
+  const parseResult = MissionCreateSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const validated = parseResult.data;
   const request: CreateMissionRequest = {
-    name: args.name as string,
-    description: args.description as string,
-    intent_id: args.intent_id as string,
-    agent_assignments: args.agent_assignments as CreateMissionRequest['agent_assignments'],
-    estimated_duration: args.estimated_duration as string,
-    created_by: args.created_by as string,
-    namespace: args.namespace as string,
+    name: validated.name,
+    description: validated.description,
+    intent_id: validated.intent_id,
+    agent_assignments: validated.agent_assignments as CreateMissionRequest['agent_assignments'],
+    estimated_duration: validated.estimated_duration,
+    created_by: validated.created_by,
+    namespace: validated.namespace,
   };
 
   return missionManager.createMission(request);
@@ -493,18 +745,27 @@ export async function handleMissionCreate(
  * Handle ps_mission_status
  */
 export function handleMissionStatus(args: Record<string, unknown>): Record<string, unknown> {
-  const missionId = args.mission_id as string;
-  const status = missionManager.getMissionStatus(missionId);
-
-  if (!status) {
-    return { success: false, error: `Mission not found: ${missionId}` };
+  // Validate input with Zod
+  const parseResult = MissionStatusSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
   }
 
-  const mission = missionManager.getMission(missionId);
+  const { mission_id } = parseResult.data;
+  const status = missionManager.getMissionStatus(mission_id);
+
+  if (!status) {
+    return { success: false, error: `Mission not found: ${mission_id}` };
+  }
+
+  const mission = missionManager.getMission(mission_id);
 
   return {
     success: true,
-    mission_id: missionId,
+    mission_id,
     ...status,
     mission,
   };
@@ -514,35 +775,44 @@ export function handleMissionStatus(args: Record<string, unknown>): Record<strin
  * Handle ps_mission_control
  */
 export function handleMissionControl(args: Record<string, unknown>): Record<string, unknown> {
-  const missionId = args.mission_id as string;
-  const action = args.action as string;
+  // Validate input with Zod
+  const parseResult = MissionControlSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { mission_id, action, success: successFlag, reason } = parseResult.data;
 
   let result = false;
 
   switch (action) {
     case 'start':
-      result = missionManager.startMission(missionId);
+      result = missionManager.startMission(mission_id);
       break;
     case 'pause':
-      result = missionManager.pauseMission(missionId);
+      result = missionManager.pauseMission(mission_id);
       break;
     case 'resume':
-      result = missionManager.resumeMission(missionId);
+      result = missionManager.resumeMission(mission_id);
       break;
     case 'complete':
-      result = missionManager.completeMission(missionId, args.success as boolean ?? true);
+      result = missionManager.completeMission(mission_id, successFlag ?? true);
       break;
     case 'abort':
-      result = missionManager.abortMission(missionId, args.reason as string);
+      result = missionManager.abortMission(mission_id, reason as string);
       break;
     default:
+      // This should never happen due to Zod validation, but kept for type safety
       return { success: false, error: `Unknown action: ${action}` };
   }
 
   return {
     success: result,
     action,
-    mission_id: missionId,
+    mission_id,
     error: result ? undefined : `Failed to ${action} mission`,
   };
 }

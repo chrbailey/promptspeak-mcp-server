@@ -24,6 +24,20 @@ import type {
 } from './intent-types.js';
 import { intentManager } from './intent-manager.js';
 import { agentRegistry } from './agent-registry.js';
+import { LRUCache, SEVEN_DAYS_MS } from './lru-cache.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHE CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Maximum number of missions to store before LRU eviction */
+const MAX_MISSIONS = 500;
+
+/** TTL for completed missions: 7 days */
+const COMPLETED_MISSION_TTL_MS = SEVEN_DAYS_MS;
+
+/** Active missions have effectively infinite TTL (they are touched regularly) */
+const ACTIVE_MISSION_TTL_MS = Infinity;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MISSION MANAGER CLASS
@@ -31,9 +45,28 @@ import { agentRegistry } from './agent-registry.js';
 
 /**
  * Manages multi-agent missions.
+ * Uses LRU cache to prevent unbounded memory growth.
+ * Active missions are kept alive via touch(), completed missions expire after 7 days.
  */
 export class MissionManager {
-  private missions: Map<string, Mission> = new Map();
+  private missions: LRUCache<Mission>;
+
+  constructor() {
+    // Use 7-day TTL - active missions are kept alive by touching on access/update
+    this.missions = new LRUCache<Mission>({
+      maxSize: MAX_MISSIONS,
+      ttlMs: COMPLETED_MISSION_TTL_MS,
+      onEvict: (key, value) => {
+        const mission = value as Mission;
+        console.log(`[MissionManager] Evicting mission: ${mission.mission_id} (status: ${mission.status})`);
+        // Ensure agents are cleaned up when mission is evicted
+        for (const assignment of mission.agents) {
+          intentManager.unbindAgent(assignment.agent_id);
+          agentRegistry.clearBinding(assignment.agent_id);
+        }
+      },
+    });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // MISSION LIFECYCLE
@@ -122,7 +155,7 @@ export class MissionManager {
     status?: MissionStatus;
     namespace?: string;
   }): Mission[] {
-    let missions = Array.from(this.missions.values());
+    let missions = this.missions.values();
 
     if (filters?.status) {
       missions = missions.filter(m => m.status === filters.status);
@@ -133,6 +166,38 @@ export class MissionManager {
     }
 
     return missions;
+  }
+
+  /**
+   * Get cache statistics for monitoring.
+   */
+  getCacheStats(): { size: number; maxSize: number; ttlMs: number } {
+    return this.missions.stats();
+  }
+
+  /**
+   * Cleanup expired entries from cache.
+   * Returns the number of entries evicted.
+   */
+  cleanup(): number {
+    return this.missions.cleanup();
+  }
+
+  /**
+   * Touch a mission to extend its TTL (for active missions).
+   */
+  private touchMission(missionId: string): void {
+    const mission = this.missions.get(missionId);
+    if (mission && this.isActiveMission(mission.status)) {
+      this.missions.touch(missionId);
+    }
+  }
+
+  /**
+   * Check if mission status indicates it's still active.
+   */
+  private isActiveMission(status: MissionStatus): boolean {
+    return status === 'planning' || status === 'briefing' || status === 'active' || status === 'paused';
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -231,6 +296,9 @@ export class MissionManager {
     mission.status = 'active';
     mission.timeline.started_at = new Date().toISOString();
 
+    // Touch to extend TTL for active mission
+    this.touchMission(missionId);
+
     // Update all assigned agents
     for (const assignment of mission.agents) {
       agentRegistry.updateStatus(assignment.agent_id, 'executing');
@@ -248,6 +316,9 @@ export class MissionManager {
 
     mission.status = 'paused';
 
+    // Touch to extend TTL for paused mission (still active)
+    this.touchMission(missionId);
+
     // Update all assigned agents
     for (const assignment of mission.agents) {
       agentRegistry.updateStatus(assignment.agent_id, 'blocked');
@@ -264,6 +335,9 @@ export class MissionManager {
     if (!mission || mission.status !== 'paused') return false;
 
     mission.status = 'active';
+
+    // Touch to extend TTL for resumed mission
+    this.touchMission(missionId);
 
     // Update all assigned agents
     for (const assignment of mission.agents) {
@@ -370,6 +444,9 @@ export class MissionManager {
       );
     }
 
+    // Touch to extend TTL for active mission receiving updates
+    this.touchMission(missionId);
+
     return true;
   }
 
@@ -413,7 +490,7 @@ export class MissionManager {
     byStatus: Record<MissionStatus, number>;
     activeAgents: number;
   } {
-    const missions = Array.from(this.missions.values());
+    const missions = this.missions.values();
 
     const byStatus: Record<MissionStatus, number> = {
       planning: 0,

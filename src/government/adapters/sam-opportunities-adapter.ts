@@ -300,7 +300,9 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
     if (params.noticeId) {
       return `opp:${params.noticeId}`;
     }
-    return `search:${JSON.stringify(params)}`;
+    // Sort keys for deterministic cache keys (prevents cache misses from key ordering)
+    const normalized = JSON.stringify(params, Object.keys(params).sort());
+    return `opp:${Buffer.from(normalized).toString('base64').slice(0, 32)}`;
   }
 
   protected parseResponse(data: unknown): SAMOpportunity {
