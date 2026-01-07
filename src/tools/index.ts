@@ -108,3 +108,17 @@ export {
   handleCalendarCalculate,
   handleCalendarFRCP,
 } from './ps_calendar.js';
+
+// Tool Registry (centralized tool definitions)
+export {
+  buildToolRegistry,
+  getToolStats,
+  VALIDATION_TOOLS,
+  EXECUTION_TOOLS,
+  DELEGATION_TOOLS,
+  STATE_TOOLS,
+  CONFIG_TOOLS,
+  CONFIDENCE_TOOLS,
+  FEATURE_TOOLS,
+  AUDIT_TOOLS
+} from './registry.js';

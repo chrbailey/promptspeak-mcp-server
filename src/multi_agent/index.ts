@@ -18,6 +18,22 @@
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DEPENDENCY INJECTION EXPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  container,
+  createMultiAgentContainer,
+  getDefaultContainer,
+} from './container.js';
+
+export type {
+  MultiAgentContainer,
+  AgentRegistryDeps,
+  MissionManagerDeps,
+} from './container.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LRU CACHE EXPORTS
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -20,8 +20,9 @@ import type {
   AgentStatus,
   IntentBinding,
 } from './intent-types.js';
-import { intentManager } from './intent-manager.js';
+import { intentManager as defaultIntentManager, type IntentManager } from './intent-manager.js';
 import { LRUCache, ONE_HOUR_MS } from './lru-cache.js';
+import type { AgentRegistryDeps } from './container.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE CONFIGURATION
@@ -43,15 +44,33 @@ const AGENT_TTL_MS = ONE_HOUR_MS;
  */
 export class AgentRegistry {
   private agents: LRUCache<AgentRegistration>;
+  private readonly intentManager: IntentManager;
 
-  constructor() {
+  /**
+   * Create an AgentRegistry instance.
+   *
+   * @param deps - Optional dependencies for testing/DI. Falls back to singletons.
+   * @param deps.intentManager - IntentManager instance to use for agent bindings
+   *
+   * @example
+   * // Production usage (uses default singleton)
+   * const registry = new AgentRegistry();
+   *
+   * @example
+   * // Testing with mock
+   * const registry = new AgentRegistry({ intentManager: mockIntentManager });
+   */
+  constructor(deps?: AgentRegistryDeps) {
+    // Use injected dependency or fall back to singleton
+    this.intentManager = deps?.intentManager ?? defaultIntentManager;
+
     this.agents = new LRUCache<AgentRegistration>({
       maxSize: MAX_AGENTS,
       ttlMs: AGENT_TTL_MS,
       onEvict: (key, value) => {
         const agent = value as AgentRegistration;
         // Unbind agent from any Intent when evicted
-        intentManager.unbindAgent(agent.agent_id);
+        this.intentManager.unbindAgent(agent.agent_id);
         console.log(`[AgentRegistry] Evicting inactive agent: ${agent.agent_id}`);
       },
     });
@@ -157,7 +176,7 @@ export class AgentRegistry {
    */
   deregister(agentId: string): boolean {
     // First, unbind from any Intent
-    intentManager.unbindAgent(agentId);
+    this.intentManager.unbindAgent(agentId);
 
     return this.agents.delete(agentId);
   }

@@ -22,9 +22,10 @@ import type {
   AgentRole,
   IntentBinding,
 } from './intent-types.js';
-import { intentManager } from './intent-manager.js';
-import { agentRegistry } from './agent-registry.js';
+import { intentManager as defaultIntentManager, type IntentManager } from './intent-manager.js';
+import { agentRegistry as defaultAgentRegistry, type AgentRegistry } from './agent-registry.js';
 import { LRUCache, SEVEN_DAYS_MS } from './lru-cache.js';
+import type { MissionManagerDeps } from './container.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE CONFIGURATION
@@ -50,8 +51,32 @@ const ACTIVE_MISSION_TTL_MS = Infinity;
  */
 export class MissionManager {
   private missions: LRUCache<Mission>;
+  private readonly intentManager: IntentManager;
+  private readonly agentRegistry: AgentRegistry;
 
-  constructor() {
+  /**
+   * Create a MissionManager instance.
+   *
+   * @param deps - Optional dependencies for testing/DI. Falls back to singletons.
+   * @param deps.intentManager - IntentManager instance for intent operations
+   * @param deps.agentRegistry - AgentRegistry instance for agent operations
+   *
+   * @example
+   * // Production usage (uses default singletons)
+   * const manager = new MissionManager();
+   *
+   * @example
+   * // Testing with mocks
+   * const manager = new MissionManager({
+   *   intentManager: mockIntentManager,
+   *   agentRegistry: mockAgentRegistry,
+   * });
+   */
+  constructor(deps?: MissionManagerDeps) {
+    // Use injected dependencies or fall back to singletons
+    this.intentManager = deps?.intentManager ?? defaultIntentManager;
+    this.agentRegistry = deps?.agentRegistry ?? defaultAgentRegistry;
+
     // Use 7-day TTL - active missions are kept alive by touching on access/update
     this.missions = new LRUCache<Mission>({
       maxSize: MAX_MISSIONS,
@@ -61,8 +86,8 @@ export class MissionManager {
         console.log(`[MissionManager] Evicting mission: ${mission.mission_id} (status: ${mission.status})`);
         // Ensure agents are cleaned up when mission is evicted
         for (const assignment of mission.agents) {
-          intentManager.unbindAgent(assignment.agent_id);
-          agentRegistry.clearBinding(assignment.agent_id);
+          this.intentManager.unbindAgent(assignment.agent_id);
+          this.agentRegistry.clearBinding(assignment.agent_id);
         }
       },
     });
@@ -78,7 +103,7 @@ export class MissionManager {
   async createMission(request: CreateMissionRequest): Promise<CreateMissionResponse> {
     try {
       // Verify Intent exists
-      const intent = intentManager.getIntent(request.intent_id);
+      const intent = this.intentManager.getIntent(request.intent_id);
       if (!intent) {
         return { success: false, error: `Intent not found: ${request.intent_id}` };
       }
@@ -220,13 +245,13 @@ export class MissionManager {
     }
 
     // Verify agent exists
-    const agent = agentRegistry.getAgent(agentId);
+    const agent = this.agentRegistry.getAgent(agentId);
     if (!agent) {
       return { success: false, error: `Agent not found: ${agentId}` };
     }
 
     // Bind agent to Intent
-    const bindResult = await intentManager.bindAgent({
+    const bindResult = await this.intentManager.bindAgent({
       intent_id: mission.intent_id,
       agent_id: agentId,
       bound_by: assignedBy,
@@ -244,9 +269,9 @@ export class MissionManager {
     });
 
     // Update agent registry
-    const binding = intentManager.getAgentBinding(agentId);
+    const binding = this.intentManager.getAgentBinding(agentId);
     if (binding) {
-      agentRegistry.setBinding(agentId, binding);
+      this.agentRegistry.setBinding(agentId, binding);
     }
 
     return { success: true, binding_id: bindResult.binding_id };
@@ -266,10 +291,10 @@ export class MissionManager {
     mission.agents.splice(index, 1);
 
     // Unbind from Intent
-    intentManager.unbindAgent(agentId);
+    this.intentManager.unbindAgent(agentId);
 
     // Update agent registry
-    agentRegistry.clearBinding(agentId);
+    this.agentRegistry.clearBinding(agentId);
 
     return true;
   }
@@ -301,7 +326,7 @@ export class MissionManager {
 
     // Update all assigned agents
     for (const assignment of mission.agents) {
-      agentRegistry.updateStatus(assignment.agent_id, 'executing');
+      this.agentRegistry.updateStatus(assignment.agent_id, 'executing');
     }
 
     return true;
@@ -321,7 +346,7 @@ export class MissionManager {
 
     // Update all assigned agents
     for (const assignment of mission.agents) {
-      agentRegistry.updateStatus(assignment.agent_id, 'blocked');
+      this.agentRegistry.updateStatus(assignment.agent_id, 'blocked');
     }
 
     return true;
@@ -341,7 +366,7 @@ export class MissionManager {
 
     // Update all assigned agents
     for (const assignment of mission.agents) {
-      agentRegistry.updateStatus(assignment.agent_id, 'executing');
+      this.agentRegistry.updateStatus(assignment.agent_id, 'executing');
     }
 
     return true;
@@ -365,9 +390,9 @@ export class MissionManager {
 
     // Update all assigned agents and record metrics
     for (const assignment of mission.agents) {
-      intentManager.unbindAgent(assignment.agent_id);
-      agentRegistry.clearBinding(assignment.agent_id);
-      agentRegistry.recordCompletion(assignment.agent_id, durationMs, success);
+      this.intentManager.unbindAgent(assignment.agent_id);
+      this.agentRegistry.clearBinding(assignment.agent_id);
+      this.agentRegistry.recordCompletion(assignment.agent_id, durationMs, success);
     }
 
     return true;
@@ -385,9 +410,9 @@ export class MissionManager {
 
     // Recall all agents
     for (const assignment of mission.agents) {
-      intentManager.unbindAgent(assignment.agent_id);
-      agentRegistry.clearBinding(assignment.agent_id);
-      agentRegistry.updateStatus(assignment.agent_id, 'recalled');
+      this.intentManager.unbindAgent(assignment.agent_id);
+      this.agentRegistry.clearBinding(assignment.agent_id);
+      this.agentRegistry.updateStatus(assignment.agent_id, 'recalled');
     }
 
     return true;
