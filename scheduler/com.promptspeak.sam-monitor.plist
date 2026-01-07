@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Label: unique identifier for this job -->
+    <key>Label</key>
+    <string>com.promptspeak.sam-monitor</string>
+
+    <!-- Program: the script to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/npx</string>
+        <string>tsx</string>
+        <string>/Users/christopherbailey/Promptspeak LLM-LLM Symbolic Language/mcp-server/run-naics-monitor.ts</string>
+    </array>
+
+    <!-- Working Directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/christopherbailey/Promptspeak LLM-LLM Symbolic Language/mcp-server</string>
+
+    <!-- Schedule: 6:00 AM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Log output -->
+    <key>StandardOutPath</key>
+    <string>/Users/christopherbailey/Promptspeak LLM-LLM Symbolic Language/mcp-server/logs/sam-monitor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/christopherbailey/Promptspeak LLM-LLM Symbolic Language/mcp-server/logs/sam-monitor-error.log</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+
+    <!-- Run at load (for testing - remove for production) -->
+    <!-- <key>RunAtLoad</key><true/> -->
+</dict>
+</plist>

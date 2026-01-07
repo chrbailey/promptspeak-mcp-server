@@ -387,6 +387,9 @@ export type HoldReason =
   | 'mcp_validation_pending'
   | 'forbidden_constraint'
   | 'confidence_below_threshold'
+  // Agent orchestration hold reasons (MADIF)
+  | 'agent_spawn_approval'            // Agent proposal requires human approval
+  | 'agent_resource_exceeded'         // Agent exceeded resource limits
   // Legal domain hold reasons (◇ domain frames)
   | 'legal_citation_unverified'       // Citation not found in legal databases
   | 'legal_deadline_risk'             // Action near/past filing deadline

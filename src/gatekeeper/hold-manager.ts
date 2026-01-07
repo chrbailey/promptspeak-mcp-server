@@ -821,6 +821,9 @@ export class HoldManager {
       mcp_validation_pending: 0,
       forbidden_constraint: 0,
       confidence_below_threshold: 0,
+      // Agent orchestration hold reasons
+      agent_spawn_approval: 0,
+      agent_resource_exceeded: 0,
       // Legal hold reasons
       legal_citation_unverified: 0,
       legal_deadline_risk: 0,

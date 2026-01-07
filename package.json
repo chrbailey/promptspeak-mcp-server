@@ -13,7 +13,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:stress": "vitest run tests/stress --reporter=verbose",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "monitor": "tsx run-naics-monitor.ts",
+    "monitor:install": "bash scheduler/install-scheduler.sh install",
+    "monitor:uninstall": "bash scheduler/install-scheduler.sh uninstall",
+    "monitor:status": "bash scheduler/install-scheduler.sh status",
+    "sam:search": "tsx search-ai-opportunities.ts",
+    "sam:rfi": "tsx demo-rfi-search.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -22,10 +28,12 @@
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^6.9.16",
     "uuid": "^13.0.0",
     "yaml": "^2.8.2",
     "zod": "^3.22.4"
@@ -38,7 +46,9 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.0",
+    "@types/nodemailer": "^6.4.17",
     "@types/uuid": "^10.0.0",
+    "docx": "^9.5.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "vitest": "^4.0.16"

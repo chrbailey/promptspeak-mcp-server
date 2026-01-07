@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PromptSpeak Symbol Details</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            color: #e8e8e8;
+            min-height: 100vh;
+            padding: 40px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 300;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        /* Symbol Card */
+        .symbol-detail {
+            background: rgba(255,255,255,0.02);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 40px;
+            overflow: hidden;
+        }
+
+        .symbol-header {
+            padding: 25px 30px;
+            background: linear-gradient(90deg, rgba(0,212,255,0.1), rgba(123,44,191,0.1));
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .symbol-id-large {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 1.4rem;
+            color: #00d4ff;
+        }
+        .symbol-meta {
+            display: flex;
+            gap: 15px;
+        }
+        .meta-badge {
+            background: rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        .meta-badge.category {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            color: white;
+            font-weight: 600;
+        }
+
+        .symbol-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .section {
+            padding: 25px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .section:nth-child(odd) {
+            border-right: 1px solid rgba(255,255,255,0.05);
+        }
+        .section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #666;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+        }
+        .section.intent .section-title::before { background: #d4a5ff; }
+        .section.who .section-title::before { background: #00d4ff; }
+        .section.what .section-title::before { background: #4ecdc4; }
+        .section.why .section-title::before { background: #ffc107; }
+        .section.where .section-title::before { background: #81c784; }
+        .section.when .section-title::before { background: #ff8a65; }
+        .section.how .section-title::before { background: #7b2cbf; }
+        .section.req .section-title::before { background: #4caf50; }
+        .section.anti .section-title::before { background: #f44336; }
+        .section.terms .section-title::before { background: #2196f3; }
+
+        .section-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .intent-box {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(212,165,255,0.1), rgba(0,212,255,0.1));
+            border: none;
+            text-align: center;
+        }
+        .intent-text {
+            font-size: 1.2rem;
+            font-style: italic;
+            color: #d4a5ff;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag {
+            background: rgba(0,212,255,0.15);
+            color: #00d4ff;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .list-item:last-child { margin-bottom: 0; }
+        .list-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .list-icon.must { background: #4caf50; color: white; }
+        .list-icon.must-not { background: #f44336; color: white; }
+        .list-icon.focus { background: #2196f3; color: white; }
+
+        .how-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .how-section h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        /* Full Width Sections */
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Hash/Version Footer */
+        .symbol-footer {
+            padding: 15px 30px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #555;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        /* Comparison Grid */
+        .comparison-header {
+            text-align: center;
+            margin: 60px 0 30px;
+            font-size: 1.3rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            color: #888;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+        }
+
+        .mini-card {
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            overflow: hidden;
+        }
+        .mini-header {
+            padding: 15px 20px;
+            background: linear-gradient(90deg, rgba(0,212,255,0.1), transparent);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .mini-id {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+        .mini-type {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+        }
+        .mini-body {
+            padding: 20px;
+        }
+        .mini-section {
+            margin-bottom: 15px;
+        }
+        .mini-section:last-child { margin-bottom: 0; }
+        .mini-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .mini-value {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+        }
+        .mini-intent {
+            font-style: italic;
+            color: #d4a5ff;
+        }
+
+        @media (max-width: 1000px) {
+            .symbol-body { grid-template-columns: 1fr; }
+            .section:nth-child(odd) { border-right: none; }
+            .comparison-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>INSIDE A PROMPTSPEAK SYMBOL</h1>
+        <p class="subtitle">Real example: What specific information is stored</p>
+
+        <!-- Full Symbol Example -->
+        <div class="symbol-detail">
+            <div class="symbol-header">
+                <div class="symbol-id-large">&#926;.NVDA.FINANCIALS.Q3FY25</div>
+                <div class="symbol-meta">
+                    <span class="meta-badge category">COMPANY</span>
+                    <span class="meta-badge">v1</span>
+                    <span class="meta-badge">financial_performance</span>
+                </div>
+            </div>
+
+            <div class="symbol-body">
+                <!-- Commander's Intent - Full Width -->
+                <div class="section intent intent-box">
+                    <div class="section-title">Commander's Intent</div>
+                    <div class="intent-text">"Deliver a comprehensive financial performance analysis highlighting NVIDIA's record-breaking Q3FY25 results and AI-driven growth."</div>
+                </div>
+
+                <!-- WHO -->
+                <div class="section who">
+                    <div class="section-title">WHO — Audience</div>
+                    <div class="section-content">
+                        Investors, financial analysts, and portfolio managers analyzing NVIDIA's quarterly performance
+                    </div>
+                </div>
+
+                <!-- WHAT -->
+                <div class="section what">
+                    <div class="section-title">WHAT — Subject</div>
+                    <div class="section-content">
+                        NVIDIA's Q3FY25 financial results including record revenue, margins, earnings, and cash position
+                    </div>
+                </div>
+
+                <!-- WHY -->
+                <div class="section why">
+                    <div class="section-title">WHY — Purpose</div>
+                    <div class="section-content">
+                        Q3FY25 represents record-breaking performance with 94% revenue growth driven by AI demand, critical for investment decisions
+                    </div>
+                </div>
+
+                <!-- WHERE -->
+                <div class="section where">
+                    <div class="section-title">WHERE — Scope</div>
+                    <div class="section-content">
+                        NVIDIA Corporation (NVDA) - consolidated financial results
+                    </div>
+                </div>
+
+                <!-- WHEN -->
+                <div class="section when">
+                    <div class="section-title">WHEN — Time Context</div>
+                    <div class="section-content">
+                        Q3FY25 (three months ended October 27, 2024)
+                    </div>
+                </div>
+
+                <!-- HOW -->
+                <div class="section how">
+                    <div class="section-title">HOW — Approach</div>
+                    <div class="section-content">
+                        <div class="how-grid">
+                            <div class="how-section">
+                                <h4>Focus Areas</h4>
+                                <div class="list-item"><span class="list-icon focus">&#10003;</span> Record revenue growth</div>
+                                <div class="list-item"><span class="list-icon focus">&#10003;</span> Data center dominance</div>
+                                <div class="list-item"><span class="list-icon focus">&#10003;</span> Profitability metrics</div>
+                                <div class="list-item"><span class="list-icon focus">&#10003;</span> Cash generation</div>
+                            </div>
+                            <div class="how-section">
+                                <h4>Constraints</h4>
+                                <div class="list-item"><span class="list-icon" style="background:#ff8a65;">!</span> Use actual reported figures</div>
+                                <div class="list-item"><span class="list-icon" style="background:#ff8a65;">!</span> Include GAAP and non-GAAP</div>
+                                <div class="list-item"><span class="list-icon" style="background:#ff8a65;">!</span> Show YoY and sequential</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Requirements -->
+                <div class="section req">
+                    <div class="section-title">Requirements — MUST Include</div>
+                    <div class="section-content">
+                        <div class="list-item"><span class="list-icon must">&#10003;</span> $35.1B total revenue</div>
+                        <div class="list-item"><span class="list-icon must">&#10003;</span> 94% YoY growth</div>
+                        <div class="list-item"><span class="list-icon must">&#10003;</span> Data Center revenue of $30.8B</div>
+                        <div class="list-item"><span class="list-icon must">&#10003;</span> Reference record performance</div>
+                        <div class="list-item"><span class="list-icon must">&#10003;</span> Cash position of $38.5B</div>
+                    </div>
+                </div>
+
+                <!-- Anti-Requirements -->
+                <div class="section anti">
+                    <div class="section-title">Anti-Requirements — MUST NOT</div>
+                    <div class="section-content">
+                        <div class="list-item"><span class="list-icon must-not">&#10007;</span> Round figures significantly</div>
+                        <div class="list-item"><span class="list-icon must-not">&#10007;</span> Omit growth percentages</div>
+                        <div class="list-item"><span class="list-icon must-not">&#10007;</span> Exclude Data Center performance</div>
+                    </div>
+                </div>
+
+                <!-- Key Terms -->
+                <div class="section terms full-width">
+                    <div class="section-title">Key Terms — Validation Markers</div>
+                    <div class="tag-list">
+                        <span class="tag">$35.1 billion</span>
+                        <span class="tag">94% growth</span>
+                        <span class="tag">record revenue</span>
+                        <span class="tag">$30.8 billion Data Center</span>
+                        <span class="tag">Hopper platform</span>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div class="section full-width" style="border-bottom: none;">
+                    <div class="section-title">Tags — Discovery & Filtering</div>
+                    <div class="tag-list">
+                        <span class="tag">NVDA</span>
+                        <span class="tag">Q3FY25</span>
+                        <span class="tag">financials</span>
+                        <span class="tag">revenue</span>
+                        <span class="tag">record</span>
+                        <span class="tag">AI_growth</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="symbol-footer">
+                <span>hash: ae6ac49f820422ac</span>
+                <span>created: 2025-12-28T13:07:31.034Z</span>
+                <span>created_by: document-agent</span>
+            </div>
+        </div>
+
+        <!-- Comparison: Different Symbol Types -->
+        <h2 class="comparison-header">SYMBOL TYPES COMPARISON</h2>
+
+        <div class="comparison-grid">
+            <!-- Company Symbol -->
+            <div class="mini-card">
+                <div class="mini-header" style="background: linear-gradient(90deg, rgba(0,212,255,0.15), transparent);">
+                    <div class="mini-id">&#926;.NVDA.FINANCIALS.Q3FY25</div>
+                    <div class="mini-type">Company Symbol</div>
+                </div>
+                <div class="mini-body">
+                    <div class="mini-section">
+                        <div class="mini-label">Intent</div>
+                        <div class="mini-value mini-intent">"Deliver comprehensive financial analysis of record Q3FY25 results"</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Who</div>
+                        <div class="mini-value">Investors, analysts, portfolio managers</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">What</div>
+                        <div class="mini-value">Q3FY25 revenue, margins, earnings, cash</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Key Requirements</div>
+                        <div class="mini-value">$35.1B revenue, 94% YoY, $30.8B DC</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Symbol -->
+            <div class="mini-card">
+                <div class="mini-header" style="background: linear-gradient(90deg, rgba(123,44,191,0.15), transparent);">
+                    <div class="mini-id">&#926;.K.MHG.PATTERN.BACKDATING</div>
+                    <div class="mini-type">Knowledge Pattern</div>
+                </div>
+                <div class="mini-body">
+                    <div class="mini-section">
+                        <div class="mini-label">Intent</div>
+                        <div class="mini-value mini-intent">"Document back-dating pattern where transactions post to closed periods"</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Who</div>
+                        <div class="mini-value">External auditors, SOX teams, controllers</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">What</div>
+                        <div class="mini-value">Control override: transactions posted to prior periods</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Key Focus</div>
+                        <div class="mini-value">trandate vs datecreated delta, >3 day flags</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Symbol -->
+            <div class="mini-card">
+                <div class="mini-header" style="background: linear-gradient(90deg, rgba(129,199,132,0.15), transparent);">
+                    <div class="mini-id">&#926;.T.PRODUCT.NSCRA</div>
+                    <div class="mini-type">Task Symbol</div>
+                </div>
+                <div class="mini-body">
+                    <div class="mini-section">
+                        <div class="mini-label">Intent</div>
+                        <div class="mini-value mini-intent">"Complete consulting product spec for NetSuite Configuration Assessment"</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Who</div>
+                        <div class="mini-value">ERP consultants, M&A due diligence teams</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">What</div>
+                        <div class="mini-value">Data-driven service revealing config waste</div>
+                    </div>
+                    <div class="mini-section">
+                        <div class="mini-label">Key Deliverables</div>
+                        <div class="mini-value">Pricing, methodology, templates, ROI framework</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Structure Summary -->
+        <h2 class="comparison-header" style="margin-top: 60px;">WHAT'S STORED IN EVERY SYMBOL</h2>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px;">
+            <div style="background: rgba(0,212,255,0.1); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">&#127919;</div>
+                <div style="font-weight: 600; margin-bottom: 5px;">Identity</div>
+                <div style="font-size: 0.8rem; color: #888;">symbolId, version, hash, category, tags</div>
+            </div>
+            <div style="background: rgba(123,44,191,0.1); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">&#127775;</div>
+                <div style="font-weight: 600; margin-bottom: 5px;">Intent</div>
+                <div style="font-size: 0.8rem; color: #888;">commander's_intent — the north star</div>
+            </div>
+            <div style="background: rgba(76,175,80,0.1); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">&#128270;</div>
+                <div style="font-weight: 600; margin-bottom: 5px;">5W+H Context</div>
+                <div style="font-size: 0.8rem; color: #888;">who, what, why, where, when, how</div>
+            </div>
+            <div style="background: rgba(255,87,34,0.1); border-radius: 12px; padding: 20px; text-align: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">&#9989;</div>
+                <div style="font-weight: 600; margin-bottom: 5px;">Validation</div>
+                <div style="font-size: 0.8rem; color: #888;">requirements, anti_requirements, key_terms</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

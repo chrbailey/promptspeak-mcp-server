@@ -32,3 +32,24 @@ telephone-scale-*.json
 
 # Test files (temporary)
 test-*.ts
+
+# Business/Strategy documents (keep private)
+ACQUIHIRE-*.md
+ACQUIHIRE-*.pdf
+SUBMISSION-PACKAGE.md
+PRODUCT_MARKET_FIT_ANALYSIS.md
+X-TWITTER-THREAD.md
+LINKEDIN-ARTICLE.txt
+acquihire-*.md
+acquihire-*.ts
+
+# Runtime data directories
+data/
+output/
+
+# Temporary analysis scripts
+rank-opportunities.py
+debug-*.ts
+investigate-*.ts
+quick-*.ts
+save-*.ts

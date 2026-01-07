@@ -84,6 +84,19 @@ import {
   handleTranslationTool
 } from './translation/index.js';
 
+// Import agent orchestration (MADIF)
+import {
+  orchestrationToolDefinitions,
+  handleOrchestrationTool
+} from './agents/tools.js';
+import { initializeAgentSystem } from './agents/integration.js';
+
+// Import multi-agent / Commander's Intent
+import {
+  multiAgentToolDefinitions,
+  handleMultiAgentTool
+} from './multi_agent/index.js';
+
 // ============================================================================
 // TOOL DEFINITIONS
 // ============================================================================
@@ -447,7 +460,13 @@ const TOOLS: Tool[] = [
   ...documentToolDefinitions,
 
   // Translation Layer Tools
-  ...translationToolDefinitions
+  ...translationToolDefinitions,
+
+  // Agent Orchestration Tools (MADIF)
+  ...orchestrationToolDefinitions,
+
+  // Multi-Agent / Commander's Intent Tools
+  ...multiAgentToolDefinitions
 ];
 
 // ============================================================================
@@ -483,6 +502,16 @@ async function main() {
     console.error(`Symbol registry initialized: ${stats.total_symbols} symbols loaded`);
   } catch (error) {
     console.error('Warning: Could not initialize symbol registry:', error);
+  }
+
+  // Initialize MADIF agent system
+  try {
+    const agentSystem = await initializeAgentSystem({
+      dbPath: path.join(__dirname, '..', 'data', 'agents.db'),
+    });
+    console.error('MADIF agent system initialized');
+  } catch (error) {
+    console.error('Warning: Could not initialize MADIF agent system:', error);
   }
 
   // Create MCP server
@@ -669,6 +698,35 @@ async function main() {
         case 'ps_opacity_resolve':
         case 'ps_opacity_stats':
           result = await handleTranslationTool(name, args as Record<string, unknown>);
+          break;
+
+        // Agent Orchestration (MADIF)
+        case 'ps_orch_query':
+        case 'ps_orch_propose_agent':
+        case 'ps_orch_status':
+        case 'ps_orch_abort':
+        case 'ps_agent_list_proposals':
+        case 'ps_agent_approve':
+        case 'ps_agent_reject':
+        case 'ps_agent_list':
+        case 'ps_agent_get':
+        case 'ps_agent_enable':
+        case 'ps_agent_disable':
+        case 'ps_agent_terminate':
+        case 'ps_agent_metrics':
+          result = await handleOrchestrationTool(name, args as Record<string, unknown>);
+          break;
+
+        // Multi-Agent / Commander's Intent
+        case 'ps_intent_create':
+        case 'ps_intent_get':
+        case 'ps_intent_consult':
+        case 'ps_agent_register':
+        case 'ps_agent_bind':
+        case 'ps_mission_create':
+        case 'ps_mission_status':
+        case 'ps_mission_control':
+          result = await handleMultiAgentTool(name, args as Record<string, unknown>);
           break;
 
         default:

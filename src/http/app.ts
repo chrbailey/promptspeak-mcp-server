@@ -16,6 +16,7 @@ import { authMiddleware, AuthenticatedRequest } from './middleware/auth.js';
 import symbolRoutes from './routes/symbols.js';
 import healthRoutes from './routes/health.js';
 import openapiRoutes from './routes/openapi.js';
+import agentRoutes from './routes/agents.js';
 
 export function createApp(): Application {
   const app = express();
@@ -116,6 +117,10 @@ export function createApp(): Application {
 
   // API routes (auth required)
   app.use('/api/v1/symbols', authMiddleware, symbolRoutes);
+
+  // Agent approval routes (webhook callbacks - no auth for one-click links)
+  // These are the URLs sent in Slack/Discord/Email notifications
+  app.use('/api/v1/agents', agentRoutes);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ERROR HANDLING

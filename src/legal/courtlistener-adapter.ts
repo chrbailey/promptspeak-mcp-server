@@ -43,13 +43,72 @@ export interface CourtListenerConfig {
 }
 
 const DEFAULT_CONFIG: CourtListenerConfig = {
-  baseUrl: 'https://www.courtlistener.com/api/rest/v3',
+  baseUrl: 'https://www.courtlistener.com/api/rest/v4',
   timeoutMs: 30000,
   enableCache: true,
   cacheTtlMs: 24 * 60 * 60 * 1000, // 24 hours
   maxCacheSize: 10000,
   maxRequestsPerMinute: 55, // Stay under 60 limit
 };
+
+// =============================================================================
+// NOMINATIVE REPORTER MAPPING (Pre-1875 Supreme Court)
+// =============================================================================
+// Before 1875, Supreme Court cases were cited by reporter name, not U.S. volume.
+// This mapping allows verification of historical citations like "5 U.S. 137"
+// by converting to their nominative form "1 Cranch 137".
+//
+// See: https://en.wikipedia.org/wiki/United_States_Reports
+
+interface NominativeReporter {
+  name: string;
+  abbreviation: string;
+  usVolumeStart: number;
+  usVolumeEnd: number;
+}
+
+const NOMINATIVE_REPORTERS: NominativeReporter[] = [
+  { name: 'Dallas', abbreviation: 'Dall.', usVolumeStart: 1, usVolumeEnd: 4 },
+  { name: 'Cranch', abbreviation: 'Cranch', usVolumeStart: 5, usVolumeEnd: 13 },
+  { name: 'Wheaton', abbreviation: 'Wheat.', usVolumeStart: 14, usVolumeEnd: 25 },
+  { name: 'Peters', abbreviation: 'Pet.', usVolumeStart: 26, usVolumeEnd: 41 },
+  { name: 'Howard', abbreviation: 'How.', usVolumeStart: 42, usVolumeEnd: 65 },
+  { name: 'Black', abbreviation: 'Black', usVolumeStart: 66, usVolumeEnd: 67 },
+  { name: 'Wallace', abbreviation: 'Wall.', usVolumeStart: 68, usVolumeEnd: 90 },
+];
+
+/**
+ * Convert a U.S. Reports citation to its nominative reporter equivalent.
+ * Example: "5 U.S. 137" → "1 Cranch 137"
+ *
+ * @returns The nominative citation string, or null if not a pre-1875 case
+ */
+function convertToNominativeCitation(
+  volume: number,
+  reporter: string,
+  page: number
+): string | null {
+  // Only apply to U.S. Reports citations
+  const normalizedReporter = reporter.toUpperCase().replace(/\./g, '').replace(/\s/g, '');
+  if (normalizedReporter !== 'US') {
+    return null;
+  }
+
+  // Find the nominative reporter for this volume
+  const nominative = NOMINATIVE_REPORTERS.find(
+    r => volume >= r.usVolumeStart && volume <= r.usVolumeEnd
+  );
+
+  if (!nominative) {
+    return null; // Volume 91+ uses standard U.S. Reports
+  }
+
+  // Calculate the nominative volume number
+  // e.g., 5 U.S. → Cranch starts at 5, so 5 - 5 + 1 = 1 Cranch
+  const nominativeVolume = volume - nominative.usVolumeStart + 1;
+
+  return `${nominativeVolume} ${nominative.name} ${page}`;
+}
 
 // =============================================================================
 // COURTLISTENER API RESPONSE TYPES
@@ -438,8 +497,87 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
   /**
    * Lookup a citation by text (uses CourtListener's search API).
    * Updated to use /search/ endpoint which is more reliable than /citation-lookup/.
+   *
+   * IMPORTANT: This method verifies that returned results actually contain the
+   * exact citation we're looking for, not just any document matching search terms.
+   *
+   * For pre-1875 Supreme Court cases, it will automatically try the nominative
+   * reporter format (e.g., "1 Cranch 137" instead of "5 U.S. 137").
    */
   async lookupByText(citationText: string): Promise<KnownCaseRecord | null> {
+    // Parse the citation we're looking for
+    const citationMatch = citationText.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
+    if (!citationMatch) {
+      console.warn(`[CourtListener] Could not parse citation: ${citationText}`);
+      return null;
+    }
+
+    const searchVolume = parseInt(citationMatch[1]);
+    const searchReporter = this.normalizeReporter(citationMatch[2]);
+    const searchPage = parseInt(citationMatch[3]);
+
+    // First, try the original citation
+    const result = await this.performCitationSearch(
+      citationText,
+      searchVolume,
+      searchReporter,
+      searchPage
+    );
+
+    if (result) {
+      return result;
+    }
+
+    // If not found and it's a pre-1875 U.S. Reports citation, try nominative format
+    const nominativeCitation = convertToNominativeCitation(
+      searchVolume,
+      citationMatch[2], // Use original reporter text for conversion check
+      searchPage
+    );
+
+    if (nominativeCitation) {
+      console.log(`[CourtListener] Trying nominative citation: ${nominativeCitation}`);
+
+      // Parse the nominative citation
+      const nomMatch = nominativeCitation.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
+      if (nomMatch) {
+        const nomVolume = parseInt(nomMatch[1]);
+        const nomReporter = this.normalizeReporter(nomMatch[2]);
+        const nomPage = parseInt(nomMatch[3]);
+
+        const nomResult = await this.performCitationSearch(
+          nominativeCitation,
+          nomVolume,
+          nomReporter,
+          nomPage
+        );
+
+        if (nomResult) {
+          // Return with original U.S. Reports citation info
+          return {
+            ...nomResult,
+            volume: searchVolume,
+            reporter: searchReporter,
+            page: searchPage,
+          };
+        }
+      }
+    }
+
+    this.stats.casesNotFound++;
+    return null;
+  }
+
+  /**
+   * Perform a single citation search against CourtListener API.
+   * This is the core search logic used by lookupByText.
+   */
+  private async performCitationSearch(
+    citationText: string,
+    targetVolume: number,
+    targetReporter: string,
+    targetPage: number
+  ): Promise<KnownCaseRecord | null> {
     // Check rate limit
     if (!this.rateLimiter.canRequest()) {
       const waitTime = this.rateLimiter.getWaitTime();
@@ -451,11 +589,12 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
       this.stats.apiCalls++;
       this.rateLimiter.recordRequest();
 
-      // Use search endpoint which is more reliable than citation-lookup
+      // Use citation= parameter for exact citation matching instead of q= for full-text
+      // This returns only cases that have the citation in their citation list
       const searchParams = new URLSearchParams({
-        q: citationText,
+        citation: citationText,
         type: 'o', // opinions
-        page_size: '5',
+        page_size: '20', // Get more results to find exact match
       });
 
       const url = `${this.config.baseUrl}/search/?${searchParams.toString()}`;
@@ -485,44 +624,57 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
         return null;
       }
 
-      const data = await response.json() as { count?: number; results?: Array<Record<string, unknown>> };
+      const data = await response.json() as {
+        count?: number;
+        results?: Array<{
+          citation?: string[];
+          caseName?: string;
+          case_name?: string;
+          dateFiled?: string;
+          date_filed?: string;
+          court?: string;
+          court_id?: string;
+        }>
+      };
 
-      // Search endpoint returns { count, results: [...] }
+      // Search through results to find one with an EXACT citation match
       if (data.results && data.results.length > 0) {
-        const result = data.results[0] as Record<string, unknown>;
-        this.stats.casesFound++;
+        for (const result of data.results) {
+          const citations = result.citation || [];
 
-        // Extract citation components from the text if possible
-        const citationMatch = citationText.match(/(\d+)\s+([A-Za-z.]+(?:\s+\d+[a-z]*)?)\s+(\d+)/);
-        const volume = citationMatch ? parseInt(citationMatch[1]) : 0;
-        const reporter = citationMatch ? citationMatch[2] : 'Unknown';
-        const page = citationMatch ? parseInt(citationMatch[3]) : 0;
+          // Check each citation in the result
+          for (const citeStr of citations) {
+            if (this.citationMatches(citeStr, targetVolume, targetReporter, targetPage)) {
+              this.stats.casesFound++;
 
-        // Extract year from result - handle unknown types
-        const dateStr = String(result.dateFiled || result.date_filed || '');
-        const yearMatch = dateStr.match(/(\d{4})/);
-        const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+              // Extract year from result
+              const dateStr = String(result.dateFiled || result.date_filed || '');
+              const yearMatch = dateStr.match(/(\d{4})/);
+              const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
 
-        // Extract case name and court - handle unknown types
-        const caseName = String(result.caseName || result.case_name || 'Unknown Case');
-        const courtValue = String(result.court || result.court_id || 'unknown');
+              // Extract case name and court
+              const caseName = String(result.caseName || result.case_name || 'Unknown Case');
+              const courtValue = String(result.court || result.court_id || 'unknown');
 
-        return {
-          caseName,
-          normalizedName: caseName.toLowerCase().replace(/[^a-z]/g, ''),
-          volume,
-          reporter,
-          page,
-          year,
-          court: courtValue,
-          jurisdiction: this.inferJurisdiction(courtValue),
-          overruled: false,
-          source: 'verified_addition' as const,
-          addedAt: Date.now(),
-        };
+              return {
+                caseName,
+                normalizedName: caseName.toLowerCase().replace(/[^a-z]/g, ''),
+                volume: targetVolume,
+                reporter: targetReporter,
+                page: targetPage,
+                year,
+                court: courtValue,
+                jurisdiction: this.inferJurisdiction(courtValue),
+                overruled: false,
+                source: 'verified_addition' as const,
+                addedAt: Date.now(),
+              };
+            }
+          }
+        }
       }
 
-      this.stats.casesNotFound++;
+      // No exact match found in this search
       return null;
 
     } catch (error) {
@@ -534,6 +686,46 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
       }
       return null;
     }
+  }
+
+  /**
+   * Normalize a reporter name for comparison.
+   * Handles variations like "U.S." vs "US", "F.3d" vs "F. 3d", etc.
+   */
+  private normalizeReporter(reporter: string): string {
+    return reporter
+      .replace(/\s+/g, ' ')      // Normalize whitespace
+      .replace(/\.\s*/g, '.')    // Remove spaces after periods
+      .trim()
+      .toUpperCase();
+  }
+
+  /**
+   * Check if a citation string matches volume/reporter/page.
+   * Handles various citation formats like "347 U.S. 483", "500 F.3d 123", etc.
+   */
+  private citationMatches(
+    citationStr: string,
+    targetVolume: number,
+    targetReporter: string,
+    targetPage: number
+  ): boolean {
+    // Parse the citation string
+    const match = citationStr.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
+    if (!match) return false;
+
+    const volume = parseInt(match[1]);
+    const reporter = this.normalizeReporter(match[2]);
+    const page = parseInt(match[3]);
+
+    // Check for exact match
+    if (volume !== targetVolume || page !== targetPage) return false;
+
+    // Compare reporters (allowing some flexibility)
+    const normalizedTarget = targetReporter.replace(/\./g, '').replace(/\s/g, '');
+    const normalizedFound = reporter.replace(/\./g, '').replace(/\s/g, '');
+
+    return normalizedTarget === normalizedFound;
   }
 
   /**
@@ -596,6 +788,12 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
   /**
    * Perform API lookup to CourtListener using the search endpoint.
    * The search endpoint is more reliable than citation-lookup for verification.
+   *
+   * IMPORTANT: Verifies that returned results contain the EXACT citation,
+   * not just documents that happen to match search terms.
+   *
+   * For pre-1875 Supreme Court cases, automatically tries nominative reporter
+   * format (e.g., "1 Cranch 137" instead of "5 U.S. 137").
    */
   private async performApiLookup(
     caseName: string | null,
@@ -603,125 +801,61 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     reporter: string,
     page: number
   ): Promise<KnownCaseRecord | null> {
-    // Check rate limit
-    if (!this.rateLimiter.canRequest()) {
-      const waitTime = this.rateLimiter.getWaitTime();
-      console.warn(`[CourtListener] Rate limited. Waiting ${waitTime}ms...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+    const citationStr = `${volume} ${reporter} ${page}`;
+    const normalizedReporter = this.normalizeReporter(reporter);
+
+    // First, try the original citation
+    const result = await this.performCitationSearch(
+      citationStr,
+      volume,
+      normalizedReporter,
+      page
+    );
+
+    if (result) {
+      // Cache and return
+      this.cache.set(volume, reporter, page, result);
+      return result;
     }
 
-    try {
-      this.stats.apiCalls++;
-      this.rateLimiter.recordRequest();
+    // If not found and it's a pre-1875 U.S. Reports citation, try nominative format
+    const nominativeCitation = convertToNominativeCitation(volume, reporter, page);
 
-      // Construct citation string for search
-      const citationStr = `${volume} ${reporter} ${page}`;
+    if (nominativeCitation) {
+      console.log(`[CourtListener] Trying nominative citation: ${nominativeCitation}`);
 
-      // Use search endpoint which is more reliable
-      const searchParams = new URLSearchParams({
-        q: citationStr,
-        type: 'o', // opinions
-        page_size: '5',
-      });
+      // Parse the nominative citation
+      const nomMatch = nominativeCitation.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
+      if (nomMatch) {
+        const nomVolume = parseInt(nomMatch[1]);
+        const nomReporter = this.normalizeReporter(nomMatch[2]);
+        const nomPage = parseInt(nomMatch[3]);
 
-      const url = `${this.config.baseUrl}/search/?${searchParams.toString()}`;
+        const nomResult = await this.performCitationSearch(
+          nominativeCitation,
+          nomVolume,
+          nomReporter,
+          nomPage
+        );
 
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-      };
-
-      if (this.config.apiToken) {
-        headers['Authorization'] = `Token ${this.config.apiToken}`;
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        this.stats.apiErrors++;
-        console.error(`[CourtListener] API error: ${response.status} ${response.statusText}`);
-
-        // Cache the negative result to avoid repeated failed calls
-        this.cache.set(volume, reporter, page, null);
-        return null;
-      }
-
-      const data = await response.json() as { count: number; results: Array<{
-        caseName?: string;
-        case_name?: string;
-        citation?: string;
-        dateFiled?: string;
-        date_filed?: string;
-        court?: string;
-        court_id?: string;
-        id?: number;
-        absolute_url?: string;
-      }> };
-
-      // Check if we got results
-      if (data.count > 0 && data.results && data.results.length > 0) {
-        // Look for a result that matches our citation pattern
-        const result = data.results[0];
-
-        this.stats.casesFound++;
-
-        // Parse date to year
-        let year = 0;
-        const dateStr = result.dateFiled || result.date_filed;
-        if (dateStr) {
-          const parsed = new Date(dateStr);
-          if (!isNaN(parsed.getTime())) {
-            year = parsed.getFullYear();
-          }
+        if (nomResult) {
+          // Return with original U.S. Reports citation info
+          const record: KnownCaseRecord = {
+            ...nomResult,
+            volume,
+            reporter,
+            page,
+          };
+          this.cache.set(volume, reporter, page, record);
+          return record;
         }
-
-        const caseName = result.caseName || result.case_name || 'Unknown Case';
-        const record: KnownCaseRecord = {
-          caseName,
-          normalizedName: caseName.toLowerCase().replace(/[^a-z]/g, ''),
-          volume,
-          reporter,
-          page,
-          year,
-          court: result.court || result.court_id || 'unknown',
-          jurisdiction: this.inferJurisdiction(result.court || result.court_id),
-          overruled: false,
-          source: 'verified_addition',
-          addedAt: Date.now(),
-        };
-
-        // Cache the result
-        this.cache.set(volume, reporter, page, record);
-
-        return record;
       }
-
-      // Citation not found - cache negative result
-      this.stats.casesNotFound++;
-      this.cache.set(volume, reporter, page, null);
-
-      return null;
-
-    } catch (error) {
-      this.stats.apiErrors++;
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('[CourtListener] Request timed out');
-      } else {
-        console.error('[CourtListener] API error:', error);
-      }
-
-      // Don't cache errors - allow retry
-      return null;
     }
+
+    // No match found - cache negative result
+    this.stats.casesNotFound++;
+    this.cache.set(volume, reporter, page, null);
+    return null;
   }
 
   /**
