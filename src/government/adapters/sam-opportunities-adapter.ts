@@ -20,6 +20,10 @@ import {
   type RetryConfig,
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
+  type Result,
+  success,
+  failure,
+  fromError,
 } from './base-adapter.js';
 import type { DirectiveSymbol } from '../../symbols/types.js';
 
@@ -315,7 +319,7 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
   setApiKey(key: string): void {
     this.config.apiKey = key;
     this.stubMode = false;
-    console.log('[SAM Opportunities] API key configured - live mode enabled');
+    this.logger.info('API key configured - live mode enabled');
   }
 
   /**
@@ -334,17 +338,16 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
 
   /**
    * Lookup a single opportunity by notice ID
+   * Returns Result<LookupResult<SAMOpportunity>> for type-safe error handling.
    */
-  async lookup(params: Record<string, unknown>): Promise<LookupResult<SAMOpportunity>> {
+  async lookup(params: Record<string, unknown>): Promise<Result<LookupResult<SAMOpportunity>>> {
+    const startTime = Date.now();
     const noticeId = params.noticeId as string;
+
     if (!noticeId) {
-      return {
-        success: false,
-        error: 'noticeId is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: this.config.baseUrl,
-      };
+      return failure('VALIDATION_ERROR', 'noticeId is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     // Check cache
@@ -352,25 +355,31 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
     const cached = this.cache.get(cacheKey);
     if (cached) {
       this.stats.cacheHits++;
-      return {
-        success: true,
-        data: cached,
-        fromCache: true,
-        timestamp: new Date().toISOString(),
-        source: this.config.baseUrl,
-      };
+      return success(
+        {
+          success: true,
+          data: cached,
+          fromCache: true,
+          timestamp: new Date().toISOString(),
+          source: this.config.baseUrl,
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: true }
+      );
     }
     this.stats.cacheMisses++;
 
     if (this.stubMode) {
       const stubData = this.getStubOpportunity(noticeId);
-      return {
-        success: true,
-        data: stubData,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'STUB',
-      };
+      return success(
+        {
+          success: true,
+          data: stubData,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'STUB',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     }
 
     try {
@@ -386,30 +395,24 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
 
       if (data.opportunitiesData && data.opportunitiesData.length > 0) {
         const opp = data.opportunitiesData[0];
-        return {
-          success: true,
-          data: opp,
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: this.config.baseUrl,
-        };
+        return success(
+          {
+            success: true,
+            data: opp,
+            fromCache: false,
+            timestamp: new Date().toISOString(),
+            source: this.config.baseUrl,
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: false }
+        );
       }
 
-      return {
-        success: false,
-        error: 'Opportunity not found',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: this.config.baseUrl,
-      };
+      return failure('NOT_FOUND', 'Opportunity not found', {
+        details: { noticeId },
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: this.config.baseUrl,
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
@@ -427,11 +430,11 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
       const noticeId = params.noticeId as string;
       const result = await this.lookup(params);
 
-      if (result.success && result.data) {
-        results.set(noticeId, result.data);
-        if (result.fromCache) partialCache = true;
-      } else {
-        errors.set(noticeId, result.error || 'Unknown error');
+      if (result.success && result.data.data) {
+        results.set(noticeId, result.data.data);
+        if (result.data.fromCache) partialCache = true;
+      } else if (!result.success) {
+        errors.set(noticeId, result.error.message || 'Unknown error');
       }
     }
 
@@ -677,7 +680,7 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
   // ═══════════════════════════════════════════════════════════════════════════
 
   private getStubOpportunity(noticeId: string): SAMOpportunity {
-    console.warn(`[SAM Opportunities] STUB MODE: Returning mock data for ${noticeId}. Configure SAM_API_KEY for live data.`);
+    this.logger.warn(`STUB MODE: Returning mock data for ${noticeId}. Configure SAM_API_KEY for live data.`);
 
     return {
       noticeId,
@@ -699,7 +702,7 @@ export class SAMOpportunitiesAdapter extends BaseGovernmentAdapter<
   }
 
   private getStubSearchResults(params: OpportunitySearchParams): OpportunitySearchResponse {
-    console.warn('[SAM Opportunities] STUB MODE: Returning mock search results. Configure SAM_API_KEY for live data.');
+    this.logger.warn('STUB MODE: Returning mock search results. Configure SAM_API_KEY for live data.');
 
     const mockOpportunities: SAMOpportunity[] = [
       {

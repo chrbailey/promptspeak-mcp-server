@@ -8,6 +8,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { PolicyOverlay, ConfidenceThresholds } from '../types/index.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('PolicyLoader');
 
 // ============================================================================
 // TYPES
@@ -134,7 +137,7 @@ export class PolicyLoader {
           const policy = JSON.parse(content) as PolicyFile;
           this.loadedPolicies.set(policy.id, policy);
         } catch (error) {
-          console.error(`Failed to load policy ${filePath}:`, error);
+          logger.error(`Failed to load policy ${filePath}`, error instanceof Error ? error : undefined);
         }
       }
     }
@@ -168,7 +171,7 @@ export class PolicyLoader {
     // Recursively get parent
     const parent = this.getMergedPolicy(policy.extends);
     if (!parent) {
-      console.warn(`Policy ${id} extends ${policy.extends} but parent not found`);
+      logger.warn(`Policy ${id} extends ${policy.extends} but parent not found`);
       return policy;
     }
 

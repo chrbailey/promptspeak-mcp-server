@@ -25,6 +25,10 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  type Result,
+  success,
+  failure,
+  fromError,
 } from './base-adapter.js';
 import type { DirectiveSymbol, SymbolCategory } from '../../symbols/types.js';
 
@@ -348,18 +352,16 @@ export class USASpendingAdapter extends BaseGovernmentAdapter<
 
   /**
    * Look up a specific award by its ID.
+   * Returns Result<LookupResult<USASpendingAwardRecord>> for type-safe error handling.
    */
-  public async lookup(params: { awardId: string }): Promise<LookupResult<USASpendingAwardRecord>> {
+  public async lookup(params: { awardId: string }): Promise<Result<LookupResult<USASpendingAwardRecord>>> {
+    const startTime = Date.now();
     const { awardId } = params;
 
     if (!awardId) {
-      return {
-        success: false,
-        error: 'Award ID is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'usaspending',
-      };
+      return failure('VALIDATION_ERROR', 'Award ID is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const cacheKey = this.getCacheKey({ awardId });
@@ -368,34 +370,33 @@ export class USASpendingAdapter extends BaseGovernmentAdapter<
       // Check cache first
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        return {
-          success: true,
-          data: cached,
-          fromCache: true,
-          timestamp: new Date().toISOString(),
-          source: 'usaspending',
-        };
+        return success(
+          {
+            success: true,
+            data: cached,
+            fromCache: true,
+            timestamp: new Date().toISOString(),
+            source: 'usaspending',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: true }
+        );
       }
 
       // Fetch from API
       const award = await this.getAwardById(awardId);
 
-      return {
-        success: true,
-        data: award,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'usaspending',
-      };
+      return success(
+        {
+          success: true,
+          data: award,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'usaspending',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'usaspending',
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
@@ -411,13 +412,13 @@ export class USASpendingAdapter extends BaseGovernmentAdapter<
 
     for (const params of paramsList) {
       const result = await this.lookup(params);
-      if (result.success && result.data) {
-        results.set(params.awardId, result.data);
-        if (result.fromCache) {
+      if (result.success && result.data.data) {
+        results.set(params.awardId, result.data.data);
+        if (result.data.fromCache) {
           partialCache = true;
         }
-      } else {
-        errors.set(params.awardId, result.error || 'Unknown error');
+      } else if (!result.success) {
+        errors.set(params.awardId, result.error.message || 'Unknown error');
       }
     }
 

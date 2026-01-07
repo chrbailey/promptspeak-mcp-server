@@ -9,6 +9,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
+import { createLogger } from '../../core/logging/index.js';
+
+const logger = createLogger('OpenAPI');
 
 const router = Router();
 
@@ -68,7 +71,7 @@ router.get('/openapi.json', (req: Request, res: Response) => {
 
     res.json(jsonSpec);
   } catch (error) {
-    console.error('OpenAPI JSON error:', error);
+    logger.error('OpenAPI JSON error', error instanceof Error ? error : undefined);
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to load OpenAPI specification',

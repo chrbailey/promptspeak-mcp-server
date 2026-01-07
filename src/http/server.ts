@@ -14,43 +14,43 @@ import { loadConfig, getConfig } from './config.js';
 import { initializeDatabase } from '../symbols/database.js';
 import { initializeSymbolManager } from '../symbols/manager.js';
 import { ensureDefaultApiKey, initializeApiKeyTable } from '../auth/api-key.js';
+import { createLogger } from '../core/logging/index.js';
 import * as path from 'path';
 import * as fs from 'fs';
 
+const logger = createLogger('HttpServer');
+
 async function main(): Promise<void> {
-  console.log('╔════════════════════════════════════════════════════════════════╗');
-  console.log('║     PromptSpeak HTTP API Server                                 ║');
-  console.log('║     REST API for CustomGPT Actions                             ║');
-  console.log('╚════════════════════════════════════════════════════════════════╝');
-  console.log();
+  logger.info('PromptSpeak HTTP API Server starting...');
+  logger.info('REST API for CustomGPT Actions');
 
   // Load configuration
   const config = loadConfig();
-  console.log(`[Config] Environment: ${config.nodeEnv}`);
-  console.log(`[Config] Port: ${config.port}`);
-  console.log(`[Config] Database: ${config.dbPath}`);
+  logger.info(`Environment: ${config.nodeEnv}`);
+  logger.info(`Port: ${config.port}`);
+  logger.info(`Database: ${config.dbPath}`);
 
   // Ensure data directory exists
   const dataDir = path.dirname(config.dbPath);
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
-    console.log(`[Init] Created data directory: ${dataDir}`);
+    logger.info(`Created data directory: ${dataDir}`);
   }
 
   // Initialize database
-  console.log('[Init] Initializing database...');
+  logger.info('Initializing database...');
   initializeDatabase(config.dbPath);
 
   // Initialize API key table
-  console.log('[Init] Initializing API key table...');
+  logger.info('Initializing API key table...');
   initializeApiKeyTable();
 
   // Initialize symbol manager
-  console.log('[Init] Initializing symbol manager...');
+  logger.info('Initializing symbol manager...');
   initializeSymbolManager(dataDir);
 
   // Create default API key if none exist
-  console.log('[Init] Checking for default API key...');
+  logger.info('Checking for default API key...');
   await ensureDefaultApiKey();
 
   // Create Express app
@@ -58,43 +58,22 @@ async function main(): Promise<void> {
 
   // Start server
   const server = app.listen(config.port, config.host, () => {
-    console.log();
-    console.log('╔════════════════════════════════════════════════════════════════╗');
-    console.log(`║  Server running at http://${config.host}:${config.port}`.padEnd(67) + '║');
-    console.log('╠════════════════════════════════════════════════════════════════╣');
-    console.log('║  Endpoints:                                                    ║');
-    console.log('║    GET    /health                 - Health check               ║');
-    console.log('║    GET    /api/v1/symbols         - List symbols               ║');
-    console.log('║    POST   /api/v1/symbols         - Create symbol              ║');
-    console.log('║    GET    /api/v1/symbols/:id     - Get symbol                 ║');
-    console.log('║    PATCH  /api/v1/symbols/:id     - Update symbol              ║');
-    console.log('║    DELETE /api/v1/symbols/:id     - Delete symbol              ║');
-    console.log('║    POST   /api/v1/symbols/import  - Bulk import                ║');
-    console.log('║    GET    /api/v1/symbols/stats   - Registry stats             ║');
-    console.log('╠════════════════════════════════════════════════════════════════╣');
-    console.log('║  Authentication:                                               ║');
-    console.log(`║    Header: ${config.auth.apiKeyHeader}`.padEnd(67) + '║');
-    console.log('║    Format: ps_live_xxxxxxxxxxxx                                ║');
-    console.log('╠════════════════════════════════════════════════════════════════╣');
-    console.log('║  For CustomGPT Actions:                                        ║');
-    console.log('║    1. Use ngrok or cloudflared to expose this server           ║');
-    console.log('║    2. Add the public URL as an Action in your CustomGPT        ║');
-    console.log('║    3. Use the generated OpenAPI spec as the schema             ║');
-    console.log('╚════════════════════════════════════════════════════════════════╝');
-    console.log();
+    logger.info(`Server running at http://${config.host}:${config.port}`);
+    logger.info(`Auth header: ${config.auth.apiKeyHeader}`);
+    logger.info('Endpoints: /health, /api/v1/symbols, /api/v1/symbols/:id');
   });
 
   // Graceful shutdown
   const shutdown = (signal: string) => {
-    console.log(`\n[${signal}] Shutting down gracefully...`);
+    logger.info(`${signal} received, shutting down gracefully...`);
     server.close(() => {
-      console.log('[Shutdown] HTTP server closed');
+      logger.info('HTTP server closed');
       process.exit(0);
     });
 
     // Force shutdown after 10 seconds
     setTimeout(() => {
-      console.error('[Shutdown] Forced shutdown after timeout');
+      logger.error('Forced shutdown after timeout');
       process.exit(1);
     }, 10000);
   };
@@ -104,6 +83,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('Failed to start server:', error);
+  logger.error('Failed to start server:', error);
   process.exit(1);
 });

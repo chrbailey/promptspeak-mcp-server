@@ -43,6 +43,13 @@ export {
   AdapterError,
   type AdapterErrorCode,
 
+  // Result<T> pattern utilities
+  type Result,
+  type ResultMetadata,
+  success,
+  failure,
+  fromError,
+
   // Internal utilities
   SlidingWindowRateLimiter,
   LRUCache,

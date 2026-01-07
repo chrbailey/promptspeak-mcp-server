@@ -8,6 +8,9 @@
 import * as crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { getDatabase } from '../symbols/database.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('ApiKeyManager');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -289,11 +292,8 @@ export async function ensureDefaultApiKey(): Promise<string | null> {
       rateLimitTier: 'enterprise',
     });
 
-    console.log('╔════════════════════════════════════════════════════════════════╗');
-    console.log('║ DEFAULT API KEY CREATED (save this - shown only once!)         ║');
-    console.log('╠════════════════════════════════════════════════════════════════╣');
-    console.log(`║ Key: ${keyResult.key}`);
-    console.log('╚════════════════════════════════════════════════════════════════╝');
+    logger.info('DEFAULT API KEY CREATED (save this - shown only once!)');
+    logger.info(`Key: ${keyResult.key}`);
 
     return keyResult.key;
   }

@@ -18,6 +18,9 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('SymbolManager');
 
 import type {
   DirectiveSymbol,
@@ -156,12 +159,12 @@ export class SymbolManager {
       const backupPath = path.join(this.symbolsRoot, 'registry.json.migrated');
       if (!fs.existsSync(backupPath)) {
         fs.renameSync(registryPath, backupPath);
-        console.log('[SymbolManager] JSON registry backed up to registry.json.migrated');
+        logger.info('JSON registry backed up to registry.json.migrated');
       }
       return;
     }
 
-    console.log('[SymbolManager] Migrating from JSON to SQLite...');
+    logger.info('Migrating from JSON to SQLite...');
 
     try {
       const registryData = fs.readFileSync(registryPath, 'utf-8');
@@ -183,26 +186,26 @@ export class SymbolManager {
               if (result.success) {
                 migrated++;
               } else {
-                console.warn(`[Migration] Failed to migrate ${symbolId}: ${result.error}`);
+                logger.warn(`[Migration] Failed to migrate ${symbolId}: ${result.error}`);
                 failed++;
               }
             }
           } catch (err) {
-            console.warn(`[Migration] Error migrating ${symbolId}:`, err);
+            logger.warn(`[Migration] Error migrating ${symbolId}`, undefined, err instanceof Error ? err : undefined);
             failed++;
           }
         }
       });
 
-      console.log(`[SymbolManager] Migration complete: ${migrated} symbols migrated, ${failed} failed`);
+      logger.info(`Migration complete: ${migrated} symbols migrated, ${failed} failed`);
 
       // Backup the old registry
       const backupPath = path.join(this.symbolsRoot, 'registry.json.migrated');
       fs.renameSync(registryPath, backupPath);
-      console.log('[SymbolManager] JSON registry backed up to registry.json.migrated');
+      logger.info('JSON registry backed up to registry.json.migrated');
 
     } catch (err) {
-      console.error('[SymbolManager] Migration failed:', err);
+      logger.error('Migration failed', err instanceof Error ? err : undefined);
     }
   }
 

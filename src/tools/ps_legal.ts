@@ -19,6 +19,7 @@
 
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { LegalPreFlightResults } from '../types/index.js';
+import { createLogger } from '../core/logging/index.js';
 import {
   CitationValidator,
   InMemoryCourtDatabase,
@@ -40,6 +41,8 @@ import { homedir } from 'os';
 const CONFIG_DIR = join(homedir(), '.legal-review');
 const TOKEN_FILE = join(CONFIG_DIR, '.courtlistener-token');
 
+const logger = createLogger('LegalTools');
+
 function loadSavedToken(): string | undefined {
   try {
     if (existsSync(TOKEN_FILE)) {
@@ -60,7 +63,7 @@ function saveToken(token: string): void {
     }
     writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
   } catch (error) {
-    console.error('Warning: Could not save CourtListener token:', error);
+    logger.warn('Could not save CourtListener token', undefined, error instanceof Error ? error : undefined);
   }
 }
 

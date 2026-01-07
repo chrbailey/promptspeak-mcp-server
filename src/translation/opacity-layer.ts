@@ -13,6 +13,9 @@ import type {
   Extracted5WH,
   OpaqueExtracted5WH,
 } from './types.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('OpacityLayer');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATABASE INTEGRATION (lazy loaded to avoid circular deps)
@@ -60,10 +63,10 @@ export class OpacityLayer {
         // Clean up expired tokens
         const cleaned = db.cleanupExpiredOpaqueTokens();
         if (cleaned > 0) {
-          console.log(`[OpacityLayer] Cleaned up ${cleaned} expired tokens`);
+          logger.info(`Cleaned up ${cleaned} expired tokens`);
         }
       } catch (error) {
-        console.warn('[OpacityLayer] Failed to initialize from database:', error);
+        logger.warn('Failed to initialize from database', undefined, error instanceof Error ? error : undefined);
       }
     }
 
@@ -121,7 +124,7 @@ export class OpacityLayer {
           expiresAt: options?.expiresAt,
         });
       } catch (error) {
-        console.warn('[OpacityLayer] Failed to persist token:', error);
+        logger.warn('Failed to persist token', undefined, error instanceof Error ? error : undefined);
       }
     }
 
@@ -175,7 +178,7 @@ export class OpacityLayer {
           return row.plaintext;
         }
       } catch (error) {
-        console.warn('[OpacityLayer] Failed to retrieve token:', error);
+        logger.warn('Failed to retrieve token', undefined, error instanceof Error ? error : undefined);
       }
     }
 
@@ -218,7 +221,7 @@ export class OpacityLayer {
             this.reverseCache.set(plaintext, token);
           }
         } catch (error) {
-          console.warn('[OpacityLayer] Failed to batch resolve tokens:', error);
+          logger.warn('Failed to batch resolve tokens', undefined, error instanceof Error ? error : undefined);
         }
       }
     }

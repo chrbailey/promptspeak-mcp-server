@@ -35,6 +35,10 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  type Result,
+  success,
+  failure,
+  fromError,
 } from './base-adapter.js';
 import type { DirectiveSymbol, SymbolCategory } from '../../symbols/types.js';
 
@@ -388,29 +392,24 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
 
   /**
    * Look up an entity by UEI.
+   * Returns Result<LookupResult<SAMEntityRecord>> for type-safe error handling.
    */
-  public async lookup(params: { uei: string }): Promise<LookupResult<SAMEntityRecord>> {
+  public async lookup(params: { uei: string }): Promise<Result<LookupResult<SAMEntityRecord>>> {
+    const startTime = Date.now();
     const { uei } = params;
 
     if (!uei) {
-      return {
-        success: false,
-        error: 'UEI is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'sam.gov',
-      };
+      return failure('VALIDATION_ERROR', 'UEI is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     // Validate UEI format (12 alphanumeric characters)
     if (!/^[A-Z0-9]{12}$/.test(uei.toUpperCase())) {
-      return {
-        success: false,
-        error: 'Invalid UEI format. UEI must be 12 alphanumeric characters.',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'sam.gov',
-      };
+      return failure('VALIDATION_ERROR', 'Invalid UEI format. UEI must be 12 alphanumeric characters.', {
+        details: { uei },
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const cacheKey = this.getCacheKey({ uei: uei.toUpperCase() });
@@ -419,13 +418,16 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
       // Check cache first
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        return {
-          success: true,
-          data: cached,
-          fromCache: true,
-          timestamp: new Date().toISOString(),
-          source: 'sam.gov',
-        };
+        return success(
+          {
+            success: true,
+            data: cached,
+            fromCache: true,
+            timestamp: new Date().toISOString(),
+            source: 'sam.gov',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: true }
+        );
       }
 
       // If not configured, return stub data
@@ -433,59 +435,54 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
         const stubData = this.createStubEntity(uei.toUpperCase());
         this.cache.set(cacheKey, stubData);
 
-        return {
-          success: true,
-          data: stubData,
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'sam.gov (STUB)',
-        };
+        return success(
+          {
+            success: true,
+            data: stubData,
+            fromCache: false,
+            timestamp: new Date().toISOString(),
+            source: 'sam.gov (STUB)',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: false }
+        );
       }
 
       if (!this.isConfigured) {
-        return {
-          success: false,
-          error: 'SAM.gov API key not configured. Register at https://api.data.gov/signup/',
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'sam.gov',
-        };
+        return failure('AUTH_FAILED', 'SAM.gov API key not configured. Register at https://api.data.gov/signup/', {
+          metadata: { executionTimeMs: Date.now() - startTime },
+        });
       }
 
       // Fetch from API
       const entity = await this.getEntityByUEI(uei.toUpperCase());
 
-      return {
-        success: true,
-        data: entity,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'sam.gov',
-      };
+      return success(
+        {
+          success: true,
+          data: entity,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'sam.gov',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'sam.gov',
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
   /**
    * Look up an entity by CAGE code.
+   * Returns Result<LookupResult<SAMEntityRecord>> for type-safe error handling.
    */
-  public async lookupByCage(cageCode: string): Promise<LookupResult<SAMEntityRecord>> {
+  public async lookupByCage(cageCode: string): Promise<Result<LookupResult<SAMEntityRecord>>> {
+    const startTime = Date.now();
+
     if (!cageCode || !/^[A-Z0-9]{5}$/.test(cageCode.toUpperCase())) {
-      return {
-        success: false,
-        error: 'Invalid CAGE code format. CAGE must be 5 alphanumeric characters.',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'sam.gov',
-      };
+      return failure('VALIDATION_ERROR', 'Invalid CAGE code format. CAGE must be 5 alphanumeric characters.', {
+        details: { cageCode },
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const results = await this.searchEntities({
@@ -494,22 +491,22 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
     });
 
     if (results.entities.length === 0) {
-      return {
-        success: false,
-        error: `No entity found with CAGE code: ${cageCode}`,
+      return failure('NOT_FOUND', `No entity found with CAGE code: ${cageCode}`, {
+        details: { cageCode },
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
+    }
+
+    return success(
+      {
+        success: true,
+        data: results.entities[0],
         fromCache: false,
         timestamp: new Date().toISOString(),
         source: 'sam.gov',
-      };
-    }
-
-    return {
-      success: true,
-      data: results.entities[0],
-      fromCache: false,
-      timestamp: new Date().toISOString(),
-      source: 'sam.gov',
-    };
+      },
+      { executionTimeMs: Date.now() - startTime, cacheHit: false }
+    );
   }
 
   /**
@@ -524,13 +521,13 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
 
     for (const params of paramsList) {
       const result = await this.lookup(params);
-      if (result.success && result.data) {
-        results.set(params.uei, result.data);
-        if (result.fromCache) {
+      if (result.success && result.data.data) {
+        results.set(params.uei, result.data.data);
+        if (result.data.fromCache) {
           partialCache = true;
         }
-      } else {
-        errors.set(params.uei, result.error || 'Unknown error');
+      } else if (!result.success) {
+        errors.set(params.uei, result.error.message || 'Unknown error');
       }
     }
 
@@ -559,7 +556,7 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
 
     // If not configured, return stub results
     if (!this.isConfigured && this.config.useStubWhenUnconfigured) {
-      console.warn('[SAMEntity] API key not configured, returning stub data');
+      this.logger.warn('API key not configured, returning stub data');
       const stubEntities = this.createStubSearchResults(conditions, limit);
       return {
         entities: stubEntities,

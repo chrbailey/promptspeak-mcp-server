@@ -26,6 +26,9 @@ import { intentManager as defaultIntentManager, type IntentManager } from './int
 import { agentRegistry as defaultAgentRegistry, type AgentRegistry } from './agent-registry.js';
 import { LRUCache, SEVEN_DAYS_MS } from './lru-cache.js';
 import type { MissionManagerDeps } from './container.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('MissionManager');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE CONFIGURATION
@@ -83,7 +86,7 @@ export class MissionManager {
       ttlMs: COMPLETED_MISSION_TTL_MS,
       onEvict: (key, value) => {
         const mission = value as Mission;
-        console.log(`[MissionManager] Evicting mission: ${mission.mission_id} (status: ${mission.status})`);
+        logger.info(`Evicting mission: ${mission.mission_id} (status: ${mission.status})`);
         // Ensure agents are cleaned up when mission is evicted
         for (const assignment of mission.agents) {
           this.intentManager.unbindAgent(assignment.agent_id);

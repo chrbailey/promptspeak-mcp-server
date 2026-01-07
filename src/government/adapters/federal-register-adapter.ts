@@ -26,6 +26,10 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  type Result,
+  success,
+  failure,
+  fromError,
 } from './base-adapter.js';
 import type { DirectiveSymbol, SymbolCategory } from '../../symbols/types.js';
 
@@ -370,18 +374,16 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
 
   /**
    * Look up a specific document by document number.
+   * Returns Result<LookupResult<FederalRegisterRecord>> for type-safe error handling.
    */
-  public async lookup(params: { documentNumber: string }): Promise<LookupResult<FederalRegisterRecord>> {
+  public async lookup(params: { documentNumber: string }): Promise<Result<LookupResult<FederalRegisterRecord>>> {
+    const startTime = Date.now();
     const { documentNumber } = params;
 
     if (!documentNumber) {
-      return {
-        success: false,
-        error: 'Document number is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'federalregister',
-      };
+      return failure('VALIDATION_ERROR', 'Document number is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const cacheKey = this.getCacheKey({ documentNumber });
@@ -390,34 +392,33 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       // Check cache first
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        return {
-          success: true,
-          data: cached,
-          fromCache: true,
-          timestamp: new Date().toISOString(),
-          source: 'federalregister',
-        };
+        return success(
+          {
+            success: true,
+            data: cached,
+            fromCache: true,
+            timestamp: new Date().toISOString(),
+            source: 'federalregister',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: true }
+        );
       }
 
       // Fetch from API
       const doc = await this.getDocumentByNumber(documentNumber);
 
-      return {
-        success: true,
-        data: doc,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'federalregister',
-      };
+      return success(
+        {
+          success: true,
+          data: doc,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'federalregister',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'federalregister',
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
@@ -458,10 +459,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
         // If batch fails, try individually
         for (const num of uncachedNumbers) {
           const result = await this.lookup({ documentNumber: num });
-          if (result.success && result.data) {
-            results.set(num, result.data);
-          } else {
-            errors.set(num, result.error || 'Unknown error');
+          if (result.success && result.data.data) {
+            results.set(num, result.data.data);
+          } else if (!result.success) {
+            errors.set(num, result.error.message || 'Unknown error');
           }
         }
       }

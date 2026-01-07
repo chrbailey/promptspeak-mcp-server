@@ -32,6 +32,9 @@ import { CoverageCalculator } from './coverage.js';
 import { HoldManager, holdManager } from './hold-manager.js';
 import { driftEngine } from '../drift/index.js';
 import { generateAuditId, generateBehaviorHash } from '../utils/hash.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('Gatekeeper');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AGENT EVICTION CONFIGURATION
@@ -247,7 +250,7 @@ export class Gatekeeper {
 
     // Log if enabled
     if (this.evictionConfig.logEvictions) {
-      console.log(`[Gatekeeper] Evicted agent ${agentId} (reason: ${reason})`);
+      logger.info(`Evicted agent ${agentId} (reason: ${reason})`);
     }
   }
 

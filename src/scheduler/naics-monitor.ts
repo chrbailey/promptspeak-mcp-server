@@ -16,6 +16,9 @@ import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getSAMOpportunitiesAdapter, type SAMOpportunity } from '../government/index.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('NAICSMonitor');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -113,7 +116,7 @@ function loadSeenOpportunities(filePath: string): Set<string> {
       return new Set(data.noticeIds);
     }
   } catch (error) {
-    console.warn('Could not load seen opportunities, starting fresh:', error);
+    logger.warn('Could not load seen opportunities, starting fresh', undefined, error instanceof Error ? error : undefined);
   }
   return new Set();
 }
@@ -212,7 +215,7 @@ export async function runMonitor(config: MonitorConfig = DEFAULT_CONFIG): Promis
       // Rate limit delay
       await delay(1100);
     } catch (error) {
-      console.error(`   Error searching NAICS ${naicsCode}:`, error);
+      logger.error(`Error searching NAICS ${naicsCode}`, error instanceof Error ? error : undefined);
       byNaics[naicsCode] = [];
     }
   }
@@ -356,10 +359,10 @@ async function sendFileNotification(filePath: string, result: MonitorResult): Pr
     };
 
     fs.writeFileSync(filePath, JSON.stringify(notification, null, 2));
-    console.log(`✅ File notification written: ${filePath}`);
+    logger.info(`File notification written: ${filePath}`);
     return true;
   } catch (error) {
-    console.error('❌ File notification failed:', error);
+    logger.error('File notification failed', error instanceof Error ? error : undefined);
     return false;
   }
 }
@@ -431,7 +434,7 @@ async function sendEmailNotification(
         html: htmlBody,
       });
 
-      console.log(`✅ Email sent to: ${config.to}`);
+      logger.info(`Email sent to: ${config.to}`);
       return true;
     } else {
       // Save email to file for manual sending or external pickup
@@ -449,12 +452,12 @@ async function sendEmailNotification(
         timestamp: result.runTime,
       }, null, 2));
 
-      console.log(`📧 Email prepared for: ${config.to} (saved to ${emailPath})`);
-      console.log('   Configure SMTP settings in .env to send automatically');
+      logger.info(`Email prepared for: ${config.to} (saved to ${emailPath})`);
+      logger.info('Configure SMTP settings in .env to send automatically');
       return true;
     }
   } catch (error) {
-    console.error('❌ Email notification failed:', error);
+    logger.error('Email notification failed', error instanceof Error ? error : undefined);
     return false;
   }
 }
@@ -487,14 +490,14 @@ async function sendWebhookNotification(
     });
 
     if (response.ok) {
-      console.log(`✅ Webhook notification sent to: ${config.url}`);
+      logger.info(`Webhook notification sent to: ${config.url}`);
       return true;
     } else {
-      console.error(`❌ Webhook failed: ${response.status} ${response.statusText}`);
+      logger.error(`Webhook failed: ${response.status} ${response.statusText}`);
       return false;
     }
   } catch (error) {
-    console.error('❌ Webhook notification failed:', error);
+    logger.error('Webhook notification failed', error instanceof Error ? error : undefined);
     return false;
   }
 }
@@ -557,14 +560,14 @@ async function sendSlackNotification(
     });
 
     if (response.ok) {
-      console.log(`✅ Slack notification sent`);
+      logger.info('Slack notification sent');
       return true;
     } else {
-      console.error(`❌ Slack failed: ${response.status}`);
+      logger.error(`Slack failed: ${response.status}`);
       return false;
     }
   } catch (error) {
-    console.error('❌ Slack notification failed:', error);
+    logger.error('Slack notification failed', error instanceof Error ? error : undefined);
     return false;
   }
 }
@@ -577,6 +580,7 @@ async function sendDiscordNotification(
     const embeds = [
       {
         title: `🏛️ SAM.gov Alert: ${result.newOpportunities.length} New Opportunities`,
+        url: undefined as string | undefined,
         color: 0x0066cc,
         fields: [
           { name: '⭐ SDVOSB', value: String(result.bySetAside.sdvosb.length), inline: true },
@@ -612,14 +616,14 @@ async function sendDiscordNotification(
     });
 
     if (response.ok) {
-      console.log(`✅ Discord notification sent`);
+      logger.info('Discord notification sent');
       return true;
     } else {
-      console.error(`❌ Discord failed: ${response.status}`);
+      logger.error(`Discord failed: ${response.status}`);
       return false;
     }
   } catch (error) {
-    console.error('❌ Discord notification failed:', error);
+    logger.error('Discord notification failed', error instanceof Error ? error : undefined);
     return false;
   }
 }

@@ -7,6 +7,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getConfig } from '../config.js';
+import { createLogger } from '../../core/logging/index.js';
+
+const logger = createLogger('RequestLogger');
 
 export function requestLogger(
   req: Request,
@@ -23,7 +26,7 @@ export function requestLogger(
 
   // Log request
   if (config.logging.level === 'debug') {
-    console.log(`[${new Date().toISOString()}] --> ${req.method} ${req.path}`, {
+    logger.debug(`--> ${req.method} ${req.path}`, {
       requestId,
       query: req.query,
       headers: {
@@ -44,11 +47,19 @@ export function requestLogger(
                      res.statusCode >= 400 ? 'warn' : 'info';
 
     if (config.logging.level === 'debug' || logLevel !== 'info') {
-      console.log(`[${new Date().toISOString()}] <-- ${req.method} ${req.path} ${res.statusCode} ${duration}ms`, {
+      const logData = {
         requestId,
         statusCode: res.statusCode,
         duration,
-      });
+      };
+      const message = `<-- ${req.method} ${req.path} ${res.statusCode} ${duration}ms`;
+      if (logLevel === 'error') {
+        logger.error(message, undefined, logData);
+      } else if (logLevel === 'warn') {
+        logger.warn(message, logData);
+      } else {
+        logger.info(message, logData);
+      }
     }
 
     return originalSend.call(this, body);

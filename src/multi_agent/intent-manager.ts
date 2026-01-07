@@ -22,6 +22,9 @@ import type {
   Constraint,
 } from './intent-types.js';
 import { LRUCache, TWENTY_FOUR_HOURS_MS, TWELVE_HOURS_MS } from './lru-cache.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('IntentManager');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE CONFIGURATION
@@ -61,7 +64,7 @@ export class IntentManager {
       onEvict: (key, value) => {
         // Clean up any bindings associated with evicted intents
         const intent = value as IntentSymbol;
-        console.log(`[IntentManager] Evicting intent: ${intent.symbol_id}`);
+        logger.info(`Evicting intent: ${intent.symbol_id}`);
       },
     });
 
@@ -74,7 +77,7 @@ export class IntentManager {
         if (binding.status === 'active') {
           this.bindingsByAgent.delete(binding.agent_id);
         }
-        console.log(`[IntentManager] Evicting binding: ${binding.binding_id}`);
+        logger.info(`Evicting binding: ${binding.binding_id}`);
       },
     });
   }

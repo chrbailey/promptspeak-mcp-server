@@ -26,6 +26,9 @@ import {
   getWebhookDispatcher,
   configureFromEnv,
 } from '../notifications/webhook-dispatcher.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('MADIFIntegration');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HOLD MANAGER ADAPTER
@@ -149,37 +152,37 @@ export async function initializeAgentSystem(options?: {
     };
   }
 
-  console.error('Initializing MADIF agent system...');
+  logger.info('Initializing MADIF agent system...');
 
   // 1. Initialize database
   const database = initializeAgentDatabase(options?.dbPath);
-  console.error('  - Agent database initialized');
+  logger.info('  - Agent database initialized');
 
   // 2. Initialize registry (loads definitions and instances from DB)
   const registry = initializeAgentRegistry();
-  console.error('  - Agent registry initialized');
+  logger.info('  - Agent registry initialized');
 
   // 3. Initialize proposal manager
   const proposalManager = initializeProposalManager();
-  console.error('  - Proposal manager initialized');
+  logger.info('  - Proposal manager initialized');
 
   // 4. Connect proposal manager to hold manager
   const holdAdapter = createHoldManagerAdapter(holdManager);
   setHoldManager(holdAdapter);
-  console.error('  - Connected to hold manager');
+  logger.info('  - Connected to hold manager');
 
   // 5. Configure webhook dispatcher from environment
   const webhookDispatcher = initializeWebhookDispatcher({
     callbackBaseUrl: options?.webhookCallbackUrl || process.env.WEBHOOK_CALLBACK_URL || 'http://localhost:3000',
   });
   configureFromEnv();
-  console.error('  - Webhook dispatcher configured');
+  logger.info('  - Webhook dispatcher configured');
 
   // 6. Set up hold manager callbacks for notifications
   holdManager.setOnHoldCreated((hold) => {
     // Log agent-related holds
     if (hold.reason === 'agent_spawn_approval' || hold.reason === 'agent_resource_exceeded') {
-      console.error(`[MADIF] Hold created: ${hold.holdId} (${hold.reason})`);
+      logger.info(`Hold created: ${hold.holdId} (${hold.reason})`);
     }
   });
 
@@ -187,12 +190,12 @@ export async function initializeAgentSystem(options?: {
     // Log agent-related decisions
     const hold = holdManager.getHold(decision.holdId);
     if (hold && (hold.reason === 'agent_spawn_approval' || hold.reason === 'agent_resource_exceeded')) {
-      console.error(`[MADIF] Hold decided: ${decision.holdId} -> ${decision.state}`);
+      logger.info(`Hold decided: ${decision.holdId} -> ${decision.state}`);
     }
   });
 
   initialized = true;
-  console.error('MADIF agent system ready');
+  logger.info('MADIF agent system ready');
 
   return {
     database,

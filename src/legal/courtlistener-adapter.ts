@@ -14,6 +14,9 @@
 // =============================================================================
 
 import type { CaseDatabase, KnownCaseRecord } from './types.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('CourtListener');
 
 // =============================================================================
 // CONFIGURATION
@@ -508,7 +511,7 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     // Parse the citation we're looking for
     const citationMatch = citationText.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
     if (!citationMatch) {
-      console.warn(`[CourtListener] Could not parse citation: ${citationText}`);
+      logger.warn(`Could not parse citation: ${citationText}`);
       return null;
     }
 
@@ -536,7 +539,7 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     );
 
     if (nominativeCitation) {
-      console.log(`[CourtListener] Trying nominative citation: ${nominativeCitation}`);
+      logger.info(`Trying nominative citation: ${nominativeCitation}`);
 
       // Parse the nominative citation
       const nomMatch = nominativeCitation.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);
@@ -581,7 +584,7 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     // Check rate limit
     if (!this.rateLimiter.canRequest()) {
       const waitTime = this.rateLimiter.getWaitTime();
-      console.warn(`[CourtListener] Rate limited. Wait ${waitTime}ms`);
+      logger.warn(`Rate limited. Wait ${waitTime}ms`);
       return null;
     }
 
@@ -620,7 +623,7 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
 
       if (!response.ok) {
         this.stats.apiErrors++;
-        console.error(`[CourtListener] API error: ${response.status} ${response.statusText}`);
+        logger.error(`API error: ${response.status} ${response.statusText}`);
         return null;
       }
 
@@ -680,9 +683,9 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     } catch (error) {
       this.stats.apiErrors++;
       if (error instanceof Error && error.name === 'AbortError') {
-        console.error('[CourtListener] Request timed out');
+        logger.error('Request timed out');
       } else {
-        console.error('[CourtListener] API error:', error);
+        logger.error('API error', error instanceof Error ? error : undefined);
       }
       return null;
     }
@@ -822,7 +825,7 @@ export class CourtListenerCaseDatabase implements CaseDatabase {
     const nominativeCitation = convertToNominativeCitation(volume, reporter, page);
 
     if (nominativeCitation) {
-      console.log(`[CourtListener] Trying nominative citation: ${nominativeCitation}`);
+      logger.info(`Trying nominative citation: ${nominativeCitation}`);
 
       // Parse the nominative citation
       const nomMatch = nominativeCitation.match(/(\d+)\s+([A-Za-z.\s]+?)\s+(\d+)/);

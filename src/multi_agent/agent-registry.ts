@@ -23,6 +23,9 @@ import type {
 import { intentManager as defaultIntentManager, type IntentManager } from './intent-manager.js';
 import { LRUCache, ONE_HOUR_MS } from './lru-cache.js';
 import type { AgentRegistryDeps } from './container.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('AgentRegistry');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CACHE CONFIGURATION
@@ -71,7 +74,7 @@ export class AgentRegistry {
         const agent = value as AgentRegistration;
         // Unbind agent from any Intent when evicted
         this.intentManager.unbindAgent(agent.agent_id);
-        console.log(`[AgentRegistry] Evicting inactive agent: ${agent.agent_id}`);
+        logger.info(`Evicting inactive agent: ${agent.agent_id}`);
       },
     });
   }

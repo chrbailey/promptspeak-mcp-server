@@ -12,6 +12,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { InjectionViolation, FullValidationResult } from './sanitizer.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('SecurityAudit');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -121,7 +124,7 @@ export class AuditLogger {
     try {
       fs.appendFileSync(this.logPath, line);
     } catch (error) {
-      console.error('[AUDIT] Failed to write log:', error);
+      logger.error('Failed to write log', error instanceof Error ? error : undefined);
     }
 
     // Update stats
@@ -138,7 +141,7 @@ export class AuditLogger {
       if (entry.eventType.includes('BLOCKED') ||
           entry.eventType === 'INJECTION_ATTEMPT' ||
           entry.eventType === 'SECURITY_ALERT') {
-        console.warn(`[AUDIT:${entry.eventType}]`, entry.symbolId || 'N/A', entry.details);
+        logger.warn(`[AUDIT:${entry.eventType}] ${entry.symbolId || 'N/A'}`, entry.details);
       }
     }
 
@@ -375,7 +378,7 @@ export class AuditLogger {
 
       return entries;
     } catch (error) {
-      console.error('[AUDIT] Failed to query entries:', error);
+      logger.error('Failed to query entries', error instanceof Error ? error : undefined);
       return [];
     }
   }
@@ -445,7 +448,7 @@ export class AuditLogger {
       const recent = lines.slice(-limit);
       return recent.map(line => JSON.parse(line) as AuditEntry);
     } catch (error) {
-      console.error('[AUDIT] Failed to read entries:', error);
+      logger.error('Failed to read entries', error instanceof Error ? error : undefined);
       return [];
     }
   }
@@ -466,7 +469,7 @@ export class AuditLogger {
         .map(line => JSON.parse(line) as AuditEntry)
         .filter(entry => entry.symbolId === symbolId);
     } catch (error) {
-      console.error('[AUDIT] Failed to read entries:', error);
+      logger.error('Failed to read entries', error instanceof Error ? error : undefined);
       return [];
     }
   }
@@ -490,7 +493,7 @@ export class AuditLogger {
           entry.eventType.includes('BLOCKED')
         );
     } catch (error) {
-      console.error('[AUDIT] Failed to read entries:', error);
+      logger.error('Failed to read entries', error instanceof Error ? error : undefined);
       return [];
     }
   }

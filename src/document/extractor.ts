@@ -20,6 +20,9 @@ import type {
 } from './types.js';
 import type { SymbolCategory } from '../symbols/types.js';
 import { getDocumentParser } from './parser.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('SymbolExtractor');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RATE LIMITER & COST CONTROL
@@ -149,7 +152,7 @@ export class APIRateLimiter {
     this.sessionStartTime = Date.now();
     this.sessionRequestCount = 0;
     if (this.config.logEvents) {
-      console.log('[RateLimiter] Session reset');
+      logger.info('Session reset');
     }
   }
 
@@ -205,7 +208,7 @@ export class APIRateLimiter {
       // If concurrent limit reached, wait in queue
       if (this.activeRequests >= this.config.maxConcurrentRequests) {
         if (this.config.logEvents) {
-          console.log('[RateLimiter] Queuing request (concurrent limit)');
+          logger.info('Queuing request (concurrent limit)');
         }
         await new Promise<void>((resolve, reject) => {
           this.requestQueue.push({ resolve, reject });
@@ -216,7 +219,7 @@ export class APIRateLimiter {
       // If rate limited, wait and retry
       if (check.retryAfterMs) {
         if (this.config.logEvents) {
-          console.log(`[RateLimiter] Rate limited, waiting ${check.retryAfterMs}ms`);
+          logger.info(`Rate limited, waiting ${check.retryAfterMs}ms`);
         }
         await this.sleep(check.retryAfterMs);
         return this.acquire();
@@ -317,7 +320,7 @@ export class APIRateLimiter {
           this.stats.retries++;
           const delay = this.config.retryBaseDelayMs * Math.pow(2, attempt);
           if (this.config.logEvents) {
-            console.log(`[RateLimiter] Retry ${attempt + 1}/${this.config.maxRetries} after ${delay}ms: ${lastError.message}`);
+            logger.info(`Retry ${attempt + 1}/${this.config.maxRetries} after ${delay}ms: ${lastError.message}`);
           }
           await this.sleep(delay);
         }
@@ -511,7 +514,7 @@ export class SymbolExtractor {
     // Validate API key
     const key = apiKey || process.env.ANTHROPIC_API_KEY;
     if (!key) {
-      console.warn('[SymbolExtractor] No API key provided. API calls will fail.');
+      logger.warn('No API key provided. API calls will fail.');
     }
 
     this.client = new Anthropic({

@@ -13,6 +13,9 @@ import type {
   RiskLevel,
 } from '../agents/types.js';
 import { recordAgentAuditEvent } from '../agents/database.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('WebhookDispatcher');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -195,7 +198,7 @@ export class WebhookDispatcher {
       }
     }
 
-    console.error(`Failed to send to channel ${channel.name} after ${this.config.maxRetries} attempts:`, lastError);
+    logger.error(`Failed to send to channel ${channel.name} after ${this.config.maxRetries} attempts`, lastError ?? undefined);
     return false;
   }
 
@@ -490,11 +493,11 @@ export class WebhookDispatcher {
       }
     } else {
       // Log email for debugging (SMTP not implemented)
-      console.log('EMAIL NOTIFICATION (SMTP not configured):');
-      console.log(`To: ${channel.email.to.join(', ')}`);
-      console.log(`Subject: [Action Required] Agent Approval: ${payload.agent.name}`);
-      console.log(`Approve: ${payload.approveUrl}`);
-      console.log(`Reject: ${payload.rejectUrl}`);
+      logger.info('EMAIL NOTIFICATION (SMTP not configured):');
+      logger.info(`To: ${channel.email.to.join(', ')}`);
+      logger.info(`Subject: [Action Required] Agent Approval: ${payload.agent.name}`);
+      logger.info(`Approve: ${payload.approveUrl}`);
+      logger.info(`Reject: ${payload.rejectUrl}`);
     }
   }
 

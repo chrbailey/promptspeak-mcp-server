@@ -7,6 +7,9 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { getConfig } from '../config.js';
+import { createLogger } from '../../core/logging/index.js';
+
+const logger = createLogger('ErrorHandler');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CUSTOM ERROR TYPES
@@ -104,12 +107,10 @@ export function errorHandler(
   const requestId = req.headers['x-request-id'] as string;
 
   // Log the error
-  console.error(`[${new Date().toISOString()}] Error:`, {
+  logger.error(`Request error: ${err.message}`, err, {
     requestId,
     method: req.method,
     path: req.path,
-    error: err.message,
-    stack: err.stack,
   });
 
   // Determine status code and build response

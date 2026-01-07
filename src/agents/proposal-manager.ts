@@ -31,6 +31,9 @@ import {
   deleteExpiredProposals as dbDeleteExpiredProposals,
 } from './database.js';
 import { getTemplateForSourceType } from './templates/index.js';
+import { createLogger } from '../core/logging/index.js';
+
+const logger = createLogger('ProposalManager');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HOLD MANAGER INTEGRATION
@@ -110,10 +113,10 @@ export class AgentProposalManager {
         }
       }
       this.initialized = true;
-      console.log(`Loaded ${proposals.length} proposals from database`);
+      logger.info(`Loaded ${proposals.length} proposals from database`);
     } catch (error) {
       // Database may not be initialized yet, that's okay
-      console.warn('Could not load proposals from database:', error);
+      logger.warn('Could not load proposals from database', undefined, error instanceof Error ? error : undefined);
     }
   }
 
@@ -145,7 +148,7 @@ export class AgentProposalManager {
         dbCreateProposal(proposal);
       }
     } catch (error) {
-      console.error('Failed to sync proposal to database:', error);
+      logger.error('Failed to sync proposal to database', error instanceof Error ? error : undefined);
     }
   }
 
@@ -627,7 +630,7 @@ export class AgentProposalManager {
    */
   private async queueForApproval(proposal: AgentProposal): Promise<void> {
     if (!holdManager) {
-      console.warn('HoldManager not configured. Approval workflow disabled.');
+      logger.warn('HoldManager not configured. Approval workflow disabled.');
       return;
     }
 
@@ -705,7 +708,7 @@ export class AgentProposalManager {
         return proposal;
       }
     } catch (error) {
-      console.warn('Failed to get proposal from database:', error);
+      logger.warn('Failed to get proposal from database', undefined, error instanceof Error ? error : undefined);
     }
 
     return null;
@@ -732,7 +735,7 @@ export class AgentProposalManager {
         return proposal;
       }
     } catch (error) {
-      console.warn('Failed to get proposal by hold ID from database:', error);
+      logger.warn('Failed to get proposal by hold ID from database', undefined, error instanceof Error ? error : undefined);
     }
 
     return null;
@@ -759,7 +762,7 @@ export class AgentProposalManager {
       }
       return proposals;
     } catch (error) {
-      console.warn('Failed to list proposals from database, using cache:', error);
+      logger.warn('Failed to list proposals from database, using cache', undefined, error instanceof Error ? error : undefined);
       // Fall back to cache
       let proposals = Array.from(this.proposals.values());
 
@@ -929,7 +932,7 @@ export class AgentProposalManager {
 
       return dbExpired;
     } catch (error) {
-      console.warn('Failed to expire proposals in database, using cache:', error);
+      logger.warn('Failed to expire proposals in database, using cache', undefined, error instanceof Error ? error : undefined);
 
       // Fall back to cache-only expiration
       const now = new Date();

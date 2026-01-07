@@ -31,6 +31,10 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  type Result,
+  success,
+  failure,
+  fromError,
 } from './base-adapter.js';
 import type { DirectiveSymbol, SymbolCategory } from '../../symbols/types.js';
 
@@ -420,18 +424,16 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
   /**
    * Look up a specific document by ID.
+   * Returns Result<LookupResult<RegulationsDocumentRecord>> for type-safe error handling.
    */
-  public async lookup(params: { documentId: string }): Promise<LookupResult<RegulationsDocumentRecord>> {
+  public async lookup(params: { documentId: string }): Promise<Result<LookupResult<RegulationsDocumentRecord>>> {
+    const startTime = Date.now();
     const { documentId } = params;
 
     if (!documentId) {
-      return {
-        success: false,
-        error: 'Document ID is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return failure('VALIDATION_ERROR', 'Document ID is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const cacheKey = this.getCacheKey({ documentId });
@@ -440,13 +442,16 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
       // Check cache first
       const cached = this.cache.get(cacheKey);
       if (cached) {
-        return {
-          success: true,
-          data: cached,
-          fromCache: true,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov',
-        };
+        return success(
+          {
+            success: true,
+            data: cached,
+            fromCache: true,
+            timestamp: new Date().toISOString(),
+            source: 'regulations.gov',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: true }
+        );
       }
 
       // If not configured, return stub data
@@ -454,44 +459,39 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
         const stubData = this.createStubDocument(documentId);
         this.cache.set(cacheKey, stubData);
 
-        return {
-          success: true,
-          data: stubData,
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov (STUB)',
-        };
+        return success(
+          {
+            success: true,
+            data: stubData,
+            fromCache: false,
+            timestamp: new Date().toISOString(),
+            source: 'regulations.gov (STUB)',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: false }
+        );
       }
 
       if (!this.isConfigured) {
-        return {
-          success: false,
-          error: 'Regulations.gov API key not configured. Register at https://api.data.gov/signup/',
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov',
-        };
+        return failure('AUTH_FAILED', 'Regulations.gov API key not configured. Register at https://api.data.gov/signup/', {
+          metadata: { executionTimeMs: Date.now() - startTime },
+        });
       }
 
       // Fetch from API
       const doc = await this.getDocumentById(documentId);
 
-      return {
-        success: true,
-        data: doc,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return success(
+        {
+          success: true,
+          data: doc,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'regulations.gov',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
@@ -507,13 +507,13 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
     for (const params of paramsList) {
       const result = await this.lookup(params);
-      if (result.success && result.data) {
-        results.set(params.documentId, result.data);
-        if (result.fromCache) {
+      if (result.success && result.data.data) {
+        results.set(params.documentId, result.data.data);
+        if (result.data.fromCache) {
           partialCache = true;
         }
-      } else {
-        errors.set(params.documentId, result.error || 'Unknown error');
+      } else if (!result.success) {
+        errors.set(params.documentId, result.error.message || 'Unknown error');
       }
     }
 
@@ -543,7 +543,7 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
     // If not configured, return stub results
     if (!this.isConfigured && this.config.useStubWhenUnconfigured) {
-      console.warn('[RegulationsGov] API key not configured, returning stub data');
+      this.logger.warn('API key not configured, returning stub data');
       const stubDocs = this.createStubSearchResults(conditions, perPage);
       return {
         documents: stubDocs,
@@ -660,16 +660,15 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
   /**
    * Look up a docket by ID.
+   * Returns Result<LookupResult<RegulationsDocketRecord>> for type-safe error handling.
    */
-  public async lookupDocket(docketId: string): Promise<LookupResult<RegulationsDocketRecord>> {
+  public async lookupDocket(docketId: string): Promise<Result<LookupResult<RegulationsDocketRecord>>> {
+    const startTime = Date.now();
+
     if (!docketId) {
-      return {
-        success: false,
-        error: 'Docket ID is required',
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return failure('VALIDATION_ERROR', 'Docket ID is required', {
+        metadata: { executionTimeMs: Date.now() - startTime },
+      });
     }
 
     const cacheKey = this.getCacheKey({ type: 'docket', docketId });
@@ -678,55 +677,53 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
       // Check cache first
       const cached = this.cache.get(cacheKey) as RegulationsDocketRecord | null;
       if (cached) {
-        return {
-          success: true,
-          data: cached,
-          fromCache: true,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov',
-        };
+        return success(
+          {
+            success: true,
+            data: cached,
+            fromCache: true,
+            timestamp: new Date().toISOString(),
+            source: 'regulations.gov',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: true }
+        );
       }
 
       // If not configured, return stub data
       if (!this.isConfigured && this.config.useStubWhenUnconfigured) {
         const stubData = this.createStubDocket(docketId);
-        return {
-          success: true,
-          data: stubData,
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov (STUB)',
-        };
+        return success(
+          {
+            success: true,
+            data: stubData,
+            fromCache: false,
+            timestamp: new Date().toISOString(),
+            source: 'regulations.gov (STUB)',
+          },
+          { executionTimeMs: Date.now() - startTime, cacheHit: false }
+        );
       }
 
       if (!this.isConfigured) {
-        return {
-          success: false,
-          error: 'Regulations.gov API key not configured',
-          fromCache: false,
-          timestamp: new Date().toISOString(),
-          source: 'regulations.gov',
-        };
+        return failure('AUTH_FAILED', 'Regulations.gov API key not configured', {
+          metadata: { executionTimeMs: Date.now() - startTime },
+        });
       }
 
       const docket = await this.getDocketById(docketId);
 
-      return {
-        success: true,
-        data: docket,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return success(
+        {
+          success: true,
+          data: docket,
+          fromCache: false,
+          timestamp: new Date().toISOString(),
+          source: 'regulations.gov',
+        },
+        { executionTimeMs: Date.now() - startTime, cacheHit: false }
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-        fromCache: false,
-        timestamp: new Date().toISOString(),
-        source: 'regulations.gov',
-      };
+      return fromError(error, 'ADAPTER_ERROR');
     }
   }
 
@@ -747,7 +744,7 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
     // If not configured, return stub results
     if (!this.isConfigured && this.config.useStubWhenUnconfigured) {
-      console.warn('[RegulationsGov] API key not configured, returning stub data');
+      this.logger.warn('API key not configured, returning stub data');
       return {
         dockets: [this.createStubDocket('STUB-0001')],
         total: 1,

@@ -10,11 +10,17 @@
  *   - Retry with exponential backoff
  *   - Circuit breaker pattern (prevents cascading failures)
  *   - Error handling and logging
+ *   - Result<T> pattern for type-safe error handling
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 import type { DirectiveSymbol } from '../../symbols/types.js';
+import { type Result, type ResultMetadata, success, failure, fromError } from '../../core/result/index.js';
+import { createLogger } from '../../core/logging/index.js';
+
+// Re-export Result utilities for adapter use
+export { type Result, type ResultMetadata, success, failure, fromError } from '../../core/result/index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION TYPES
@@ -501,6 +507,7 @@ export class LRUCache<T> {
 export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, TRecord> {
   protected rateLimiter: SlidingWindowRateLimiter;
   protected cache: LRUCache<TRecord>;
+  protected logger = createLogger('BaseAdapter');
   protected stats: AdapterStats = {
     totalRequests: 0,
     successfulRequests: 0,
@@ -538,6 +545,8 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
   constructor(protected config: TConfig) {
     this.rateLimiter = new SlidingWindowRateLimiter(config.rateLimit);
     this.cache = new LRUCache(config.cache);
+    // Defer logger creation to allow subclass to set adapter name first
+    this.logger = createLogger(this.getAdapterName());
   }
 
   /**
@@ -562,8 +571,9 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
 
   /**
    * Abstract lookup method to be implemented by subclasses.
+   * Returns Result<LookupResult<TRecord>> for type-safe error handling.
    */
-  public abstract lookup(params: Record<string, unknown>): Promise<LookupResult<TRecord>>;
+  public abstract lookup(params: Record<string, unknown>): Promise<Result<LookupResult<TRecord>>>;
 
   /**
    * Abstract batch lookup method to be implemented by subclasses.
@@ -589,7 +599,7 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
         this.circuitBreaker.state = 'HALF_OPEN';
         this.circuitBreaker.successCount = 0;
         this.circuitBreaker.lastStateChange = now;
-        console.log(`[${this.getAdapterName()}] Circuit breaker: OPEN -> HALF_OPEN`);
+        this.logger.info('Circuit breaker: OPEN -> HALF_OPEN');
       } else {
         throw new AdapterError(
           `Circuit breaker is OPEN - ${this.getAdapterName()} temporarily unavailable`,
@@ -613,7 +623,7 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
         this.circuitBreaker.state = 'CLOSED';
         this.circuitBreaker.failureCount = 0;
         this.circuitBreaker.lastStateChange = Date.now();
-        console.log(`[${this.getAdapterName()}] Circuit breaker: HALF_OPEN -> CLOSED`);
+        this.logger.info('Circuit breaker: HALF_OPEN -> CLOSED');
       }
     } else if (this.circuitBreaker.state === 'CLOSED') {
       this.circuitBreaker.failureCount = 0; // Reset on success
@@ -638,11 +648,11 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
       // Any failure in HALF_OPEN goes back to OPEN
       this.circuitBreaker.state = 'OPEN';
       this.circuitBreaker.lastStateChange = Date.now();
-      console.log(`[${this.getAdapterName()}] Circuit breaker: HALF_OPEN -> OPEN`);
+      this.logger.info('Circuit breaker: HALF_OPEN -> OPEN');
     } else if (this.circuitBreaker.failureCount >= this.circuitBreakerConfig.failureThreshold) {
       this.circuitBreaker.state = 'OPEN';
       this.circuitBreaker.lastStateChange = Date.now();
-      console.log(`[${this.getAdapterName()}] Circuit breaker: CLOSED -> OPEN (${this.circuitBreaker.failureCount} failures)`);
+      this.logger.info(`Circuit breaker: CLOSED -> OPEN (${this.circuitBreaker.failureCount} failures)`);
     }
   }
 
@@ -718,8 +728,8 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
           retryCount++;
           this.stats.totalRetries++;
           const delay = this.calculateBackoff(retryCount);
-          console.warn(
-            `[${this.getAdapterName()}] Retry ${retryCount}/${this.config.retry.maxRetries} after ${delay}ms: ${error.message}`
+          this.logger.warn(
+            `Retry ${retryCount}/${this.config.retry.maxRetries} after ${delay}ms: ${error.message}`
           );
           await this.sleep(delay);
           continue;
@@ -818,7 +828,7 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
   protected async waitForRateLimit(): Promise<void> {
     const waitTime = this.rateLimiter.getWaitTime();
     if (waitTime > 0) {
-      console.log(`[${this.getAdapterName()}] Rate limited, waiting ${waitTime}ms...`);
+      this.logger.info(`Rate limited, waiting ${waitTime}ms...`);
       await this.sleep(waitTime);
     }
   }
