@@ -35,6 +35,7 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  ErrorCode,
   type Result,
   success,
   failure,
@@ -566,10 +567,10 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
     }
 
     if (!this.isConfigured) {
-      throw new AdapterError(
-        'SAM.gov API key not configured',
-        'AUTH_FAILED'
-      );
+      throw new AdapterError('SAM.gov API key not configured', {
+        adapterName: this.getAdapterName(),
+        code: ErrorCode.AUTH_FAILED,
+      });
     }
 
     const params = this.buildSearchParams(conditions, page, limit);
@@ -595,7 +596,10 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to search entities: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -613,7 +617,11 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
       );
 
       if (!response.entityData || response.entityData.length === 0) {
-        throw new AdapterError(`Entity not found: ${uei}`, 'NOT_FOUND', 404);
+        throw new AdapterError(`Entity not found: ${uei}`, {
+          adapterName: this.getAdapterName(),
+          code: ErrorCode.NOT_FOUND,
+          statusCode: 404,
+        });
       }
 
       return this.normalizeEntity(response.entityData[0]);
@@ -623,7 +631,10 @@ export class SAMEntityAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to get entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }

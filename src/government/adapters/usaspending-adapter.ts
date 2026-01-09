@@ -505,7 +505,10 @@ export class USASpendingAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to search awards: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -598,10 +601,13 @@ export class USASpendingAdapter extends BaseGovernmentAdapter<
 
       return this.normalizeAwardDetail(response);
     } catch (error) {
-      if (error instanceof AdapterError && error.code === 'NOT_FOUND') {
-        throw new AdapterError(`Award not found: ${awardId}`, 'NOT_FOUND', 404);
+      if (error instanceof AdapterError) {
+        throw error;
       }
-      throw error;
+      throw new AdapterError(`Failed to get award: ${awardId}`, {
+        adapterName: this.getAdapterName(),
+        originalError: error instanceof Error ? error : undefined,
+      });
     }
   }
 

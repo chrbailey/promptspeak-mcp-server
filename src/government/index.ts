@@ -41,7 +41,15 @@ export {
 
   // Error handling
   AdapterError,
-  type AdapterErrorCode,
+  ErrorCode,
+  PromptSpeakError,
+  isPromptSpeakError,
+  CircuitBreakerError,
+  NetworkError,
+  TimeoutError,
+  RateLimitError,
+  AuthenticationError,
+  NotFoundError,
 
   // Result<T> pattern utilities
   type Result,

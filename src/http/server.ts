@@ -7,16 +7,13 @@
  * Usage:
  *   npm run start:http    - Start production server
  *   npm run dev:http      - Start development server with hot reload
+ *
+ * Follows the modular pattern established in the MCP server refactor.
  */
 
 import { createApp } from './app.js';
-import { loadConfig, getConfig } from './config.js';
-import { initializeDatabase } from '../symbols/database.js';
-import { initializeSymbolManager } from '../symbols/manager.js';
-import { ensureDefaultApiKey, initializeApiKeyTable } from '../auth/api-key.js';
-import { createLogger } from '../core/logging/index.js';
-import * as path from 'path';
-import * as fs from 'fs';
+import { loadConfig } from './config.js';
+import { initializeHttpServer, createLogger } from './server-init.js';
 
 const logger = createLogger('HttpServer');
 
@@ -26,41 +23,30 @@ async function main(): Promise<void> {
 
   // Load configuration
   const config = loadConfig();
-  logger.info(`Environment: ${config.nodeEnv}`);
-  logger.info(`Port: ${config.port}`);
-  logger.info(`Database: ${config.dbPath}`);
+  logger.info('Configuration loaded', {
+    environment: config.nodeEnv,
+    port: config.port,
+    database: config.dbPath,
+  });
 
-  // Ensure data directory exists
-  const dataDir = path.dirname(config.dbPath);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    logger.info(`Created data directory: ${dataDir}`);
+  // Initialize all subsystems
+  const initResult = await initializeHttpServer({ config });
+
+  if (!initResult.success) {
+    logger.error('Server initialization failed', undefined, {
+      errors: initResult.errors,
+    });
+    process.exit(1);
   }
 
-  // Initialize database
-  logger.info('Initializing database...');
-  initializeDatabase(config.dbPath);
-
-  // Initialize API key table
-  logger.info('Initializing API key table...');
-  initializeApiKeyTable();
-
-  // Initialize symbol manager
-  logger.info('Initializing symbol manager...');
-  initializeSymbolManager(dataDir);
-
-  // Create default API key if none exist
-  logger.info('Checking for default API key...');
-  await ensureDefaultApiKey();
-
-  // Create Express app
+  // Create and start Express app
   const app = createApp();
-
-  // Start server
   const server = app.listen(config.port, config.host, () => {
-    logger.info(`Server running at http://${config.host}:${config.port}`);
-    logger.info(`Auth header: ${config.auth.apiKeyHeader}`);
-    logger.info('Endpoints: /health, /api/v1/symbols, /api/v1/symbols/:id');
+    logger.info('Server started', {
+      url: `http://${config.host}:${config.port}`,
+      authHeader: config.auth.apiKeyHeader,
+      endpoints: ['/health', '/api/v1/symbols', '/api/v1/agents'],
+    });
   });
 
   // Graceful shutdown
@@ -83,6 +69,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  logger.error('Failed to start server:', error);
+  logger.error('Failed to start server', error instanceof Error ? error : undefined);
   process.exit(1);
 });

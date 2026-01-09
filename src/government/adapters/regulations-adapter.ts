@@ -31,6 +31,7 @@ import {
   DEFAULT_RETRY_CONFIG,
   DEFAULT_CACHE_CONFIG,
   AdapterError,
+  ErrorCode,
   type Result,
   success,
   failure,
@@ -554,10 +555,10 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
     }
 
     if (!this.isConfigured) {
-      throw new AdapterError(
-        'Regulations.gov API key not configured',
-        'AUTH_FAILED'
-      );
+      throw new AdapterError('Regulations.gov API key not configured', {
+        adapterName: this.getAdapterName(),
+        code: ErrorCode.AUTH_FAILED,
+      });
     }
 
     const params = this.buildDocumentSearchParams(conditions, page, perPage);
@@ -584,7 +585,10 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to search documents: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -754,10 +758,10 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
     }
 
     if (!this.isConfigured) {
-      throw new AdapterError(
-        'Regulations.gov API key not configured',
-        'AUTH_FAILED'
-      );
+      throw new AdapterError('Regulations.gov API key not configured', {
+        adapterName: this.getAdapterName(),
+        code: ErrorCode.AUTH_FAILED,
+      });
     }
 
     const params = this.buildDocketSearchParams(conditions, page, perPage);
@@ -784,7 +788,10 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to search dockets: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -803,10 +810,13 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
       return this.normalizeDocument(response.data);
     } catch (error) {
-      if (error instanceof AdapterError && error.code === 'NOT_FOUND') {
-        throw new AdapterError(`Document not found: ${documentId}`, 'NOT_FOUND', 404);
+      if (error instanceof AdapterError) {
+        throw error;
       }
-      throw error;
+      throw new AdapterError(`Failed to get document: ${documentId}`, {
+        adapterName: this.getAdapterName(),
+        originalError: error instanceof Error ? error : undefined,
+      });
     }
   }
 
@@ -824,10 +834,13 @@ export class RegulationsGovAdapter extends BaseGovernmentAdapter<
 
       return this.normalizeDocket(response.data);
     } catch (error) {
-      if (error instanceof AdapterError && error.code === 'NOT_FOUND') {
-        throw new AdapterError(`Docket not found: ${docketId}`, 'NOT_FOUND', 404);
+      if (error instanceof AdapterError) {
+        throw error;
       }
-      throw error;
+      throw new AdapterError(`Failed to get docket: ${docketId}`, {
+        adapterName: this.getAdapterName(),
+        originalError: error instanceof Error ? error : undefined,
+      });
     }
   }
 

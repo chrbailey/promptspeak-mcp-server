@@ -517,7 +517,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to search documents: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -541,7 +544,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to get documents for date: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -591,7 +597,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to get agencies: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -615,7 +624,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to get agency: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }
@@ -635,10 +647,13 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
 
       return this.normalizeDocument(response);
     } catch (error) {
-      if (error instanceof AdapterError && error.code === 'NOT_FOUND') {
-        throw new AdapterError(`Document not found: ${documentNumber}`, 'NOT_FOUND', 404);
+      if (error instanceof AdapterError) {
+        throw error;
       }
-      throw error;
+      throw new AdapterError(`Failed to get document: ${documentNumber}`, {
+        adapterName: this.getAdapterName(),
+        originalError: error instanceof Error ? error : undefined,
+      });
     }
   }
 
@@ -663,7 +678,10 @@ export class FederalRegisterAdapter extends BaseGovernmentAdapter<
       }
       throw new AdapterError(
         `Failed to get documents: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UNKNOWN'
+        {
+          adapterName: this.getAdapterName(),
+          originalError: error instanceof Error ? error : undefined,
+        }
       );
     }
   }

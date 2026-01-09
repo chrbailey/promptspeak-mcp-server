@@ -18,9 +18,35 @@
 import type { DirectiveSymbol } from '../../symbols/types.js';
 import { type Result, type ResultMetadata, success, failure, fromError } from '../../core/result/index.js';
 import { createLogger } from '../../core/logging/index.js';
+import {
+  AdapterError,
+  CircuitBreakerError,
+  NetworkError,
+  TimeoutError,
+  RateLimitError,
+  AuthenticationError,
+  NotFoundError,
+  ErrorCode,
+  PromptSpeakError,
+  isPromptSpeakError,
+} from '../../core/errors/index.js';
 
 // Re-export Result utilities for adapter use
 export { type Result, type ResultMetadata, success, failure, fromError } from '../../core/result/index.js';
+
+// Re-export error types for adapter use
+export {
+  AdapterError,
+  CircuitBreakerError,
+  NetworkError,
+  TimeoutError,
+  RateLimitError,
+  AuthenticationError,
+  NotFoundError,
+  ErrorCode,
+  PromptSpeakError,
+  isPromptSpeakError,
+} from '../../core/errors/index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION TYPES
@@ -167,38 +193,6 @@ export interface AdapterStats {
   /** Average response time in milliseconds */
   avgResponseTimeMs: number;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ERROR TYPES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Custom error class for adapter-specific errors.
- */
-export class AdapterError extends Error {
-  constructor(
-    message: string,
-    public readonly code: AdapterErrorCode,
-    public readonly statusCode?: number,
-    public readonly retryable: boolean = false,
-    public readonly originalError?: Error
-  ) {
-    super(message);
-    this.name = 'AdapterError';
-  }
-}
-
-export type AdapterErrorCode =
-  | 'NETWORK_ERROR'
-  | 'TIMEOUT'
-  | 'RATE_LIMITED'
-  | 'AUTH_FAILED'
-  | 'NOT_FOUND'
-  | 'INVALID_RESPONSE'
-  | 'SERVER_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'CIRCUIT_OPEN'
-  | 'UNKNOWN';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CIRCUIT BREAKER TYPES
@@ -601,11 +595,13 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
         this.circuitBreaker.lastStateChange = now;
         this.logger.info('Circuit breaker: OPEN -> HALF_OPEN');
       } else {
-        throw new AdapterError(
+        throw new CircuitBreakerError(
           `Circuit breaker is OPEN - ${this.getAdapterName()} temporarily unavailable`,
-          'CIRCUIT_OPEN',
-          503,
-          false
+          {
+            serviceName: this.getAdapterName(),
+            resetAfter: this.circuitBreakerConfig.openDurationMs,
+            statusCode: 503,
+          }
         );
       }
     }
@@ -636,8 +632,10 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
    * In HALF_OPEN state, immediately transitions back to OPEN.
    * In CLOSED state, transitions to OPEN after threshold is reached.
    */
-  protected recordFailure(errorCode: string): void {
-    if (!this.circuitBreakerConfig.monitoredErrors.includes(errorCode)) {
+  protected recordFailure(errorCode: ErrorCode | string): void {
+    // Convert ErrorCode to string for comparison with monitored errors
+    const codeStr = String(errorCode);
+    if (!this.circuitBreakerConfig.monitoredErrors.includes(codeStr)) {
       return; // Don't count non-monitored errors
     }
 
@@ -723,8 +721,8 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
       } catch (error) {
         lastError = error as Error;
 
-        // Check if we should retry
-        if (error instanceof AdapterError && error.retryable && retryCount < this.config.retry.maxRetries) {
+        // Check if we should retry (works with all PromptSpeakError subclasses)
+        if (isPromptSpeakError(error) && error.retryable && retryCount < this.config.retry.maxRetries) {
           retryCount++;
           this.stats.totalRetries++;
           const delay = this.calculateBackoff(retryCount);
@@ -743,7 +741,7 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
     this.stats.failedRequests++;
 
     // Update circuit breaker with failure
-    if (lastError instanceof AdapterError) {
+    if (isPromptSpeakError(lastError)) {
       this.recordFailure(lastError.code);
     }
 
@@ -787,19 +785,37 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
 
       // Handle HTTP errors
       if (!response.ok) {
-        const errorCode = this.mapHttpStatusToErrorCode(response.status);
         const retryable = this.config.retry.retryableStatusCodes.includes(response.status);
 
         if (response.status === 429) {
           this.stats.rateLimitedRequests++;
+          throw new RateLimitError(`HTTP ${response.status}: ${response.statusText}`, {
+            statusCode: response.status,
+            retryable,
+          });
         }
 
-        throw new AdapterError(
-          `HTTP ${response.status}: ${response.statusText}`,
-          errorCode,
-          response.status,
-          retryable
-        );
+        if (response.status === 401 || response.status === 403) {
+          throw new AuthenticationError(`HTTP ${response.status}: ${response.statusText}`, {
+            statusCode: response.status,
+            retryable: false,
+          });
+        }
+
+        if (response.status === 404) {
+          throw new NotFoundError('Resource', url, {
+            statusCode: response.status,
+            retryable: false,
+          });
+        }
+
+        // Generic adapter error for other status codes
+        throw new AdapterError(`HTTP ${response.status}: ${response.statusText}`, {
+          adapterName: this.getAdapterName(),
+          code: response.status >= 500 ? ErrorCode.SERVER_ERROR : ErrorCode.ADAPTER_ERROR,
+          statusCode: response.status,
+          retryable,
+        });
       }
 
       const data = await response.json();
@@ -807,18 +823,34 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
     } catch (error) {
       clearTimeout(timeout);
 
-      if (error instanceof AdapterError) {
+      // Re-throw if it's already a PromptSpeak error
+      if (error instanceof AdapterError || error instanceof CircuitBreakerError ||
+          error instanceof NetworkError || error instanceof TimeoutError ||
+          error instanceof RateLimitError || error instanceof AuthenticationError ||
+          error instanceof NotFoundError) {
         throw error;
       }
 
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new AdapterError('Request timed out', 'TIMEOUT', undefined, true, error);
+          throw new TimeoutError('Request timed out', {
+            timeoutMs: this.config.timeoutMs,
+            originalError: error,
+            retryable: true,
+          });
         }
-        throw new AdapterError(`Network error: ${error.message}`, 'NETWORK_ERROR', undefined, true, error);
+        throw new NetworkError(`Network error: ${error.message}`, {
+          url,
+          originalError: error,
+          retryable: true,
+        });
       }
 
-      throw new AdapterError('Unknown error', 'UNKNOWN', undefined, false);
+      throw new AdapterError('Unknown error', {
+        adapterName: this.getAdapterName(),
+        code: ErrorCode.UNKNOWN,
+        retryable: false,
+      });
     }
   }
 
@@ -841,17 +873,6 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
       this.config.retry.initialDelayMs *
       Math.pow(this.config.retry.backoffMultiplier, retryCount - 1);
     return Math.min(delay, this.config.retry.maxDelayMs);
-  }
-
-  /**
-   * Map HTTP status code to adapter error code.
-   */
-  private mapHttpStatusToErrorCode(status: number): AdapterErrorCode {
-    if (status === 401 || status === 403) return 'AUTH_FAILED';
-    if (status === 404) return 'NOT_FOUND';
-    if (status === 429) return 'RATE_LIMITED';
-    if (status >= 500) return 'SERVER_ERROR';
-    return 'UNKNOWN';
   }
 
   /**
