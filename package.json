@@ -33,7 +33,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^7.0.12",
     "uuid": "^13.0.0",
     "yaml": "^2.8.2",
     "zod": "^3.22.4"
@@ -46,7 +46,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.0",
-    "@types/nodemailer": "^6.4.17",
+    "@types/nodemailer": "^7.0.4",
     "@types/uuid": "^10.0.0",
     "docx": "^9.5.1",
     "tsx": "^4.7.0",
