@@ -215,16 +215,12 @@ export class Logger {
 
   /**
    * Write the formatted log entry to the appropriate output stream.
+   * NOTE: MCP servers must use stderr for ALL logging since stdout is
+   * reserved for JSON-RPC protocol communication.
    */
-  private write(level: LogLevel, output: string): void {
-    // Use stderr for errors and critical, stdout for everything else
-    if (level === 'error' || level === 'critical') {
-      console.error(output);
-    } else if (level === 'warn') {
-      console.warn(output);
-    } else {
-      console.log(output);
-    }
+  private write(_level: LogLevel, output: string): void {
+    // ALL output goes to stderr for MCP compatibility
+    console.error(output);
   }
 }
 

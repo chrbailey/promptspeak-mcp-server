@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     'SYMBOL_CREATE', 'SYMBOL_CREATE_BLOCKED',
     'SYMBOL_UPDATE', 'SYMBOL_UPDATE_BLOCKED',
     'SYMBOL_DELETE', 'SYMBOL_ACCESS', 'SYMBOL_FORMAT',
-    'VALIDATION_WARNING', 'INJECTION_ATTEMPT', 'SECURITY_ALERT'
+    'VALIDATION_WARNING', 'INJECTION_ATTEMPT', 'SECURITY_ALERT',
+    'EPISTEMIC_FLAG', 'SYMBOL_VERIFIED', 'SYMBOL_DISPUTED'
   ))
 );
 
@@ -275,6 +276,55 @@ WHERE expires_at IS NOT NULL;
 
 -- Frequently accessed tokens (for caching optimization)
 CREATE INDEX IF NOT EXISTS idx_opaque_access ON opaque_mappings(access_count DESC);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- VERIFICATION EVENTS TABLE (v2.1 - Epistemic Tracking)
+-- Tracks the verification history of symbol claims
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS verification_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol_id TEXT NOT NULL,
+  timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+  event_type TEXT NOT NULL,  -- 'CREATED', 'AUTO_FLAGGED', 'HUMAN_REVIEWED', 'VERIFIED', 'DISPUTED', etc.
+  old_status TEXT,           -- Previous epistemic status
+  new_status TEXT,           -- New epistemic status
+  old_confidence REAL,       -- Previous confidence level
+  new_confidence REAL,       -- New confidence level
+  reviewer TEXT,             -- Human or system identifier
+  evidence_added TEXT,       -- JSON array of new evidence
+  notes TEXT,                -- Review notes
+
+  -- Foreign key
+  FOREIGN KEY (symbol_id) REFERENCES symbols(symbol_id) ON DELETE CASCADE,
+
+  -- Constraints
+  CONSTRAINT valid_verification_event CHECK (event_type IN (
+    'CREATED', 'AUTO_FLAGGED', 'HUMAN_REVIEWED', 'VERIFIED',
+    'DISPUTED', 'CORROBORATED', 'EVIDENCE_ADDED', 'ALTERNATIVE_ADDED',
+    'CONFIDENCE_UPDATED'
+  )),
+  CONSTRAINT valid_confidence CHECK (
+    (old_confidence IS NULL OR (old_confidence >= 0.0 AND old_confidence <= 1.0)) AND
+    (new_confidence IS NULL OR (new_confidence >= 0.0 AND new_confidence <= 1.0))
+  )
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- VERIFICATION EVENTS INDEXES
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Lookup verification history by symbol
+CREATE INDEX IF NOT EXISTS idx_verification_symbol ON verification_events(symbol_id);
+
+-- Timeline queries
+CREATE INDEX IF NOT EXISTS idx_verification_timestamp ON verification_events(timestamp DESC);
+
+-- Find events by type (e.g., all DISPUTED claims)
+CREATE INDEX IF NOT EXISTS idx_verification_type ON verification_events(event_type);
+
+-- Find verifications by reviewer
+CREATE INDEX IF NOT EXISTS idx_verification_reviewer ON verification_events(reviewer);
 `;
 
 
@@ -809,6 +859,155 @@ export class SymbolDatabase {
       totalAccesses: stats.total_accesses || 0,
       tokensWithSymbol: stats.tokens_with_symbol || 0,
       expiredTokens: stats.expired_tokens || 0,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // VERIFICATION EVENT OPERATIONS (v2.1 - Epistemic Tracking)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Insert a verification event for a symbol
+   */
+  insertVerificationEvent(params: {
+    symbolId: string;
+    eventType: string;
+    oldStatus?: string;
+    newStatus?: string;
+    oldConfidence?: number;
+    newConfidence?: number;
+    reviewer: string;
+    evidenceAdded?: string[];
+    notes?: string;
+  }): { success: boolean; error?: string } {
+    try {
+      this.db.prepare(`
+        INSERT INTO verification_events (
+          symbol_id, event_type, old_status, new_status,
+          old_confidence, new_confidence, reviewer, evidence_added, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        params.symbolId,
+        params.eventType,
+        params.oldStatus || null,
+        params.newStatus || null,
+        params.oldConfidence ?? null,
+        params.newConfidence ?? null,
+        params.reviewer,
+        params.evidenceAdded ? JSON.stringify(params.evidenceAdded) : null,
+        params.notes || null
+      );
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Get verification history for a symbol
+   */
+  getVerificationHistory(symbolId: string): Array<{
+    id: number;
+    symbolId: string;
+    timestamp: string;
+    eventType: string;
+    oldStatus: string | null;
+    newStatus: string | null;
+    oldConfidence: number | null;
+    newConfidence: number | null;
+    reviewer: string;
+    evidenceAdded: string[] | null;
+    notes: string | null;
+  }> {
+    const rows = this.db.prepare(`
+      SELECT * FROM verification_events
+      WHERE symbol_id = ?
+      ORDER BY timestamp DESC
+    `).all(symbolId) as Array<{
+      id: number;
+      symbol_id: string;
+      timestamp: string;
+      event_type: string;
+      old_status: string | null;
+      new_status: string | null;
+      old_confidence: number | null;
+      new_confidence: number | null;
+      reviewer: string;
+      evidence_added: string | null;
+      notes: string | null;
+    }>;
+
+    return rows.map(row => ({
+      id: row.id,
+      symbolId: row.symbol_id,
+      timestamp: row.timestamp,
+      eventType: row.event_type,
+      oldStatus: row.old_status,
+      newStatus: row.new_status,
+      oldConfidence: row.old_confidence,
+      newConfidence: row.new_confidence,
+      reviewer: row.reviewer,
+      evidenceAdded: row.evidence_added ? JSON.parse(row.evidence_added) : null,
+      notes: row.notes,
+    }));
+  }
+
+  /**
+   * List symbols that require human review based on their epistemic metadata.
+   * Joins symbols table with their JSON data to filter by epistemic fields.
+   */
+  listSymbolsNeedingReview(options: {
+    claimType?: string;
+    minConfidence?: number;
+    maxConfidence?: number;
+    limit?: number;
+    offset?: number;
+  }): { symbols: SymbolRow[]; total: number } {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    // Filter symbols where epistemic.requires_human_review = true
+    // SQLite JSON1 extension allows querying JSON fields
+    conditions.push("json_extract(data, '$.epistemic.requires_human_review') = 1");
+
+    if (options.claimType) {
+      conditions.push("json_extract(data, '$.epistemic.claim_type') = ?");
+      params.push(options.claimType);
+    }
+
+    if (options.minConfidence !== undefined) {
+      conditions.push("json_extract(data, '$.epistemic.confidence') >= ?");
+      params.push(options.minConfidence);
+    }
+
+    if (options.maxConfidence !== undefined) {
+      conditions.push("json_extract(data, '$.epistemic.confidence') <= ?");
+      params.push(options.maxConfidence);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = options.limit || 50;
+    const offset = options.offset || 0;
+
+    const query = `
+      SELECT * FROM symbols
+      ${whereClause}
+      ORDER BY json_extract(data, '$.epistemic.confidence') ASC,
+               created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countQuery = `SELECT COUNT(*) as count FROM symbols ${whereClause}`;
+
+    const rows = this.db.prepare(query).all(...params, limit, offset) as SymbolRow[];
+    const countResult = this.db.prepare(countQuery).get(...params) as { count: number };
+
+    return {
+      symbols: rows,
+      total: countResult.count,
     };
   }
 

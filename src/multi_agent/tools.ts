@@ -34,6 +34,8 @@ import type {
 import { intentManager } from './intent-manager.js';
 import { agentRegistry } from './agent-registry.js';
 import { missionManager } from './mission.js';
+import { getBootCamp } from './boot-camp.js';
+import type { TrainingScenario, BootCampSession, MarineCertification } from './boot-camp.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ZOD VALIDATION SCHEMAS
@@ -221,6 +223,35 @@ const MissionControlSchema = z.object({
   {
     message: 'Reason is required when action is "abort"',
     path: ['reason'],
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boot Camp Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BootCampStartSchema = z.object({
+  agent_id: z.string().min(1, 'Agent ID is required'),
+  intent_id: z.string().min(1, 'Intent ID is required'),
+});
+
+const BootCampScenarioSchema = z.object({
+  session_id: z.string().min(1, 'Session ID is required'),
+});
+
+const BootCampSubmitSchema = z.object({
+  session_id: z.string().min(1, 'Session ID is required'),
+  scenario_id: z.string().min(1, 'Scenario ID is required'),
+  selected_option: z.string().min(1, 'Selected option is required'),
+});
+
+const BootCampStatusSchema = z.object({
+  session_id: z.string().optional(),
+  agent_id: z.string().optional(),
+}).refine(
+  (data) => data.session_id || data.agent_id,
+  {
+    message: 'Either session_id or agent_id is required',
   }
 );
 
@@ -540,6 +571,133 @@ export const PS_MISSION_CONTROL_TOOL = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT CAMP TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ps_bootcamp_start - Start Marine Agent Boot Camp for an agent
+ */
+export const PS_BOOTCAMP_START_TOOL = {
+  name: 'ps_bootcamp_start',
+  description: `Start Marine Agent Boot Camp training for an agent.
+
+Boot Camp transforms generic agents into Marine Agents through 6 training phases:
+1. Intent Internalization - Deep mission understanding
+2. Constraint Calibration - Know the red lines (NEVER cross)
+3. Adversarial Training - Handle opposing agents
+4. Innovation Protocols - Find alternative paths (ADAPT, IMPROVISE, OVERCOME)
+5. Intelligence Discipline - What to observe and report
+6. Small Unit Tactics - Operate autonomously without coordinator
+
+Graduates receive a MarineCertification with calibrated characteristics that
+influence future decision-making under ambiguity.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      agent_id: {
+        type: 'string',
+        description: 'Agent ID to enroll in boot camp',
+      },
+      intent_id: {
+        type: 'string',
+        description: 'Intent ID that will govern this agent\'s training context',
+      },
+    },
+    required: ['agent_id', 'intent_id'],
+  },
+};
+
+/**
+ * ps_bootcamp_scenario - Get the next training scenario
+ */
+export const PS_BOOTCAMP_SCENARIO_TOOL = {
+  name: 'ps_bootcamp_scenario',
+  description: `Get the next training scenario for a boot camp session.
+
+Returns a situational scenario with multiple choice options. The agent must
+select the option that best aligns with Marine doctrine:
+- SEMPER FIDELIS: Loyalty to Commander's Intent
+- ADAPT: Change tactics, never change objective
+- IMPROVISE: Use available resources creatively
+- OVERCOME: "No" is information, not termination
+- INITIATIVE: Act decisively within red lines
+- INTEL_FIRST: Always bring back intelligence`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      session_id: {
+        type: 'string',
+        description: 'Boot camp session ID from ps_bootcamp_start',
+      },
+    },
+    required: ['session_id'],
+  },
+};
+
+/**
+ * ps_bootcamp_submit - Submit a scenario response
+ */
+export const PS_BOOTCAMP_SUBMIT_TOOL = {
+  name: 'ps_bootcamp_submit',
+  description: `Submit a response to a boot camp training scenario.
+
+Evaluates the selected option against Marine doctrine and returns:
+- Whether the response was correct
+- Alignment score (0.0-1.0)
+- Explanation of the correct approach
+- Whether the current phase is complete
+
+Upon completing all phases with passing scores, the agent graduates
+with a MarineCertification.`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      session_id: {
+        type: 'string',
+        description: 'Boot camp session ID',
+      },
+      scenario_id: {
+        type: 'string',
+        description: 'Scenario ID being answered',
+      },
+      selected_option: {
+        type: 'string',
+        description: 'Option ID selected (e.g., "a", "b", "c")',
+      },
+    },
+    required: ['session_id', 'scenario_id', 'selected_option'],
+  },
+};
+
+/**
+ * ps_bootcamp_status - Get boot camp status or certification
+ */
+export const PS_BOOTCAMP_STATUS_TOOL = {
+  name: 'ps_bootcamp_status',
+  description: `Get boot camp session status or agent certification.
+
+Provide either session_id (for active training) or agent_id (for certification check).
+
+Returns:
+- For sessions: current phase, progress, scores
+- For agents: certification details including characteristics and specializations`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      session_id: {
+        type: 'string',
+        description: 'Boot camp session ID (for training status)',
+      },
+      agent_id: {
+        type: 'string',
+        description: 'Agent ID (for certification status)',
+      },
+    },
+    required: [],
+  },
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ALL TOOL DEFINITIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -553,6 +711,11 @@ export const multiAgentToolDefinitions = [
   PS_MISSION_CREATE_TOOL,
   PS_MISSION_STATUS_TOOL,
   PS_MISSION_CONTROL_TOOL,
+  // Boot Camp tools
+  PS_BOOTCAMP_START_TOOL,
+  PS_BOOTCAMP_SCENARIO_TOOL,
+  PS_BOOTCAMP_SUBMIT_TOOL,
+  PS_BOOTCAMP_STATUS_TOOL,
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -817,6 +980,203 @@ export function handleMissionControl(args: Record<string, unknown>): Record<stri
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT CAMP HANDLERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Handle ps_bootcamp_start - Start Boot Camp training
+ */
+export function handleBootCampStart(args: Record<string, unknown>): Record<string, unknown> {
+  const parseResult = BootCampStartSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { agent_id, intent_id } = parseResult.data;
+
+  // Get the intent to pass to boot camp
+  const intent = intentManager.getIntent(intent_id);
+  if (!intent) {
+    return { success: false, error: `Intent not found: ${intent_id}` };
+  }
+
+  try {
+    const bootCamp = getBootCamp();
+    const session = bootCamp.startBootCamp(agent_id, intent);
+
+    return {
+      success: true,
+      session_id: session.session_id,
+      agent_id: session.agent_id,
+      current_phase: session.current_phase,
+      started_at: session.started_at,
+      message: `Boot Camp started for agent ${agent_id}. Begin with phase: ${session.current_phase}`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Handle ps_bootcamp_scenario - Get next training scenario
+ */
+export function handleBootCampScenario(args: Record<string, unknown>): Record<string, unknown> {
+  const parseResult = BootCampScenarioSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { session_id } = parseResult.data;
+  const bootCamp = getBootCamp();
+
+  const session = bootCamp.getSession(session_id);
+  if (!session) {
+    return { success: false, error: `Session not found: ${session_id}` };
+  }
+
+  const scenario = bootCamp.getScenario(session_id);
+  if (!scenario) {
+    return {
+      success: true,
+      phase_complete: true,
+      current_phase: session.current_phase,
+      message: `All scenarios for phase ${session.current_phase} have been attempted`,
+    };
+  }
+
+  return {
+    success: true,
+    session_id,
+    current_phase: session.current_phase,
+    scenario: {
+      scenario_id: scenario.scenario_id,
+      situation: scenario.situation,
+      options: scenario.options.map((o) => ({
+        id: o.id,
+        action: o.action,
+      })),
+    },
+  };
+}
+
+/**
+ * Handle ps_bootcamp_submit - Submit scenario response
+ */
+export function handleBootCampSubmit(args: Record<string, unknown>): Record<string, unknown> {
+  const parseResult = BootCampSubmitSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { session_id, scenario_id, selected_option } = parseResult.data;
+  const bootCamp = getBootCamp();
+
+  try {
+    const result = bootCamp.submitResponse(session_id, scenario_id, selected_option);
+    const session = bootCamp.getSession(session_id);
+
+    const response: Record<string, unknown> = {
+      success: true,
+      correct: result.correct,
+      alignment_score: result.score,
+      explanation: result.explanation,
+      phase_complete: result.phase_complete,
+    };
+
+    if (session) {
+      response.current_phase = session.current_phase;
+      response.phase_progress = session.phase_progress[session.current_phase];
+
+      // Check if graduated
+      if (session.certification) {
+        response.graduated = true;
+        response.certification = session.certification;
+      }
+    }
+
+    return response;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Handle ps_bootcamp_status - Get session or certification status
+ */
+export function handleBootCampStatus(args: Record<string, unknown>): Record<string, unknown> {
+  const parseResult = BootCampStatusSchema.safeParse(args);
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Validation failed: ${formatZodError(parseResult.error)}`,
+    };
+  }
+
+  const { session_id, agent_id } = parseResult.data;
+  const bootCamp = getBootCamp();
+
+  if (session_id) {
+    const session = bootCamp.getSession(session_id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${session_id}` };
+    }
+
+    return {
+      success: true,
+      type: 'session',
+      session_id: session.session_id,
+      agent_id: session.agent_id,
+      current_phase: session.current_phase,
+      phase_progress: session.phase_progress,
+      started_at: session.started_at,
+      completed_at: session.completed_at,
+      graduated: !!session.certification,
+      certification: session.certification,
+    };
+  }
+
+  if (agent_id) {
+    const certification = bootCamp.getCertification(agent_id);
+    const isCertified = bootCamp.isCertified(agent_id);
+
+    if (!isCertified) {
+      return {
+        success: true,
+        type: 'certification',
+        agent_id,
+        is_certified: false,
+        message: `Agent ${agent_id} has not completed Boot Camp`,
+      };
+    }
+
+    return {
+      success: true,
+      type: 'certification',
+      agent_id,
+      is_certified: true,
+      certification,
+    };
+  }
+
+  return { success: false, error: 'Either session_id or agent_id is required' };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -852,6 +1212,19 @@ export async function handleMultiAgentTool(
 
     case 'ps_mission_control':
       return handleMissionControl(args);
+
+    // Boot Camp tools
+    case 'ps_bootcamp_start':
+      return handleBootCampStart(args);
+
+    case 'ps_bootcamp_scenario':
+      return handleBootCampScenario(args);
+
+    case 'ps_bootcamp_submit':
+      return handleBootCampSubmit(args);
+
+    case 'ps_bootcamp_status':
+      return handleBootCampStatus(args);
 
     default:
       return { success: false, error: `Unknown multi-agent tool: ${toolName}` };

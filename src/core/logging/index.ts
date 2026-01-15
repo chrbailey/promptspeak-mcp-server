@@ -39,12 +39,16 @@
  * @packageDocumentation
  */
 
-// Types
-export {
+// Types (type-only exports for interfaces/type aliases)
+export type {
   LogLevel,
   LogContext,
   LogEntry,
   LoggerConfig,
+} from './types.js';
+
+// Runtime values
+export {
   LOG_LEVEL_PRIORITY,
   getDefaultConfig,
 } from './types.js';
@@ -55,9 +59,11 @@ export {
   withCorrelation,
 } from './context.js';
 
-// Formatters
+// Formatters (type-only for interface)
+export type { LogFormatter } from './formatters.js';
+
+// Formatters (runtime values)
 export {
-  LogFormatter,
   ConsoleFormatter,
   JSONFormatter,
   createFormatter,

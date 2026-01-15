@@ -19,7 +19,10 @@
     "monitor:uninstall": "bash scheduler/install-scheduler.sh uninstall",
     "monitor:status": "bash scheduler/install-scheduler.sh status",
     "sam:search": "tsx search-ai-opportunities.ts",
-    "sam:rfi": "tsx demo-rfi-search.ts"
+    "sam:rfi": "tsx demo-rfi-search.ts",
+    "seed": "tsx scripts/seed-database.ts",
+    "seed:dry-run": "tsx scripts/seed-database.ts --dry-run",
+    "seed:force": "tsx scripts/seed-database.ts --force"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

@@ -26,6 +26,7 @@ import {
   verifySymbolUsage,
 } from './sanitizer.js';
 import { getAuditLogger } from './audit.js';
+import type { EpistemicStatus, EpistemicMetadata } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS
@@ -335,6 +336,151 @@ Symbol IDs follow the pattern:
       required: ['symbolId'],
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // EPISTEMIC VERIFICATION TOOLS (v2.1)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ps_symbol_verify
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    name: 'ps_symbol_verify',
+    description: `Record human verification of a symbol claim.
+
+Use this tool to upgrade or dispute claims based on human review:
+- VERIFIED: Human expert has confirmed the claim is accurate
+- CORROBORATED: Additional evidence supports the claim
+- DISPUTED: Human reviewer found the claim to be incorrect or misleading
+
+Important: Accusatory claims (fraud, violations) should be DISPUTED if they lack
+evidence or have plausible alternative explanations.`,
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbolId: {
+          type: 'string',
+          description: 'Symbol ID to verify',
+        },
+        new_status: {
+          type: 'string',
+          enum: ['VERIFIED', 'DISPUTED', 'CORROBORATED'],
+          description: 'New epistemic status for the claim',
+        },
+        new_confidence: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'New confidence level (0-1). Auto-calculated if not provided.',
+        },
+        evidence_added: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of evidence sources that support this verification',
+        },
+        reviewer: {
+          type: 'string',
+          description: 'Identifier of the human reviewer',
+        },
+        notes: {
+          type: 'string',
+          description: 'Notes explaining the verification decision',
+        },
+      },
+      required: ['symbolId', 'new_status', 'reviewer'],
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ps_symbol_list_unverified
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    name: 'ps_symbol_list_unverified',
+    description: `List symbols that require human review.
+
+Returns symbols flagged for review due to:
+- Accusatory claims without sufficient evidence
+- Missing alternative explanations
+- High-stakes claims (fraud, violations, diagnoses)
+- Low confidence scores
+
+Use this to find claims that need human validation before action.`,
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        claim_type: {
+          type: 'string',
+          enum: ['FACTUAL', 'STATISTICAL', 'CAUSAL', 'PREDICTIVE', 'ACCUSATORY', 'DIAGNOSTIC', 'PRESCRIPTIVE'],
+          description: 'Filter by claim type (e.g., ACCUSATORY for fraud allegations)',
+        },
+        min_confidence: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'Minimum confidence level to include',
+        },
+        max_confidence: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'Maximum confidence level to include',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum results to return (default: 50)',
+        },
+        offset: {
+          type: 'number',
+          description: 'Pagination offset',
+        },
+      },
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ps_symbol_add_alternative
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    name: 'ps_symbol_add_alternative',
+    description: `Add an alternative explanation to a symbol's findings.
+
+CRITICAL for preventing false positives: When a pattern-based finding could have
+multiple explanations, document them here. Adding high-likelihood alternatives
+automatically reduces confidence in the original claim.
+
+Examples:
+- "9 identical payments" → Alternative: "Monthly insurance premium financing"
+- "Large round numbers" → Alternative: "Negotiated contract amounts"
+- "Vendor with single customer" → Alternative: "Subsidiary company"`,
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbolId: {
+          type: 'string',
+          description: 'Symbol ID to update',
+        },
+        alternative: {
+          type: 'string',
+          description: 'Description of the alternative explanation',
+        },
+        likelihood: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'Estimated likelihood this alternative is correct (0-1)',
+        },
+        reasoning: {
+          type: 'string',
+          description: 'Why this alternative is plausible',
+        },
+        added_by: {
+          type: 'string',
+          description: 'Who is adding this alternative',
+        },
+      },
+      required: ['symbolId', 'alternative', 'likelihood', 'added_by'],
+    },
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -378,9 +524,147 @@ export async function handleSymbolTool(
         args.format as 'full' | 'compact' | 'requirements_only' | undefined
       );
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // EPISTEMIC VERIFICATION HANDLERS (v2.1)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    case 'ps_symbol_verify':
+      return manager.verifySymbol({
+        symbolId: args.symbolId as string,
+        new_status: args.new_status as 'VERIFIED' | 'DISPUTED' | 'CORROBORATED',
+        new_confidence: args.new_confidence as number | undefined,
+        evidence_added: args.evidence_added as string[] | undefined,
+        reviewer: args.reviewer as string,
+        notes: args.notes as string | undefined,
+      });
+
+    case 'ps_symbol_list_unverified':
+      return manager.listUnverifiedSymbols({
+        claim_type: args.claim_type as string | undefined,
+        min_confidence: args.min_confidence as number | undefined,
+        max_confidence: args.max_confidence as number | undefined,
+        limit: args.limit as number | undefined,
+        offset: args.offset as number | undefined,
+      });
+
+    case 'ps_symbol_add_alternative':
+      return manager.addAlternativeExplanation({
+        symbolId: args.symbolId as string,
+        alternative: args.alternative as string,
+        likelihood: args.likelihood as number,
+        reasoning: args.reasoning as string | undefined,
+        added_by: args.added_by as string,
+      });
+
     default:
       throw new Error(`Unknown symbol tool: ${name}`);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC FORMATTING UTILITIES (v2.1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Render a confidence bar for visual uncertainty display.
+ * Uses filled and empty blocks to show confidence level.
+ */
+function renderConfidenceBar(confidence: number): string {
+  const filled = Math.round(confidence * 10);
+  const empty = 10 - filled;
+  return '[' + '█'.repeat(filled) + '░'.repeat(empty) + ']';
+}
+
+/**
+ * Get emoji indicator for epistemic status.
+ */
+function getStatusEmoji(status: EpistemicStatus): string {
+  const map: Record<EpistemicStatus, string> = {
+    'HYPOTHESIS': '❓',
+    'INFERENCE': '🔍',
+    'OBSERVATION': '👁️',
+    'CORROBORATED': '✓✓',
+    'VERIFIED': '✅',
+    'AXIOMATIC': '📐',
+  };
+  return map[status] || '❓';
+}
+
+/**
+ * Get color-coded confidence descriptor.
+ */
+function getConfidenceLevel(confidence: number): string {
+  if (confidence >= 0.9) return 'VERY HIGH';
+  if (confidence >= 0.7) return 'HIGH';
+  if (confidence >= 0.5) return 'MODERATE';
+  if (confidence >= 0.3) return 'LOW';
+  return 'VERY LOW';
+}
+
+/**
+ * Format epistemic metadata for display.
+ */
+function formatEpistemicSection(epistemic: EpistemicMetadata | undefined): string {
+  if (!epistemic) {
+    return `
+┌─ EPISTEMIC STATUS ─────────────────────────────────────────────────────────┐
+│ ⚠️  NO EPISTEMIC METADATA - Treat as UNVERIFIED INFERENCE                   │
+└─────────────────────────────────────────────────────────────────────────────┘`;
+  }
+
+  const confidenceBar = renderConfidenceBar(epistemic.confidence);
+  const statusEmoji = getStatusEmoji(epistemic.status);
+  const confidencePercent = (epistemic.confidence * 100).toFixed(0);
+  const confidenceLevel = getConfidenceLevel(epistemic.confidence);
+
+  let output = `
+┌─ EPISTEMIC STATUS ─────────────────────────────────────────────────────────┐
+│ ${statusEmoji} ${epistemic.status.padEnd(12)} | Confidence: ${confidenceBar} ${confidencePercent.padStart(3)}% (${confidenceLevel})`;
+
+  // Add review warning if needed
+  if (epistemic.requires_human_review) {
+    output += `
+├─ ⚠️  REQUIRES HUMAN REVIEW ──────────────────────────────────────────────────┤
+│ ${epistemic.review_reason || 'No reason provided'}`;
+  }
+
+  // Add claim type
+  output += `
+├─ Claim Type: ${epistemic.claim_type}`;
+
+  // Add evidence basis if available
+  if (epistemic.evidence_basis) {
+    const eb = epistemic.evidence_basis;
+    output += `
+├─ EVIDENCE BASIS ───────────────────────────────────────────────────────────┤
+│ Sources consulted: ${eb.sources_consulted.length > 0 ? eb.sources_consulted.join(', ') : 'None'}
+│ Cross-referenced: ${eb.cross_references_performed ? '✓ Yes' : '✗ NO - NOT CROSS-REFERENCED'}`;
+
+    // Add sources not consulted (gaps)
+    if (eb.sources_not_consulted && eb.sources_not_consulted.length > 0) {
+      output += `
+│ ⚠️  Sources NOT consulted: ${eb.sources_not_consulted.join(', ')}`;
+    }
+
+    // Add alternative explanations
+    if (eb.alternative_explanations && eb.alternative_explanations.length > 0) {
+      output += `
+├─ ALTERNATIVE EXPLANATIONS CONSIDERED ──────────────────────────────────────┤`;
+      for (const alt of eb.alternative_explanations) {
+        const likelihood = (alt.likelihood * 100).toFixed(0);
+        output += `
+│ • ${alt.explanation} (${likelihood}% likely)${alt.investigated ? ' [investigated]' : ''}`;
+      }
+    } else {
+      output += `
+│ ⚠️  NO ALTERNATIVE EXPLANATIONS PROVIDED`;
+    }
+  }
+
+  output += `
+└─────────────────────────────────────────────────────────────────────────────┘`;
+
+  return output;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -419,20 +703,27 @@ ${s.anti_requirements?.length ? '\nANTI-REQUIREMENTS:\n' + s.anti_requirements.m
 ${s.key_terms?.length ? '\nKEY TERMS (must appear): ' + s.key_terms.join(', ') : ''}
 `.trim();
   } else if (format === 'compact') {
+    // Compact format with inline epistemic indicator
+    const statusIndicator = s.epistemic
+      ? `${getStatusEmoji(s.epistemic.status)} ${(s.epistemic.confidence * 100).toFixed(0)}%`
+      : '❓ UNVERIFIED';
+
     content = `
-═══ ${s.symbolId} (v${s.version}) ═══
+═══ ${s.symbolId} (v${s.version}) ${statusIndicator} ═══
 WHO: ${s.who} | WHAT: ${s.what}
 WHY: ${s.why} | WHEN: ${s.when}
 INTENT: "${s.commanders_intent}"
 REQUIREMENTS: ${s.requirements.join('; ')}
+${s.epistemic?.requires_human_review ? '⚠️  REQUIRES HUMAN REVIEW' : ''}
 `.trim();
   } else {
-    // Full format
+    // Full format with complete epistemic section
     content = `
 ═══════════════════════════════════════════════════════════════════════════════
 DIRECTIVE SYMBOL: ${s.symbolId}
 Version: ${s.version} | Hash: ${s.hash}
 ═══════════════════════════════════════════════════════════════════════════════
+${formatEpistemicSection(s.epistemic)}
 
 WHO:   ${s.who}
 WHAT:  ${s.what}

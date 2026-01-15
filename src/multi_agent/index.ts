@@ -124,6 +124,26 @@ export {
 } from './mission.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BOOT CAMP EXPORTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  BootCampProtocol,
+  getBootCamp,
+  initializeBootCamp,
+  BOOT_CAMP_VERSION,
+  DEFAULT_CHARACTERISTICS,
+} from './boot-camp.js';
+
+export type {
+  MarineCharacteristics,
+  MarineCertification,
+  BootCampPhase,
+  TrainingScenario,
+  BootCampSession,
+} from './boot-camp.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MCP TOOL EXPORTS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -137,6 +157,11 @@ export {
   PS_MISSION_CREATE_TOOL,
   PS_MISSION_STATUS_TOOL,
   PS_MISSION_CONTROL_TOOL,
+  // Boot Camp tool definitions
+  PS_BOOTCAMP_START_TOOL,
+  PS_BOOTCAMP_SCENARIO_TOOL,
+  PS_BOOTCAMP_SUBMIT_TOOL,
+  PS_BOOTCAMP_STATUS_TOOL,
   multiAgentToolDefinitions,
 
   // Tool handlers
@@ -148,5 +173,10 @@ export {
   handleMissionCreate,
   handleMissionStatus,
   handleMissionControl,
+  // Boot Camp handlers
+  handleBootCampStart,
+  handleBootCampScenario,
+  handleBootCampSubmit,
+  handleBootCampStatus,
   handleMultiAgentTool,
 } from './tools.js';

@@ -46,6 +46,9 @@ import { CATEGORY_PREFIX } from './types.js';
 import { validateSymbolContent, type FullValidationResult } from './sanitizer.js';
 import { getAuditLogger, initializeAuditLogger } from './audit.js';
 import { initializeDatabase, getDatabase, type SymbolDatabase } from './database.js';
+import { getClaimValidator } from './claim-validator.js';
+import type { EpistemicMetadata } from './epistemic-types.js';
+import { createDefaultEpistemicMetadata } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -409,6 +412,74 @@ export class SymbolManager {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // EPISTEMIC VALIDATION: Detect high-stakes claims and enforce evidence
+    // ─────────────────────────────────────────────────────────────────────────
+    const claimValidator = getClaimValidator();
+    const claimValidation = claimValidator.validateSymbol(
+      {
+        who: request.who,
+        what: request.what,
+        why: request.why,
+        where: request.where,
+        when: request.when,
+        commanders_intent: request.commanders_intent,
+        requirements: request.requirements,
+        tags: request.tags,
+      },
+      request.epistemic?.evidence_basis
+    );
+
+    // Generate epistemic metadata based on validation
+    let epistemicMetadata: EpistemicMetadata;
+
+    if (request.epistemic) {
+      // User provided epistemic metadata - use as base but may override
+      epistemicMetadata = claimValidator.generateEpistemicMetadata(
+        claimValidation,
+        request.epistemic as Partial<EpistemicMetadata>
+      );
+
+      // If user claims cross-reference but validator found accusations, still flag
+      if (claimValidation.has_unverified_accusations &&
+          !request.epistemic.evidence_basis?.cross_references_performed) {
+        epistemicMetadata.requires_human_review = true;
+        epistemicMetadata.review_reason = claimValidation.reason;
+        epistemicMetadata.confidence = Math.min(
+          epistemicMetadata.confidence,
+          claimValidation.recommended_confidence
+        );
+      }
+    } else {
+      // Auto-generate epistemic metadata
+      epistemicMetadata = claimValidator.generateEpistemicMetadata(claimValidation);
+    }
+
+    // Log epistemic validation result
+    if (claimValidation.requires_human_review) {
+      logger.info('Symbol flagged for human review', {
+        symbolId: request.symbolId,
+        claimType: claimValidation.detected_claim_type,
+        confidence: epistemicMetadata.confidence,
+        reason: claimValidation.reason,
+        triggeredPatterns: claimValidation.triggered_patterns,
+      });
+
+      // Log to SQLite audit with new event type
+      this.db.insertAuditEntry({
+        eventType: 'EPISTEMIC_FLAG',
+        symbolId: request.symbolId,
+        riskScore: Math.round((1 - epistemicMetadata.confidence) * 100),
+        details: {
+          claimType: claimValidation.detected_claim_type,
+          confidence: epistemicMetadata.confidence,
+          triggeredPatterns: claimValidation.triggered_patterns,
+          suggestedSources: claimValidation.suggested_sources,
+        },
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Check if already exists
     if (this.db.symbolExists(request.symbolId)) {
       return {
@@ -455,6 +526,8 @@ export class SymbolManager {
         timestamp: now,
         changed_by: request.created_by,
       }],
+      // v2.1: Epistemic uncertainty tracking
+      epistemic: epistemicMetadata,
     };
 
     // Calculate hash
@@ -634,10 +707,20 @@ export class SymbolManager {
     const oldSymbol = existing.symbol;
     const now = new Date().toISOString();
 
+    // Handle epistemic metadata merge separately to preserve full type
+    const { epistemic: epistemicChanges, ...otherChanges } = request.changes;
+    const mergedEpistemic: EpistemicMetadata | undefined = epistemicChanges
+      ? {
+          ...(oldSymbol.epistemic || createDefaultEpistemicMetadata()),
+          ...epistemicChanges,
+        } as EpistemicMetadata
+      : oldSymbol.epistemic;
+
     // Build updated symbol
     const updated: DirectiveSymbol = {
       ...oldSymbol,
-      ...request.changes,
+      ...otherChanges,
+      epistemic: mergedEpistemic,
       symbolId: oldSymbol.symbolId, // Cannot change ID
       version: oldSymbol.version + 1,
       hash: '', // Recalculated below
@@ -922,6 +1005,295 @@ export class SymbolManager {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EPISTEMIC VERIFICATION METHODS (v2.1)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Verify a symbol claim - update its epistemic status based on human review.
+   * This is used to promote claims from INFERENCE → VERIFIED or mark as DISPUTED.
+   */
+  verifySymbol(request: {
+    symbolId: string;
+    new_status: 'VERIFIED' | 'DISPUTED' | 'CORROBORATED';
+    new_confidence?: number;
+    evidence_added?: string[];
+    reviewer: string;
+    notes?: string;
+  }): { success: boolean; error?: string } {
+    // Get existing symbol
+    const existing = this.get({ symbolId: request.symbolId });
+    if (!existing.found || !existing.symbol) {
+      return {
+        success: false,
+        error: existing.error || `Symbol ${request.symbolId} not found`,
+      };
+    }
+
+    const oldEpistemic = existing.symbol.epistemic;
+    const oldStatus = oldEpistemic?.status || 'INFERENCE';
+    const oldConfidence = oldEpistemic?.confidence ?? 0.5;
+
+    // Determine new confidence
+    let newConfidence = request.new_confidence;
+    if (newConfidence === undefined) {
+      // Auto-calculate based on new status
+      switch (request.new_status) {
+        case 'VERIFIED':
+          newConfidence = Math.max(oldConfidence, 0.9);
+          break;
+        case 'CORROBORATED':
+          newConfidence = Math.min(oldConfidence * 1.2, 0.85);
+          break;
+        case 'DISPUTED':
+          newConfidence = Math.min(oldConfidence * 0.3, 0.2);
+          break;
+      }
+    }
+
+    // Build updated epistemic metadata
+    const updatedEpistemic = {
+      ...oldEpistemic,
+      status: request.new_status,
+      confidence: newConfidence,
+      requires_human_review: request.new_status === 'DISPUTED', // Re-review disputed
+      review_reason: request.new_status === 'DISPUTED'
+        ? `Disputed by ${request.reviewer}: ${request.notes || 'No reason provided'}`
+        : undefined,
+      verification_history: [
+        ...(oldEpistemic?.verification_history || []),
+        {
+          event_type: request.new_status === 'VERIFIED' ? 'VERIFIED' :
+                     request.new_status === 'DISPUTED' ? 'DISPUTED' : 'CORROBORATED',
+          timestamp: new Date().toISOString(),
+          old_status: oldStatus,
+          new_status: request.new_status,
+          old_confidence: oldConfidence,
+          new_confidence: newConfidence,
+          reviewer: request.reviewer,
+          evidence_added: request.evidence_added,
+          notes: request.notes,
+        },
+      ],
+    };
+
+    // If evidence was added, update evidence basis
+    if (request.evidence_added && request.evidence_added.length > 0) {
+      updatedEpistemic.evidence_basis = {
+        ...(oldEpistemic?.evidence_basis || {
+          sources_consulted: [],
+          sources_not_consulted: [],
+          cross_references_performed: false,
+          alternative_explanations: [],
+          methodology: 'Unknown',
+        }),
+        sources_consulted: [
+          ...(oldEpistemic?.evidence_basis?.sources_consulted || []),
+          ...request.evidence_added,
+        ],
+      };
+    }
+
+    // Update the symbol
+    const updateResult = this.update({
+      symbolId: request.symbolId,
+      changes: { epistemic: updatedEpistemic } as unknown as Partial<DirectiveSymbol>,
+      change_description: `Status changed to ${request.new_status} by ${request.reviewer}`,
+      changed_by: request.reviewer,
+    });
+
+    if (!updateResult.success) {
+      return {
+        success: false,
+        error: updateResult.error,
+      };
+    }
+
+    // Log verification event to database
+    this.db.insertVerificationEvent({
+      symbolId: request.symbolId,
+      eventType: request.new_status === 'VERIFIED' ? 'VERIFIED' :
+                request.new_status === 'DISPUTED' ? 'DISPUTED' : 'CORROBORATED',
+      oldStatus: oldStatus,
+      newStatus: request.new_status,
+      oldConfidence: oldConfidence,
+      newConfidence: newConfidence,
+      reviewer: request.reviewer,
+      evidenceAdded: request.evidence_added,
+      notes: request.notes,
+    });
+
+    // Log to audit
+    const auditEventType = request.new_status === 'DISPUTED' ? 'SYMBOL_DISPUTED' : 'SYMBOL_VERIFIED';
+    this.db.insertAuditEntry({
+      eventType: auditEventType,
+      symbolId: request.symbolId,
+      details: {
+        oldStatus,
+        newStatus: request.new_status,
+        oldConfidence,
+        newConfidence,
+        reviewer: request.reviewer,
+        notes: request.notes,
+      },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * List symbols that require human review due to epistemic concerns.
+   */
+  listUnverifiedSymbols(request: {
+    claim_type?: string;
+    min_confidence?: number;
+    max_confidence?: number;
+    limit?: number;
+    offset?: number;
+  }): {
+    symbols: Array<{
+      symbolId: string;
+      category: SymbolCategory;
+      commanders_intent: string;
+      epistemic_status: string;
+      confidence: number;
+      review_reason?: string;
+      triggered_patterns?: string[];
+      created_at: string;
+    }>;
+    total: number;
+    has_more: boolean;
+  } {
+    const result = this.db.listSymbolsNeedingReview({
+      claimType: request.claim_type,
+      minConfidence: request.min_confidence,
+      maxConfidence: request.max_confidence,
+      limit: request.limit || 50,
+      offset: request.offset || 0,
+    });
+
+    const symbols = result.symbols.map(row => {
+      const symbol: DirectiveSymbol = JSON.parse(row.data);
+      return {
+        symbolId: symbol.symbolId,
+        category: symbol.category,
+        commanders_intent: symbol.commanders_intent,
+        epistemic_status: symbol.epistemic?.status || 'INFERENCE',
+        confidence: symbol.epistemic?.confidence ?? 0.5,
+        review_reason: symbol.epistemic?.review_reason,
+        triggered_patterns: undefined as string[] | undefined, // Would need to re-validate to get these
+        created_at: symbol.created_at,
+      };
+    });
+
+    return {
+      symbols,
+      total: result.total,
+      has_more: (request.offset || 0) + symbols.length < result.total,
+    };
+  }
+
+  /**
+   * Add an alternative explanation to a symbol's evidence basis.
+   * This is crucial for preventing false positives in accusatory findings.
+   */
+  addAlternativeExplanation(request: {
+    symbolId: string;
+    alternative: string;
+    likelihood: number;
+    reasoning?: string;
+    added_by: string;
+  }): { success: boolean; error?: string } {
+    // Get existing symbol
+    const existing = this.get({ symbolId: request.symbolId });
+    if (!existing.found || !existing.symbol) {
+      return {
+        success: false,
+        error: existing.error || `Symbol ${request.symbolId} not found`,
+      };
+    }
+
+    const oldEpistemic = existing.symbol.epistemic;
+
+    // Build new alternative explanation
+    const newAlternative = {
+      explanation: request.alternative,
+      likelihood: Math.max(0, Math.min(1, request.likelihood)),
+      reasoning: request.reasoning,
+      investigated: false,
+    };
+
+    // Update evidence basis
+    const updatedEvidenceBasis = {
+      ...(oldEpistemic?.evidence_basis || {
+        sources_consulted: [],
+        sources_not_consulted: [],
+        cross_references_performed: false,
+        alternative_explanations: [],
+        methodology: 'Unknown',
+      }),
+      alternative_explanations: [
+        ...(oldEpistemic?.evidence_basis?.alternative_explanations || []),
+        newAlternative,
+      ],
+    };
+
+    // Recalculate confidence based on alternative explanations
+    // If alternatives have high likelihood, reduce confidence in the original claim
+    const totalAlternativeLikelihood = updatedEvidenceBasis.alternative_explanations
+      .reduce((sum, alt) => sum + alt.likelihood, 0);
+    const confidenceReduction = Math.min(totalAlternativeLikelihood * 0.3, 0.4);
+    const newConfidence = Math.max(
+      0.1,
+      (oldEpistemic?.confidence ?? 0.5) - confidenceReduction
+    );
+
+    // Build updated epistemic metadata
+    const updatedEpistemic = {
+      ...oldEpistemic,
+      evidence_basis: updatedEvidenceBasis,
+      confidence: newConfidence,
+      verification_history: [
+        ...(oldEpistemic?.verification_history || []),
+        {
+          event_type: 'ALTERNATIVE_ADDED' as const,
+          timestamp: new Date().toISOString(),
+          old_confidence: oldEpistemic?.confidence ?? 0.5,
+          new_confidence: newConfidence,
+          reviewer: request.added_by,
+          notes: `Added alternative: "${request.alternative}" (likelihood: ${request.likelihood})`,
+        },
+      ],
+    };
+
+    // Update the symbol
+    const updateResult = this.update({
+      symbolId: request.symbolId,
+      changes: { epistemic: updatedEpistemic } as unknown as Partial<DirectiveSymbol>,
+      change_description: `Alternative explanation added by ${request.added_by}`,
+      changed_by: request.added_by,
+    });
+
+    if (!updateResult.success) {
+      return {
+        success: false,
+        error: updateResult.error,
+      };
+    }
+
+    // Log verification event
+    this.db.insertVerificationEvent({
+      symbolId: request.symbolId,
+      eventType: 'ALTERNATIVE_ADDED',
+      oldConfidence: oldEpistemic?.confidence ?? 0.5,
+      newConfidence: newConfidence,
+      reviewer: request.added_by,
+      notes: `Alternative: "${request.alternative}" (likelihood: ${request.likelihood})`,
+    });
+
+    return { success: true };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -94,6 +94,9 @@ import { handleOrchestrationTool } from '../agents/tools.js';
 // Import multi-agent tools
 import { handleMultiAgentTool } from '../multi_agent/index.js';
 
+// Import swarm market agent tools
+import { executeSwarmTool } from '../swarm/tools.js';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -275,6 +278,19 @@ TOOL_HANDLERS.set('ps_mission_create', (args) => handleMultiAgentTool('ps_missio
 TOOL_HANDLERS.set('ps_mission_status', (args) => handleMultiAgentTool('ps_mission_status', args));
 TOOL_HANDLERS.set('ps_mission_control', (args) => handleMultiAgentTool('ps_mission_control', args));
 
+// ---------------------------------------------------------------------------
+// Market Agent Swarm Tools
+// ---------------------------------------------------------------------------
+TOOL_HANDLERS.set('ps_swarm_create', (args) => executeSwarmTool('ps_swarm_create', args));
+TOOL_HANDLERS.set('ps_swarm_start', (args) => executeSwarmTool('ps_swarm_start', args));
+TOOL_HANDLERS.set('ps_swarm_pause', (args) => executeSwarmTool('ps_swarm_pause', args));
+TOOL_HANDLERS.set('ps_swarm_terminate', (args) => executeSwarmTool('ps_swarm_terminate', args));
+TOOL_HANDLERS.set('ps_swarm_status', (args) => executeSwarmTool('ps_swarm_status', args));
+TOOL_HANDLERS.set('ps_swarm_agent_status', (args) => executeSwarmTool('ps_swarm_agent_status', args));
+TOOL_HANDLERS.set('ps_swarm_reallocate_budget', (args) => executeSwarmTool('ps_swarm_reallocate_budget', args));
+TOOL_HANDLERS.set('ps_swarm_insights', (args) => executeSwarmTool('ps_swarm_insights', args));
+TOOL_HANDLERS.set('ps_swarm_events', (args) => executeSwarmTool('ps_swarm_events', args));
+
 // ============================================================================
 // DISPATCHER FUNCTIONS
 // ============================================================================
@@ -380,6 +396,7 @@ export function getToolsByCategory(): Record<string, string[]> {
     translation: [],
     orchestration: [],
     multi_agent: [],
+    swarm: [],
   };
 
   for (const name of Array.from(TOOL_HANDLERS.keys())) {
@@ -405,6 +422,9 @@ export function getToolsByCategory(): Record<string, string[]> {
     }
     else if (name.startsWith('ps_intent') || name.startsWith('ps_mission') || name === 'ps_agent_register' || name === 'ps_agent_bind') {
       categories.multi_agent.push(name);
+    }
+    else if (name.startsWith('ps_swarm')) {
+      categories.swarm.push(name);
     }
   }
 

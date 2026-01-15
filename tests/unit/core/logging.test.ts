@@ -82,8 +82,9 @@ describe('Core Logging Module', () => {
         const logger = createLogger('MyTestModule');
         logger.info('Test message');
 
-        expect(mockConsoleLog).toHaveBeenCalledTimes(1);
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalledTimes(1);
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('[MyTestModule]');
       });
 
@@ -102,8 +103,9 @@ describe('Core Logging Module', () => {
       it('should log debug messages', () => {
         logger.debug('Debug message');
 
-        expect(mockConsoleLog).toHaveBeenCalledTimes(1);
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalledTimes(1);
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('DEBUG');
         expect(logOutput).toContain('Debug message');
       });
@@ -111,17 +113,19 @@ describe('Core Logging Module', () => {
       it('should log info messages', () => {
         logger.info('Info message');
 
-        expect(mockConsoleLog).toHaveBeenCalledTimes(1);
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalledTimes(1);
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('INFO');
         expect(logOutput).toContain('Info message');
       });
 
-      it('should log warn messages to console.warn', () => {
+      it('should log warn messages to console.error (MCP stderr requirement)', () => {
         logger.warn('Warning message');
 
-        expect(mockConsoleWarn).toHaveBeenCalledTimes(1);
-        const logOutput = mockConsoleWarn.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalledTimes(1);
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('WARN');
         expect(logOutput).toContain('Warning message');
       });
@@ -147,7 +151,8 @@ describe('Core Logging Module', () => {
       it('should include additional data in log output', () => {
         logger.info('Message with data', { key: 'value', count: 42 });
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('key');
         expect(logOutput).toContain('value');
         expect(logOutput).toContain('42');
@@ -180,7 +185,8 @@ describe('Core Logging Module', () => {
         expect(child).toBeInstanceOf(Logger);
         child.info('Child message');
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('[Parent:Child]');
       });
 
@@ -191,7 +197,8 @@ describe('Core Logging Module', () => {
 
         child.info('Deeply nested message');
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('[Grandparent:Parent:Child]');
       });
 
@@ -221,7 +228,8 @@ describe('Core Logging Module', () => {
         });
         logger.info('Context message');
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         // Console formatter shows first 8 chars of correlation ID
         expect(logOutput).toContain('my-corre');
       });
@@ -245,9 +253,10 @@ describe('Core Logging Module', () => {
         logger.info('Info message');
         logger.warn('Warn message');
 
-        // Only warn should be logged
-        expect(mockConsoleLog).not.toHaveBeenCalled();
-        expect(mockConsoleWarn).toHaveBeenCalledTimes(1);
+        // Only warn should be logged (all output goes to stderr/console.error for MCP)
+        expect(mockConsoleError).toHaveBeenCalledTimes(1);
+        const logOutput = mockConsoleError.mock.calls[0][0];
+        expect(logOutput).toContain('WARN');
       });
 
       it('should respect LOG_LEVEL_PRIORITY ordering', () => {
@@ -267,9 +276,9 @@ describe('Core Logging Module', () => {
         logger.error('Error');
         logger.critical('Critical');
 
-        expect(mockConsoleLog).toHaveBeenCalledTimes(2); // debug + info
-        expect(mockConsoleWarn).toHaveBeenCalledTimes(1); // warn
-        expect(mockConsoleError).toHaveBeenCalledTimes(2); // error + critical
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        // All 5 levels should be logged
+        expect(mockConsoleError).toHaveBeenCalledTimes(5);
       });
 
       it('should only log critical when minLevel is critical', () => {
@@ -316,8 +325,9 @@ describe('Core Logging Module', () => {
         });
 
         expect(result).toBe('sync result');
-        expect(mockConsoleLog).toHaveBeenCalled();
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalled();
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('syncOp completed');
         expect(logOutput).toContain('duration');
       });
@@ -331,8 +341,9 @@ describe('Core Logging Module', () => {
         });
 
         expect(result).toBe('async result');
-        expect(mockConsoleLog).toHaveBeenCalled();
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        expect(mockConsoleError).toHaveBeenCalled();
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('asyncOp completed');
       });
 
@@ -833,7 +844,8 @@ describe('Core Logging Module', () => {
       LogContextManager.runWithCorrelation(() => {
         logger.info('Message with correlation');
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         expect(logOutput).toContain('(integrat');
       }, 'integration-test-correlation-id');
     });
@@ -846,7 +858,8 @@ describe('Core Logging Module', () => {
       LogContextManager.runWithCorrelation(() => {
         logger.info('Message');
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         // Should use the context correlation ID, not the one from LogContextManager
         expect(logOutput).toContain('(context-');
       }, 'manager-correlation-id');
@@ -859,7 +872,8 @@ describe('Core Logging Module', () => {
       LogContextManager.runWithCorrelation(() => {
         logger.info('JSON log message', { action: 'test' });
 
-        const logOutput = mockConsoleLog.mock.calls[0][0];
+        // MCP servers route all logs to stderr (console.error) to preserve stdout for JSON-RPC
+        const logOutput = mockConsoleError.mock.calls[0][0];
         const parsed = JSON.parse(logOutput);
 
         expect(parsed.correlationId).toBe('json-test-correlation');

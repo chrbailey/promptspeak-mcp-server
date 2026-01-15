@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * PROMPTSPEAK DIRECTIVE SYMBOL TYPES v2.0
+ * PROMPTSPEAK DIRECTIVE SYMBOL TYPES v2.1
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  * Type definitions for the Directive Symbol Registry.
@@ -13,8 +13,19 @@
  * - Provenance and trust scoring
  * - Namespace support for multi-tenant isolation
  *
+ * v2.1 Enhancements:
+ * - Epistemic uncertainty tracking for probabilistic outputs
+ * - Claim type detection and evidence requirements
+ * - Human verification workflows
+ *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
+
+// Epistemic uncertainty types
+import type { EpistemicMetadata, EvidenceBasis } from './epistemic-types.js';
+
+// Re-export epistemic types for convenience
+export type { EpistemicMetadata, EvidenceBasis } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYMBOL CATEGORIES v2.0 (MECE Taxonomy)
@@ -684,6 +695,25 @@ export interface DirectiveSymbol {
   confidence?: ConfidenceScore;
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // EPISTEMIC UNCERTAINTY (v2.1)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Epistemic metadata for tracking uncertainty in probabilistic outputs.
+   *
+   * This addresses the fundamental problem that LLMs produce confident-sounding
+   * text regardless of factual accuracy. The epistemic field tracks:
+   * - Claim type (factual, accusatory, predictive, etc.)
+   * - Evidence basis (what data was consulted)
+   * - Verification status (hypothesis → verified)
+   * - Human review requirements
+   *
+   * For high-stakes claims (accusations, diagnoses), this field is automatically
+   * populated by the claim validator with reduced confidence and review flags.
+   */
+  epistemic?: EpistemicMetadata;
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // LIFECYCLE (v2.0)
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -775,6 +805,18 @@ export interface CreateSymbolRequest {
   source_id?: string;
   source_data?: Record<string, unknown>;
   created_by?: string;
+
+  // v2.1: Epistemic metadata (optional - auto-generated if not provided)
+  /**
+   * Epistemic metadata for the claim. If not provided, will be auto-generated
+   * by the claim validator based on content analysis.
+   *
+   * Provide this to explicitly set:
+   * - Evidence basis (what sources were consulted)
+   * - Cross-reference status
+   * - Alternative explanations considered
+   */
+  epistemic?: Partial<EpistemicMetadata>;
 }
 
 export interface CreateSymbolResponse {
@@ -802,7 +844,9 @@ export interface GetSymbolResponse {
 // ps_symbol_update
 export interface UpdateSymbolRequest {
   symbolId: string;
-  changes: Partial<Omit<DirectiveSymbol, 'symbolId' | 'version' | 'hash' | 'created_at' | 'changelog'>>;
+  changes: Partial<Omit<DirectiveSymbol, 'symbolId' | 'version' | 'hash' | 'created_at' | 'changelog' | 'epistemic'>> & {
+    epistemic?: Partial<EpistemicMetadata>;
+  };
   change_description: string;
   changed_by?: string;
 }
