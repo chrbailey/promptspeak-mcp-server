@@ -14,7 +14,8 @@ import { HttpConfig } from '../config.js';
 import { requestLogger } from './request-logger.js';
 
 // Re-export middleware for direct use
-export { authMiddleware, optionalAuthMiddleware, requireScopes, AuthenticatedRequest, AuthenticatedUser } from './auth.js';
+export { authMiddleware, optionalAuthMiddleware, requireScopes } from './auth.js';
+export type { AuthenticatedRequest, AuthenticatedUser } from './auth.js';
 export { errorHandler, HttpError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError, RateLimitError, InternalError } from './error-handler.js';
 export { requestLogger } from './request-logger.js';
 

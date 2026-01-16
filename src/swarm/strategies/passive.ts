@@ -272,12 +272,7 @@ export class PassiveStrategy extends BaseStrategy {
     return marketContext.averagePrice * (1 - minDiscount / 100);
   }
 
-  /**
-   * Calculate discount percentage from market average.
-   */
-  private calculateDiscount(price: number, marketAverage: number): number {
-    return ((marketAverage - price) / marketAverage) * 100;
-  }
+  // Note: calculateDiscount() is inherited from BaseStrategy
 
   /**
    * Assess value of listing against market.

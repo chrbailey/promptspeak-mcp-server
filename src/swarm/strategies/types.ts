@@ -8,7 +8,7 @@
 import type {
   BiddingStrategy,
   MarketAgentConfig,
-  MonetaryBudget,
+  Money,
   NormalizedListing,
   SwarmEvent,
 } from '../types.js';
@@ -66,7 +66,7 @@ export interface StrategyContext {
   agentConfig: MarketAgentConfig;
 
   /** Remaining budget for this agent */
-  remainingBudget: MonetaryBudget;
+  remainingBudget: Money;
 
   /** Historical events for this agent */
   agentHistory: SwarmEvent[];
@@ -399,5 +399,150 @@ export abstract class BaseStrategy implements BiddingStrategyInterface {
       confidence: 0.7,
       reasoning: reason,
     };
+  }
+
+  /**
+   * Create a bid decision with all common fields.
+   */
+  protected bidDecision(
+    amount: number,
+    currency: string,
+    confidence: number,
+    reasoning: string,
+    metadata?: Record<string, unknown>
+  ): StrategyDecision {
+    return {
+      action: 'BID',
+      amount,
+      currency,
+      confidence,
+      reasoning,
+      metadata,
+    };
+  }
+
+  /**
+   * Create an offer decision with all common fields.
+   */
+  protected offerDecision(
+    amount: number,
+    currency: string,
+    confidence: number,
+    reasoning: string,
+    metadata?: Record<string, unknown>
+  ): StrategyDecision {
+    return {
+      action: 'OFFER',
+      amount,
+      currency,
+      confidence,
+      reasoning,
+      metadata,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRE-FLIGHT CHECKS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Run standard pre-flight checks common to all strategies.
+   * Returns a decision if checks fail, undefined if all pass.
+   *
+   * @param context The strategy context
+   * @param options Pre-flight options
+   * @returns StrategyDecision if checks fail, undefined if all pass
+   */
+  protected runPreFlightChecks(
+    context: StrategyContext,
+    options: {
+      /** Require listing to be an auction (for sniper strategy) */
+      requireAuction?: boolean;
+      /** Require auction end time to be set */
+      requireAuctionEndTime?: boolean;
+      /** Require market context data */
+      requireMarketContext?: boolean;
+      /** Custom reason for requiring market context */
+      marketContextReason?: string;
+    } = {}
+  ): StrategyDecision | undefined {
+    const { listing, remainingBudget, agentConfig, currentTime, marketContext } = context;
+
+    // Check auction requirement
+    if (options.requireAuction && !listing.isAuction) {
+      return this.skipDecision('Not an auction - strategy requires auctions');
+    }
+
+    // Check auction end time requirement
+    if (options.requireAuctionEndTime && !listing.auctionEndTime) {
+      return this.skipDecision('Auction has no end time defined');
+    }
+
+    // Check listing criteria
+    if (!this.meetsListingCriteria(listing, agentConfig)) {
+      return this.skipDecision('Listing does not meet target criteria');
+    }
+
+    // Check budget
+    if (remainingBudget.value <= 0) {
+      return this.skipDecision('No budget remaining');
+    }
+
+    // Check market context requirement
+    if (options.requireMarketContext && !marketContext) {
+      return this.watchDecision(
+        options.marketContextReason ?? 'Insufficient market data for evaluation'
+      );
+    }
+
+    // All checks passed
+    return undefined;
+  }
+
+  /**
+   * Check if auction has ended.
+   * @returns StrategyDecision if ended, undefined if still active
+   */
+  protected checkAuctionEnded(
+    listing: NormalizedListing,
+    currentTime: Date
+  ): StrategyDecision | undefined {
+    if (listing.auctionEndTime) {
+      const endTime = new Date(listing.auctionEndTime);
+      if (currentTime >= endTime) {
+        return this.skipDecision('Auction has ended');
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Check if current price exceeds maximum bid.
+   * @returns StrategyDecision if exceeded, undefined if within budget
+   */
+  protected checkPriceExceedsMax(
+    listing: NormalizedListing,
+    maxBid: number
+  ): StrategyDecision | undefined {
+    if (listing.currentPrice >= maxBid) {
+      return this.skipDecision(
+        `Current price ($${listing.currentPrice}) exceeds max bid ($${maxBid.toFixed(2)})`
+      );
+    }
+    return undefined;
+  }
+
+  /**
+   * Calculate discount percentage from market average.
+   */
+  protected calculateDiscount(price: number, marketAverage: number): number {
+    return ((marketAverage - price) / marketAverage) * 100;
+  }
+
+  /**
+   * Calculate premium percentage above market average.
+   */
+  protected calculatePremium(price: number, marketAverage: number): number {
+    return ((price - marketAverage) / marketAverage) * 100;
   }
 }

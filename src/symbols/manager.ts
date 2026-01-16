@@ -48,6 +48,11 @@ import { getAuditLogger, initializeAuditLogger } from './audit.js';
 import { initializeDatabase, getDatabase, type SymbolDatabase } from './database.js';
 import { getClaimValidator } from './claim-validator.js';
 import type { EpistemicMetadata } from './epistemic-types.js';
+import {
+  runValidationPipeline,
+  runSecurityValidation,
+  type ValidatableContent,
+} from './validation-pipeline.js';
 import { createDefaultEpistemicMetadata } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -363,121 +368,28 @@ export class SymbolManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // SECURITY: Validate and sanitize content before creation
+    // VALIDATION PIPELINE: Security + Epistemic validation
     // ─────────────────────────────────────────────────────────────────────────
-    const securityValidation = validateSymbolContent(request);
-    const auditLogger = getAuditLogger();
+    const pipelineResult = runValidationPipeline(
+      request as ValidatableContent,
+      'CREATE',
+      this.db,
+      { runEpistemic: true }
+    );
 
-    if (securityValidation.blocked) {
-      // Log injection attempt
-      if (auditLogger) {
-        const violations = Array.from(securityValidation.fieldResults.values())
-          .flatMap(r => r.violations);
-        auditLogger.logInjectionAttempt(
-          request.symbolId,
-          violations,
-          securityValidation.totalRiskScore,
-          true
-        );
-      }
-
-      // Also log to SQLite audit
-      this.db.insertAuditEntry({
-        eventType: 'SYMBOL_CREATE_BLOCKED',
-        symbolId: request.symbolId,
-        riskScore: securityValidation.totalRiskScore,
-        violations: Array.from(securityValidation.fieldResults.values())
-          .flatMap(r => r.violations),
-      });
-
+    if (!pipelineResult.passed) {
       return {
         success: false,
         symbolId: request.symbolId,
         version: 0,
         hash: '',
         path: '',
-        error: `Symbol rejected: ${securityValidation.summary}. Content contains injection patterns.`,
+        error: pipelineResult.error!,
       };
     }
 
-    // Log warning if there are non-critical violations
-    if (securityValidation.totalViolations > 0 && auditLogger) {
-      const violations = Array.from(securityValidation.fieldResults.values())
-        .flatMap(r => r.violations);
-      auditLogger.logValidationWarning(
-        request.symbolId,
-        violations,
-        securityValidation.totalRiskScore
-      );
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // EPISTEMIC VALIDATION: Detect high-stakes claims and enforce evidence
-    // ─────────────────────────────────────────────────────────────────────────
-    const claimValidator = getClaimValidator();
-    const claimValidation = claimValidator.validateSymbol(
-      {
-        who: request.who,
-        what: request.what,
-        why: request.why,
-        where: request.where,
-        when: request.when,
-        commanders_intent: request.commanders_intent,
-        requirements: request.requirements,
-        tags: request.tags,
-      },
-      request.epistemic?.evidence_basis
-    );
-
-    // Generate epistemic metadata based on validation
-    let epistemicMetadata: EpistemicMetadata;
-
-    if (request.epistemic) {
-      // User provided epistemic metadata - use as base but may override
-      epistemicMetadata = claimValidator.generateEpistemicMetadata(
-        claimValidation,
-        request.epistemic as Partial<EpistemicMetadata>
-      );
-
-      // If user claims cross-reference but validator found accusations, still flag
-      if (claimValidation.has_unverified_accusations &&
-          !request.epistemic.evidence_basis?.cross_references_performed) {
-        epistemicMetadata.requires_human_review = true;
-        epistemicMetadata.review_reason = claimValidation.reason;
-        epistemicMetadata.confidence = Math.min(
-          epistemicMetadata.confidence,
-          claimValidation.recommended_confidence
-        );
-      }
-    } else {
-      // Auto-generate epistemic metadata
-      epistemicMetadata = claimValidator.generateEpistemicMetadata(claimValidation);
-    }
-
-    // Log epistemic validation result
-    if (claimValidation.requires_human_review) {
-      logger.info('Symbol flagged for human review', {
-        symbolId: request.symbolId,
-        claimType: claimValidation.detected_claim_type,
-        confidence: epistemicMetadata.confidence,
-        reason: claimValidation.reason,
-        triggeredPatterns: claimValidation.triggered_patterns,
-      });
-
-      // Log to SQLite audit with new event type
-      this.db.insertAuditEntry({
-        eventType: 'EPISTEMIC_FLAG',
-        symbolId: request.symbolId,
-        riskScore: Math.round((1 - epistemicMetadata.confidence) * 100),
-        details: {
-          claimType: claimValidation.detected_claim_type,
-          confidence: epistemicMetadata.confidence,
-          triggeredPatterns: claimValidation.triggered_patterns,
-          suggestedSources: claimValidation.suggested_sources,
-        },
-      });
-    }
+    // Get epistemic metadata from pipeline result
+    const epistemicMetadata = pipelineResult.epistemic!.metadata;
     // ─────────────────────────────────────────────────────────────────────────
 
     // Check if already exists
@@ -551,8 +463,9 @@ export class SymbolManager {
     this.cache.set(request.symbolId, symbol);
 
     // Log successful creation
+    const auditLogger = getAuditLogger();
     if (auditLogger) {
-      auditLogger.logCreate(request.symbolId, true, securityValidation, {
+      auditLogger.logCreate(request.symbolId, true, pipelineResult.security.validation, {
         category,
         hash: symbol.hash,
       });
@@ -642,10 +555,8 @@ export class SymbolManager {
     // ─────────────────────────────────────────────────────────────────────────
     // SECURITY: Validate update changes before applying
     // ─────────────────────────────────────────────────────────────────────────
-    const auditLogger = getAuditLogger();
-
-    // Build a mock request to validate the changed fields
-    const mockRequest = {
+    // Build content to validate (merged with existing values)
+    const contentToValidate: ValidatableContent = {
       symbolId: request.symbolId,
       who: request.changes.who || existing.symbol.who,
       what: request.changes.what || existing.symbol.what,
@@ -656,31 +567,11 @@ export class SymbolManager {
       commanders_intent: request.changes.commanders_intent || existing.symbol.commanders_intent,
       requirements: request.changes.requirements || existing.symbol.requirements,
       anti_requirements: request.changes.anti_requirements || existing.symbol.anti_requirements,
-    } as CreateSymbolRequest;
+    };
 
-    const securityValidation = validateSymbolContent(mockRequest);
+    const securityResult = runSecurityValidation(contentToValidate, 'UPDATE', this.db);
 
-    if (securityValidation.blocked) {
-      // Log injection attempt
-      if (auditLogger) {
-        const violations = Array.from(securityValidation.fieldResults.values())
-          .flatMap(r => r.violations);
-        auditLogger.logInjectionAttempt(
-          request.symbolId,
-          violations,
-          securityValidation.totalRiskScore,
-          true
-        );
-      }
-
-      this.db.insertAuditEntry({
-        eventType: 'SYMBOL_UPDATE_BLOCKED',
-        symbolId: request.symbolId,
-        riskScore: securityValidation.totalRiskScore,
-        violations: Array.from(securityValidation.fieldResults.values())
-          .flatMap(r => r.violations),
-      });
-
+    if (!securityResult.passed) {
       return {
         success: false,
         symbolId: request.symbolId,
@@ -688,19 +579,8 @@ export class SymbolManager {
         new_version: 0,
         old_hash: existing.symbol.hash,
         new_hash: '',
-        error: `Update rejected: ${securityValidation.summary}. Content contains injection patterns.`,
+        error: securityResult.error!,
       };
-    }
-
-    // Log warning if there are non-critical violations
-    if (securityValidation.totalViolations > 0 && auditLogger) {
-      const violations = Array.from(securityValidation.fieldResults.values())
-        .flatMap(r => r.violations);
-      auditLogger.logValidationWarning(
-        request.symbolId,
-        violations,
-        securityValidation.totalRiskScore
-      );
     }
     // ─────────────────────────────────────────────────────────────────────────
 

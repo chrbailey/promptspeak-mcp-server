@@ -135,3 +135,31 @@ export {
 } from './batch.js';
 
 export type { BatchExecutionOptions } from './batch.js';
+
+// -----------------------------------------------------------------------------
+// MCP ADAPTER EXPORTS
+// -----------------------------------------------------------------------------
+
+export {
+  // MCP result converters
+  toMcpResult,
+  mcpSuccess,
+  mcpFailure,
+  mcpLegacyFailure,
+  mcpFromError,
+  mcpBatchResult,
+
+  // Legacy support
+  fromLegacyResponse,
+
+  // Handler wrappers
+  wrapToolHandler,
+  wrapToolHandlerSync,
+} from './mcp-adapter.js';
+
+export type {
+  McpResponseOptions,
+  McpSuccessPayload,
+  McpErrorPayload,
+  LegacyToolResponse,
+} from './mcp-adapter.js';

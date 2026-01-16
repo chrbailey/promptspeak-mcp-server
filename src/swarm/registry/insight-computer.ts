@@ -13,13 +13,15 @@
 import type {
   SwarmEvent,
   BiddingStrategy,
-  ComputedInsight,
-  AgentEffectivenessInsight,
-  StrategyRankingInsight,
-  CostEfficiencyInsight,
-  ConcentrationRiskInsight,
+  AgentEffectiveness,
+  StrategyRanking,
+  ConcentrationRisk,
 } from '../types.js';
-import { getSwarmDatabase } from '../database.js';
+import {
+  getSwarm,
+  listAgents,
+  queryEvents,
+} from '../database.js';
 import { INSIGHT_SYMBOLS, createInsightSymbol } from './symbol-mapper.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -39,13 +41,71 @@ interface EventStats {
   errors: number;
 }
 
+/** Agent effectiveness insight result */
+export interface AgentEffectivenessInsight {
+  agentId: string;
+  swarmId: string;
+  successRate: number;
+  bidWinRate: number;
+  offerAcceptRate: number;
+  totalAttempts: number;
+  totalSuccesses: number;
+  avgAcquisitionCost: number;
+  computedAt: Date;
+  symbol: string;
+}
+
+/** Strategy ranking insight result */
+export interface StrategyRankingInsight {
+  swarmId: string;
+  rankings: Array<{
+    strategy: BiddingStrategy;
+    successRate: number;
+    costEfficiency: number;
+    overallScore: number;
+  }>;
+  computedAt: Date;
+  symbol: string;
+}
+
+/** Cost efficiency insight result */
+export interface CostEfficiencyInsight {
+  swarmId: string;
+  totalSpent: number;
+  itemsAcquired: number;
+  avgCostPerItem: number;
+  avgCostPerAttempt: number;
+  minAcquisitionCost: number;
+  maxAcquisitionCost: number;
+  computedAt: Date;
+  symbol: string;
+}
+
+/** Concentration risk insight result */
+export interface ConcentrationRiskInsight {
+  swarmId: string;
+  hhi: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  spofAgents: string[];
+  highConcentrationAgents: string[];
+  agentShares: Array<{ agentId: string; share: number }>;
+  recommendation: string;
+  computedAt: Date;
+  symbol: string;
+}
+
+/** Generic computed insight */
+export interface ComputedInsight {
+  symbol: string;
+  computedAt: Date;
+  data: Record<string, unknown>;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INSIGHT COMPUTER CLASS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class InsightComputer {
-  private database = getSwarmDatabase();
-
   // ═══════════════════════════════════════════════════════════════════════════
   // AGENT EFFECTIVENESS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -58,7 +118,7 @@ export class InsightComputer {
     agentId: string,
     swarmId: string
   ): Promise<AgentEffectivenessInsight> {
-    const events = await this.database.getEventsForAgent(agentId);
+    const events = queryEvents({ swarmId, agentId });
     const stats = this.computeEventStats(events);
 
     // Calculate success metrics
@@ -97,7 +157,7 @@ export class InsightComputer {
    * Rank strategies by effectiveness across the swarm.
    */
   async computeStrategyRanking(swarmId: string): Promise<StrategyRankingInsight> {
-    const agents = await this.database.getAgentsForSwarm(swarmId);
+    const agents = listAgents(swarmId);
     const strategyStats = new Map<BiddingStrategy, {
       totalAttempts: number;
       totalSuccesses: number;
@@ -108,7 +168,7 @@ export class InsightComputer {
 
     // Aggregate stats by strategy
     for (const agent of agents) {
-      const events = await this.database.getEventsForAgent(agent.agent_id);
+      const events = queryEvents({ swarmId, agentId: agent.agent_id });
       const stats = this.computeEventStats(events);
       const strategy = agent.strategy as BiddingStrategy;
 
@@ -175,7 +235,7 @@ export class InsightComputer {
    * Compute cost efficiency metrics.
    */
   async computeCostEfficiency(swarmId: string): Promise<CostEfficiencyInsight> {
-    const events = await this.database.getEventsForSwarm(swarmId);
+    const events = queryEvents({ swarmId });
     const stats = this.computeEventStats(events);
 
     // Calculate per-item cost
@@ -191,12 +251,12 @@ export class InsightComputer {
 
     // Extract amounts from events for distribution analysis
     const amounts = events
-      .filter(e => e.event_type === 'BID_WON' || e.event_type === 'OFFER_ACCEPTED')
-      .map(e => {
-        const data = JSON.parse(e.event_data);
-        return data.amount ?? 0;
+      .filter((e: SwarmEvent) => e.eventType === 'BID_WON' || e.eventType === 'OFFER_ACCEPTED')
+      .map((e: SwarmEvent) => {
+        const data = e.metadata ?? e.data ?? {};
+        return (data as Record<string, unknown>).amount as number ?? 0;
       })
-      .filter(a => a > 0);
+      .filter((a: number) => a > 0);
 
     const minCost = amounts.length > 0 ? Math.min(...amounts) : 0;
     const maxCost = amounts.length > 0 ? Math.max(...amounts) : 0;
@@ -222,20 +282,18 @@ export class InsightComputer {
    * Detect concentration risks - single points of failure.
    */
   async computeConcentrationRisk(swarmId: string): Promise<ConcentrationRiskInsight> {
-    const agents = await this.database.getAgentsForSwarm(swarmId);
+    const agents = listAgents(swarmId);
     const agentMetrics: Array<{ agentId: string; successCount: number; spendRatio: number }> = [];
 
     let totalSuccesses = 0;
-    let totalSpent = 0;
 
     // Gather metrics
     for (const agent of agents) {
-      const events = await this.database.getEventsForAgent(agent.agent_id);
+      const events = queryEvents({ swarmId, agentId: agent.agent_id });
       const stats = this.computeEventStats(events);
 
       const successCount = stats.bidsWon + stats.offersAccepted;
       totalSuccesses += successCount;
-      totalSpent += stats.totalSpent;
 
       agentMetrics.push({
         agentId: agent.agent_id,
@@ -290,18 +348,24 @@ export class InsightComputer {
    * Compute overall swarm performance.
    */
   async computeSwarmPerformance(swarmId: string): Promise<ComputedInsight> {
-    const events = await this.database.getEventsForSwarm(swarmId);
+    const events = queryEvents({ swarmId });
     const stats = this.computeEventStats(events);
-    const swarm = await this.database.getSwarm(swarmId);
+    const swarm = getSwarm(swarmId);
 
     if (!swarm) {
       throw new Error(`Swarm ${swarmId} not found`);
     }
 
-    const config = JSON.parse(swarm.config);
-    const budgetUtilization = swarm.total_budget > 0
-      ? swarm.spent_budget / swarm.total_budget
-      : 0;
+    const totalBudget = typeof swarm.totalBudget === 'number'
+      ? swarm.totalBudget
+      : swarm.totalBudget.amount;
+    const totalSpentValue = swarm.totalSpent;
+    const spentBudget = totalSpentValue === undefined
+      ? 0
+      : typeof totalSpentValue === 'number'
+        ? totalSpentValue
+        : totalSpentValue.value ?? 0;
+    const budgetUtilization = totalBudget > 0 ? spentBudget / totalBudget : 0;
 
     const totalAttempts = stats.bidsPlaced + stats.offersSubmitted;
     const totalSuccesses = stats.bidsWon + stats.offersAccepted;
@@ -319,8 +383,8 @@ export class InsightComputer {
         totalSuccesses,
         itemsAcquired: stats.itemsAcquired,
         totalSpent: stats.totalSpent,
-        agentsActive: swarm.agents_active,
-        agentsConfigured: config.agentCount,
+        agentsActive: swarm.activeAgents,
+        agentsConfigured: swarm.agentCount,
         errorRate: totalAttempts > 0 ? stats.errors / totalAttempts : 0,
       },
     };
@@ -338,14 +402,14 @@ export class InsightComputer {
     patterns: string[];
     severity: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
   }> {
-    const events = await this.database.getEventsForSwarm(swarmId);
+    const events = queryEvents({ swarmId });
     const patterns: string[] = [];
 
     // Check for round number bids (potential manual intervention)
-    const bidEvents = events.filter(e => e.event_type === 'BID_PLACED');
-    const roundNumberCount = bidEvents.filter(e => {
-      const data = JSON.parse(e.event_data);
-      const amount = data.amount ?? 0;
+    const bidEvents = events.filter((e: SwarmEvent) => e.eventType === 'BID_PLACED');
+    const roundNumberCount = bidEvents.filter((e: SwarmEvent) => {
+      const data = e.metadata ?? e.data ?? {};
+      const amount = (data as Record<string, unknown>).amount as number ?? 0;
       return amount > 0 && amount % 10 === 0;
     }).length;
 
@@ -354,9 +418,9 @@ export class InsightComputer {
     }
 
     // Check for identical timestamps (copy-paste data)
-    const timestamps = events.map(e => e.timestamp);
+    const timestamps = events.map((e: SwarmEvent) => String(e.timestamp));
     const duplicateTimestamps = timestamps.filter(
-      (t, i) => timestamps.indexOf(t) !== i
+      (t: string, i: number) => timestamps.indexOf(t) !== i
     );
 
     if (duplicateTimestamps.length > events.length * 0.1) {
@@ -393,7 +457,7 @@ export class InsightComputer {
   /**
    * Compute statistics from event list.
    */
-  private computeEventStats(events: Array<{ event_type: string; event_data: string }>): EventStats {
+  private computeEventStats(events: SwarmEvent[]): EventStats {
     const stats: EventStats = {
       bidsPlaced: 0,
       bidsWon: 0,
@@ -408,7 +472,7 @@ export class InsightComputer {
     };
 
     for (const event of events) {
-      switch (event.event_type) {
+      switch (event.eventType) {
         case 'BID_PLACED':
           stats.bidsPlaced++;
           break;
@@ -433,8 +497,8 @@ export class InsightComputer {
           break;
         case 'ITEM_ACQUIRED': {
           stats.itemsAcquired++;
-          const data = JSON.parse(event.event_data);
-          stats.totalSpent += data.cost ?? 0;
+          const data = event.metadata ?? event.data ?? {};
+          stats.totalSpent += (data as Record<string, unknown>).cost as number ?? 0;
           break;
         }
         case 'ERROR':

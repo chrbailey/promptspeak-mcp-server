@@ -41,6 +41,23 @@ interface RateLimiterState {
   consecutiveFailures: number;
 }
 
+/**
+ * Rate limit status for a single category.
+ */
+export interface RateLimitStatus {
+  minuteTokens: number;
+  minuteLimit: number;
+  dayTokens: number;
+  dayLimit: number;
+  inBackoff: boolean;
+  backoffRemainingMs: number;
+}
+
+/**
+ * Rate limit status for all categories.
+ */
+export type RateLimitAllStatus = Record<ApiCategory, RateLimitStatus>;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // RATE LIMITER CLASS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -143,7 +160,7 @@ export class EbayRateLimiter {
     }
 
     if (waitTime > maxWaitMs) {
-      throw new RateLimitError(
+      throw new EbayRateLimitError(
         `Rate limit would require waiting ${waitTime}ms, exceeds max wait of ${maxWaitMs}ms`,
         category,
         waitTime
@@ -215,14 +232,7 @@ export class EbayRateLimiter {
   /**
    * Get current rate limiter status.
    */
-  getStatus(category: ApiCategory): {
-    minuteTokens: number;
-    minuteLimit: number;
-    dayTokens: number;
-    dayLimit: number;
-    inBackoff: boolean;
-    backoffRemainingMs: number;
-  } {
+  getStatus(category: ApiCategory): RateLimitStatus {
     this.refreshWindows(category);
     const state = this.state.get(category)!;
     const config = this.limits[category];
@@ -241,7 +251,7 @@ export class EbayRateLimiter {
   /**
    * Get status for all categories.
    */
-  getAllStatus(): Record<ApiCategory, ReturnType<typeof this.getStatus>> {
+  getAllStatus(): RateLimitAllStatus {
     return {
       browse: this.getStatus('browse'),
       offer: this.getStatus('offer'),
@@ -269,18 +279,27 @@ export class EbayRateLimiter {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Rate limit error.
+ * eBay-specific rate limit error.
+ * Contains category and wait time information specific to eBay API rate limiting.
+ *
+ * Note: For general rate limit errors, use RateLimitError from core/errors.
+ * This class is specifically for eBay API rate limiting with category tracking.
  */
-export class RateLimitError extends Error {
+export class EbayRateLimitError extends Error {
   constructor(
     message: string,
     public readonly category: ApiCategory,
     public readonly waitTimeMs: number
   ) {
     super(message);
-    this.name = 'RateLimitError';
+    this.name = 'EbayRateLimitError';
   }
 }
+
+/**
+ * @deprecated Use EbayRateLimitError instead. This alias exists for backwards compatibility.
+ */
+export const RateLimitError = EbayRateLimitError;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SINGLETON INSTANCE

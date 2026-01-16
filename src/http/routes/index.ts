@@ -15,12 +15,14 @@ import healthRoutes from './health.js';
 import symbolRoutes from './symbols.js';
 import openapiRoutes from './openapi.js';
 import agentRoutes from './agents.js';
+import ebayRoutes from './ebay.js';
 
 // Re-export route modules for direct use
 export { default as healthRoutes } from './health.js';
 export { default as symbolRoutes } from './symbols.js';
 export { default as openapiRoutes } from './openapi.js';
 export { default as agentRoutes } from './agents.js';
+export { default as ebayRoutes } from './ebay.js';
 
 /**
  * Configure public routes (no authentication required).
@@ -31,6 +33,9 @@ export function configurePublicRoutes(app: Application): void {
 
   // OpenAPI spec endpoints
   app.use('/', openapiRoutes);
+
+  // eBay OAuth routes (public - OAuth callback needs to receive eBay redirect)
+  app.use('/api/v1/ebay', ebayRoutes);
 }
 
 /**

@@ -5,6 +5,15 @@
  * Supports both API key and OAuth 2.0 authentication methods.
  */
 
+import {
+  getEnv,
+  getEnvOptional,
+  getEnvNumber,
+  getEnvBoolean,
+  getEnvList,
+  getEnvEnum,
+} from '../core/config/index.js';
+
 export interface HttpConfig {
   // Server
   port: number;
@@ -51,56 +60,22 @@ export interface HttpConfig {
   };
 }
 
-function getEnv(key: string, defaultValue?: string): string {
-  const value = process.env[key];
-  if (value === undefined) {
-    if (defaultValue !== undefined) {
-      return defaultValue;
-    }
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
-}
-
-function getEnvOptional(key: string, defaultValue: string): string {
-  return process.env[key] ?? defaultValue;
-}
-
-function getEnvNumber(key: string, defaultValue: number): number {
-  const value = process.env[key];
-  if (value === undefined) {
-    return defaultValue;
-  }
-  const parsed = parseInt(value, 10);
-  if (isNaN(parsed)) {
-    throw new Error(`Invalid number for environment variable: ${key}`);
-  }
-  return parsed;
-}
-
-function getEnvBoolean(key: string, defaultValue: boolean): boolean {
-  const value = process.env[key];
-  if (value === undefined) {
-    return defaultValue;
-  }
-  return value.toLowerCase() === 'true' || value === '1';
-}
+// Default CORS origins include OpenAI domains
+const DEFAULT_CORS_ORIGINS = [
+  'https://chat.openai.com',
+  'https://chatgpt.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
 
 export function loadConfig(): HttpConfig {
-  const nodeEnv = getEnvOptional('NODE_ENV', 'development') as HttpConfig['nodeEnv'];
+  const nodeEnv = getEnvEnum(
+    'NODE_ENV',
+    ['development', 'production', 'test'] as const,
+    'development'
+  );
 
-  // Default CORS origins include OpenAI domains
-  const defaultCorsOrigins = [
-    'https://chat.openai.com',
-    'https://chatgpt.com',
-    'http://localhost:3000',
-    'http://localhost:5173'
-  ];
-
-  const corsOriginsEnv = process.env.CORS_ORIGINS;
-  const corsOrigins = corsOriginsEnv
-    ? corsOriginsEnv.split(',').map(s => s.trim())
-    : defaultCorsOrigins;
+  const corsOrigins = getEnvList('CORS_ORIGINS', DEFAULT_CORS_ORIGINS);
 
   return {
     port: getEnvNumber('PORT', 3000),

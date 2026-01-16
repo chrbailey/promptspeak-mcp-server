@@ -31,6 +31,7 @@ import { documentToolDefinitions } from '../document/index.js';
 import { translationToolDefinitions } from '../translation/index.js';
 import { orchestrationToolDefinitions } from '../agents/tools.js';
 import { multiAgentToolDefinitions } from '../multi_agent/index.js';
+import { intelligenceToolDefinitions } from '../swarm/tools/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION TOOLS
@@ -424,7 +425,8 @@ export {
   documentToolDefinitions,
   translationToolDefinitions,
   orchestrationToolDefinitions,
-  multiAgentToolDefinitions
+  multiAgentToolDefinitions,
+  intelligenceToolDefinitions,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -458,7 +460,8 @@ export function buildToolRegistry(): Tool[] {
     ...documentToolDefinitions,    // Document Processing Agent
     ...translationToolDefinitions, // Translation Layer
     ...orchestrationToolDefinitions, // Agent Orchestration (MADIF)
-    ...multiAgentToolDefinitions   // Multi-Agent / Commander's Intent
+    ...multiAgentToolDefinitions,  // Multi-Agent / Commander's Intent
+    ...intelligenceToolDefinitions, // Market Intelligence (Swarm)
   ];
 }
 
@@ -484,6 +487,7 @@ export function getToolStats(): Record<string, number> {
     translation: translationToolDefinitions.length,
     orchestration: orchestrationToolDefinitions.length,
     multiAgent: multiAgentToolDefinitions.length,
+    intelligence: intelligenceToolDefinitions.length,
     total: buildToolRegistry().length
   };
 }

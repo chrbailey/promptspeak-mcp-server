@@ -6,7 +6,7 @@
  */
 
 import { getEbayAuth, EbayAuthError } from './auth.js';
-import { getEbayRateLimiter, RateLimitError } from './rate-limiter.js';
+import { getEbayRateLimiter, EbayRateLimitError, type RateLimitAllStatus } from './rate-limiter.js';
 import {
   getApiBaseUrl,
   getStandardHeaders,
@@ -17,22 +17,22 @@ import {
   BEST_OFFER_API,
   ORDER_API,
 } from './sandbox-config.js';
-import type {
-  EbaySearchResponse,
-  EbayItemDetail,
-  EbayItemSummary,
-  EbayPlaceBidRequest,
-  EbayPlaceBidResponse,
-  EbayCreateOfferRequest,
-  EbayOfferResponse,
-  EbayInitiateCheckoutRequest,
-  EbayCheckoutSessionResponse,
-  EbayPlaceOrderResponse,
-  EbayErrorResponse,
-  EbayError,
-  SearchQuery,
-  NormalizedListing,
+import {
   normalizeEbayItem,
+  type EbaySearchResponse,
+  type EbayItemDetail,
+  type EbayItemSummary,
+  type EbayPlaceBidRequest,
+  type EbayPlaceBidResponse,
+  type EbayCreateOfferRequest,
+  type EbayOfferResponse,
+  type EbayInitiateCheckoutRequest,
+  type EbayCheckoutSessionResponse,
+  type EbayPlaceOrderResponse,
+  type EbayErrorResponse,
+  type EbayError,
+  type SearchQuery,
+  type NormalizedListing,
 } from './types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -472,7 +472,7 @@ export class EbayClient {
       let errorData: EbayErrorResponse | undefined;
 
       try {
-        errorData = await response.json();
+        errorData = await response.json() as EbayErrorResponse;
       } catch {
         // Response might not be JSON
       }
@@ -490,7 +490,7 @@ export class EbayClient {
       return {} as T;
     }
 
-    return response.json();
+    return await response.json() as T;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -504,7 +504,7 @@ export class EbayClient {
     connected: boolean;
     sandbox: boolean;
     hasUserAuth: boolean;
-    rateLimitStatus: ReturnType<typeof this.rateLimiter.getAllStatus>;
+    rateLimitStatus: RateLimitAllStatus;
   }> {
     try {
       // Try to get an application token

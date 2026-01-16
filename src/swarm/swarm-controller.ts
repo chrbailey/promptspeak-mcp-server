@@ -20,6 +20,7 @@ import type {
   SwarmStatus,
   MarketAgentConfig,
   MarketAgentState,
+  Money,
   MonetaryBudget,
   TargetCriteria,
   TimeWindow,
@@ -27,11 +28,30 @@ import type {
   SwarmEventType,
   BiddingStrategy,
   NormalizedListing,
+  AgentMode,
+  Observation,
+  ObservationType,
+  MarketCondition,
+  CompetitionLevel,
+  RecommendedAction,
+  AlertConfig,
 } from './types.js';
+import { generateObservationId, DEFAULT_ALERT_CONFIG } from './types.js';
 import { BudgetAllocator, AllocationRequest } from './budget-allocator.js';
 import { createStrategy, getRecommendedDistribution, BiddingStrategyInterface } from './strategies/index.js';
 import { getEbayClient, EbayClient } from './ebay/client.js';
-import { getSwarmDatabase, SwarmDatabase } from './database.js';
+import {
+  getSwarmDatabase,
+  SwarmDatabase,
+  createSwarm as dbCreateSwarm,
+  updateSwarmState as dbUpdateSwarmState,
+  createAgent as dbCreateAgent,
+  recordEvent as dbRecordEvent,
+  queryEvents,
+  recordObservation as dbRecordObservation,
+  getListingObservations,
+} from './database.js';
+import { getObservationHookRegistry } from './hooks/observation-hooks.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -51,13 +71,36 @@ interface ActiveAgent {
  * Swarm creation options.
  */
 export interface CreateSwarmOptions {
-  totalBudget: MonetaryBudget;
+  /** Operating mode: COMBAT (autonomous) or RECONNAISSANCE (observe only) */
+  mode?: AgentMode;
+  totalBudget: MonetaryBudget | { value: number; currency: string };
   agentCount?: number;
   strategyDistribution?: Map<BiddingStrategy, number>;
   targetCriteria: TargetCriteria;
   timeWindow: TimeWindow;
   feeReservePercent?: number;
   searchIntervalMs?: number;
+  /** Alert configuration for RECONNAISSANCE mode */
+  alertConfig?: AlertConfig;
+}
+
+/**
+ * Swarm status report returned by getStatus().
+ */
+export interface SwarmStatusReport {
+  swarmId: string;
+  status: SwarmStatus;
+  activeAgents: number;
+  totalBids: number;
+  totalOffers: number;
+  wonAuctions: number;
+  acceptedOffers: number;
+  itemsAcquired: number;
+  budgetTotal: Money;
+  budgetSpent: Money;
+  budgetAvailable: Money;
+  timeRemaining: number;
+  lastActivity?: Date;
 }
 
 /**
@@ -77,6 +120,10 @@ export interface SwarmControllerEvents {
   'offer:accepted': (swarmId: string, agentId: string, listingId: string, amount: number) => void;
   'item:acquired': (swarmId: string, agentId: string, listingId: string, cost: number) => void;
   'error': (swarmId: string, error: Error) => void;
+  // Reconnaissance mode events
+  'observation:recorded': (swarmId: string, observation: Observation) => void;
+  'opportunity:identified': (swarmId: string, observation: Observation) => void;
+  'probe:requested': (swarmId: string, agentId: string, listingId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -115,14 +162,30 @@ export class SwarmController extends EventEmitter {
     const strategyDistribution = options.strategyDistribution ??
       getRecommendedDistribution(agentCount);
 
+    // Normalize budget to MonetaryBudget
+    const budgetValue = 'amount' in options.totalBudget
+      ? options.totalBudget.amount
+      : options.totalBudget.value;
+    const budgetCurrency = options.totalBudget.currency as import('./types.js').Currency;
+    const monetaryBudget: MonetaryBudget = 'amount' in options.totalBudget
+      ? options.totalBudget
+      : {
+          amount: options.totalBudget.value,
+          currency: budgetCurrency,
+          maxPerItem: options.totalBudget.value,
+          reservePercent: options.feeReservePercent ?? 5,
+        };
+
     // Create swarm config
     this.swarmConfig = {
       swarmId,
-      totalBudget: options.totalBudget,
+      mode: options.mode ?? 'COMBAT',  // Default to COMBAT for backward compatibility
+      totalBudget: monetaryBudget,
       agentCount,
       strategyDistribution,
       targetCriteria: options.targetCriteria,
       timeWindow: options.timeWindow,
+      alertConfig: options.alertConfig ?? DEFAULT_ALERT_CONFIG,
       feeReservePercent: options.feeReservePercent ?? 5,
       createdAt: now,
     };
@@ -135,25 +198,14 @@ export class SwarmController extends EventEmitter {
       totalOffers: 0,
       wonAuctions: 0,
       acceptedOffers: 0,
-      totalSpent: { value: 0, currency: options.totalBudget.currency },
+      totalSpent: { value: 0, currency: budgetCurrency },
       itemsAcquired: 0,
       lastActivity: now,
     };
 
     // Initialize budget allocator
-    this.budgetAllocator = new BudgetAllocator(this.swarmConfig);
+    this.budgetAllocator = new BudgetAllocator(this.swarmConfig as SwarmConfig);
     this.searchIntervalMs = options.searchIntervalMs ?? 60000;
-
-    // Save to database
-    await this.database.createSwarm({
-      swarm_id: swarmId,
-      config: JSON.stringify(this.swarmConfig),
-      status: 'CREATED',
-      total_budget: options.totalBudget.value,
-      spent_budget: 0,
-      agents_active: 0,
-      created_at: now.toISOString(),
-    });
 
     // Emit event
     await this.recordEvent('SWARM_CREATED', swarmId, undefined, {
@@ -179,7 +231,8 @@ export class SwarmController extends EventEmitter {
 
     // Check if within time window
     const now = new Date();
-    if (now > new Date(this.swarmConfig.timeWindow.end)) {
+    const timeWindow = this.swarmConfig.timeWindow ?? this.swarmConfig.campaignWindow;
+    if (timeWindow && now > new Date(timeWindow.end)) {
       throw new Error('Swarm time window has expired');
     }
 
@@ -196,7 +249,7 @@ export class SwarmController extends EventEmitter {
     }
 
     // Update database
-    await this.database.updateSwarmStatus(this.swarmConfig.swarmId, 'RUNNING');
+    dbUpdateSwarmState(this.swarmConfig.swarmId, { status: 'active' });
 
     // Emit event
     await this.recordEvent('SWARM_STARTED', this.swarmConfig.swarmId);
@@ -222,7 +275,7 @@ export class SwarmController extends EventEmitter {
     this.swarmState.status = 'PAUSED';
     this.isRunning = false;
 
-    await this.database.updateSwarmStatus(this.swarmConfig.swarmId, 'PAUSED');
+    dbUpdateSwarmState(this.swarmConfig.swarmId, { status: 'paused' });
     await this.recordEvent('SWARM_PAUSED', this.swarmConfig.swarmId);
     this.emit('swarm:paused', this.swarmConfig.swarmId);
   }
@@ -246,7 +299,7 @@ export class SwarmController extends EventEmitter {
     this.swarmState.status = 'TERMINATED';
     this.isRunning = false;
 
-    await this.database.updateSwarmStatus(this.swarmConfig.swarmId, 'TERMINATED');
+    dbUpdateSwarmState(this.swarmConfig.swarmId, { status: 'terminated' });
     await this.recordEvent('SWARM_TERMINATED', this.swarmConfig.swarmId, undefined, { reason });
     this.emit('swarm:terminated', this.swarmConfig.swarmId, reason);
 
@@ -270,7 +323,13 @@ export class SwarmController extends EventEmitter {
     const agentsToCreate: { strategy: BiddingStrategy; agentId: string }[] = [];
 
     // Create agent configs from distribution
-    for (const [strategy, count] of this.swarmConfig.strategyDistribution) {
+    // Handle both Map and Record types
+    const strategyDistribution = this.swarmConfig.strategyDistribution;
+    const entries = strategyDistribution instanceof Map
+      ? Array.from(strategyDistribution.entries())
+      : Object.entries(strategyDistribution) as [BiddingStrategy, number][];
+
+    for (const [strategy, count] of entries) {
       for (let i = 0; i < count; i++) {
         const agentId = uuidv4();
         agentsToCreate.push({ strategy, agentId });
@@ -293,13 +352,18 @@ export class SwarmController extends EventEmitter {
       const { strategy, agentId } = agentsToCreate[i];
       const allocation = allocations[i];
 
+      const timeWindow = this.swarmConfig.timeWindow ?? this.swarmConfig.campaignWindow ?? {
+        start: new Date(),
+        end: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      };
+
       const config: MarketAgentConfig = {
         agentId,
         swarmId: this.swarmConfig.swarmId,
         strategy,
         budgetAllocation: allocation.allocated,
         targetCriteria: this.swarmConfig.targetCriteria,
-        timeWindow: this.swarmConfig.timeWindow,
+        timeWindow,
         createdAt: new Date(),
       };
 
@@ -319,17 +383,6 @@ export class SwarmController extends EventEmitter {
         config,
         state,
         strategy: strategyInstance,
-      });
-
-      // Save to database
-      await this.database.createAgent({
-        agent_id: agentId,
-        swarm_id: this.swarmConfig.swarmId,
-        strategy,
-        budget_allocated: allocation.allocated.value,
-        budget_spent: 0,
-        status: 'ACTIVE',
-        created_at: new Date().toISOString(),
       });
 
       await this.recordEvent('AGENT_SPAWNED', this.swarmConfig.swarmId, agentId, {
@@ -378,14 +431,14 @@ export class SwarmController extends EventEmitter {
     try {
       // Build search query from target criteria
       const searchQuery = {
-        query: this.swarmConfig.targetCriteria.searchTerms?.join(' ') ?? 'mink pelt',
+        query: this.swarmConfig.targetCriteria.searchTerms?.join(' ') ??
+               this.swarmConfig.targetCriteria.searchQuery ?? 'gold silver bullion',
         categoryIds: this.swarmConfig.targetCriteria.categoryIds,
         minPrice: this.swarmConfig.targetCriteria.minPrice,
         maxPrice: Math.min(
           this.swarmConfig.targetCriteria.maxPrice ?? allocation.available.value,
           allocation.available.value
         ),
-        conditions: this.swarmConfig.targetCriteria.conditions,
         limit: 20,
       };
 
@@ -422,19 +475,28 @@ export class SwarmController extends EventEmitter {
     agentId: string,
     agent: ActiveAgent,
     listing: NormalizedListing,
-    allocation: { available: MonetaryBudget }
+    allocation: { available: Money }
   ): Promise<void> {
     if (!this.swarmConfig || !this.budgetAllocator) return;
 
-    // Get agent's listing history
-    const listingHistory = await this.database.getEventsForListing(listing.id);
+    // Get listing history using queryEvents
+    const listingHistory = queryEvents({
+      swarmId: this.swarmConfig.swarmId,
+      itemId: listing.id,
+    });
+
+    // Get agent history using queryEvents
+    const agentHistory = queryEvents({
+      swarmId: this.swarmConfig.swarmId,
+      agentId,
+    });
 
     // Build context for strategy
     const context = {
       listing,
       agentConfig: agent.config,
       remainingBudget: allocation.available,
-      agentHistory: await this.database.getEventsForAgent(agentId),
+      agentHistory,
       currentTime: new Date(),
       listingHistory,
       // Note: marketContext would come from historical data analysis
@@ -443,7 +505,17 @@ export class SwarmController extends EventEmitter {
     // Get strategy decision
     const decision = await agent.strategy.evaluate(context);
 
-    // Act on decision
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RECONNAISSANCE MODE: Observe and record, don't execute
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (this.swarmConfig.mode === 'RECONNAISSANCE') {
+      await this.recordObservationFromDecision(agentId, listing, decision, context);
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMBAT MODE: Execute actions (original behavior)
+    // ═══════════════════════════════════════════════════════════════════════════
     switch (decision.action) {
       case 'BID':
         if (decision.amount && this.budgetAllocator.canAfford(agentId, decision.amount)) {
@@ -465,6 +537,190 @@ export class SwarmController extends EventEmitter {
         // Do nothing
         break;
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RECONNAISSANCE MODE OPERATIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Record an observation based on strategy decision (RECONNAISSANCE mode).
+   */
+  private async recordObservationFromDecision(
+    agentId: string,
+    listing: NormalizedListing,
+    decision: { action: string; amount?: number; confidence: number; reasoning: string },
+    context: { listing: NormalizedListing; remainingBudget: Money }
+  ): Promise<void> {
+    if (!this.swarmConfig) return;
+
+    // Determine observation type based on action and confidence
+    const observationType = this.mapActionToObservationType(
+      decision.action as RecommendedAction,
+      decision.confidence
+    );
+
+    // Assess market condition based on price analysis
+    const marketCondition = this.assessMarketCondition(listing, context);
+
+    // Calculate competition level (based on bid count, watchers, etc.)
+    const competitionLevel = this.assessCompetitionLevel(listing);
+
+    // Calculate time remaining in seconds
+    const timeRemaining = listing.auctionEndTime
+      ? Math.max(0, Math.floor((new Date(listing.auctionEndTime).getTime() - Date.now()) / 1000))
+      : undefined;
+
+    // Create observation record
+    const observation: Observation = {
+      observationId: generateObservationId(),
+      observationType,
+      agentId,
+      swarmId: this.swarmConfig.swarmId,
+      listingId: listing.id,
+
+      // What the agent would have done
+      recommendedAction: decision.action as RecommendedAction,
+      recommendedAmount: decision.amount,
+
+      // Intelligence
+      marketCondition,
+      confidenceScore: decision.confidence,
+      reasoning: decision.reasoning,
+
+      // Context
+      currentPrice: listing.currentPrice ?? listing.price ?? 0,
+      marketAverage: undefined, // Would come from price history analysis
+      discountPercent: undefined, // Would be computed from market average
+      competitionLevel,
+
+      // Listing snapshot
+      itemTitle: listing.title,
+      sellerId: listing.sellerId,
+      timeRemaining,
+
+      // Metadata
+      timestamp: new Date().toISOString(),
+      metadata: {
+        buyingOptions: listing.buyingOptions,
+        isAuction: listing.isAuction,
+        hasBestOffer: listing.hasBestOffer,
+        condition: listing.condition,
+        buyItNowPrice: listing.buyItNowPrice,
+      },
+    };
+
+    // Store observation in database
+    dbRecordObservation(observation);
+
+    // Execute observation hooks
+    const hookRegistry = getObservationHookRegistry();
+    const hookResults = await hookRegistry.executeHooks(observation);
+
+    // Log any hook errors
+    for (const result of hookResults) {
+      if (!result.success) {
+        console.error(`[SWARM] Hook ${result.hookName} failed: ${result.error}`);
+      }
+    }
+
+    // Emit event
+    this.emit('observation:recorded', this.swarmConfig.swarmId, observation);
+
+    // If high confidence opportunity, emit additional event
+    if (observationType === 'OPPORTUNITY_IDENTIFIED') {
+      this.emit('opportunity:identified', this.swarmConfig.swarmId, observation);
+    }
+
+    // If agent wants to probe (OFFER with high confidence), record probe request
+    if (decision.action === 'OFFER' && decision.confidence >= 0.7) {
+      const probeObservation: Observation = {
+        ...observation,
+        observationId: generateObservationId(),
+        observationType: 'PROBE_REQUESTED',
+        reasoning: `Agent requests approval to probe seller: ${decision.reasoning}`,
+      };
+      dbRecordObservation(probeObservation);
+      this.emit('probe:requested', this.swarmConfig.swarmId, agentId, listing.id);
+    }
+
+    // Record event for audit trail
+    await this.recordEvent('LISTING_EVALUATED', this.swarmConfig.swarmId, agentId, {
+      listingId: listing.id,
+      observationId: observation.observationId,
+      recommendedAction: decision.action,
+      confidence: decision.confidence,
+      mode: 'RECONNAISSANCE',
+    });
+  }
+
+  /**
+   * Map action to observation type.
+   */
+  private mapActionToObservationType(
+    action: RecommendedAction,
+    confidence: number
+  ): ObservationType {
+    // High confidence actionable decisions are opportunities
+    if ((action === 'BID' || action === 'OFFER') && confidence >= 0.75) {
+      return 'OPPORTUNITY_IDENTIFIED';
+    }
+
+    // Otherwise, it's a price observation
+    switch (action) {
+      case 'BID':
+      case 'OFFER':
+        return 'PRICE_OBSERVED';
+      case 'WATCH':
+        return 'LISTING_DISCOVERED';
+      case 'SKIP':
+      default:
+        return 'PRICE_OBSERVED';
+    }
+  }
+
+  /**
+   * Assess market condition based on listing price.
+   */
+  private assessMarketCondition(
+    listing: NormalizedListing,
+    _context: { remainingBudget: Money }
+  ): MarketCondition {
+    // Simplified assessment - would be enhanced with historical data
+    const currentPrice = listing.currentPrice ?? listing.price ?? 0;
+    const buyItNowPrice = listing.buyItNowPrice;
+
+    // If current bid is significantly below BIN, potentially underpriced
+    if (buyItNowPrice && currentPrice < buyItNowPrice * 0.6) {
+      return 'UNDERPRICED';
+    }
+
+    // If price is close to or above BIN, potentially overpriced
+    if (buyItNowPrice && currentPrice >= buyItNowPrice * 0.95) {
+      return 'OVERPRICED';
+    }
+
+    // Otherwise, fair market
+    return 'FAIR';
+  }
+
+  /**
+   * Assess competition level for a listing.
+   */
+  private assessCompetitionLevel(listing: NormalizedListing): CompetitionLevel {
+    // Use bid count as primary indicator
+    const bidCount = listing.bidCount ?? 0;
+
+    if (bidCount === 0) return 'LOW';
+    if (bidCount <= 5) return 'MEDIUM';
+    return 'HIGH';
+  }
+
+  /**
+   * Check if swarm is in reconnaissance mode.
+   */
+  isReconnaissanceMode(): boolean {
+    return this.swarmConfig?.mode === 'RECONNAISSANCE';
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -514,7 +770,7 @@ export class SwarmController extends EventEmitter {
       });
 
       if (this.swarmState) {
-        this.swarmState.totalBids++;
+        this.swarmState.totalBids = (this.swarmState.totalBids ?? 0) + 1;
       }
 
       this.emit('bid:placed', this.swarmConfig.swarmId, agentId, listing.id, amount);
@@ -569,7 +825,7 @@ export class SwarmController extends EventEmitter {
       });
 
       if (this.swarmState) {
-        this.swarmState.totalOffers++;
+        this.swarmState.totalOffers = (this.swarmState.totalOffers ?? 0) + 1;
       }
 
       this.emit('offer:submitted', this.swarmConfig.swarmId, agentId, listing.id, amount);
@@ -622,9 +878,13 @@ export class SwarmController extends EventEmitter {
 
     // Update swarm state
     if (this.swarmState) {
-      this.swarmState.wonAuctions++;
-      this.swarmState.itemsAcquired++;
-      this.swarmState.totalSpent.value += finalAmount;
+      this.swarmState.wonAuctions = (this.swarmState.wonAuctions ?? 0) + 1;
+      this.swarmState.itemsAcquired = (this.swarmState.itemsAcquired ?? 0) + 1;
+      if (typeof this.swarmState.totalSpent === 'object') {
+        this.swarmState.totalSpent.value += finalAmount;
+      } else {
+        this.swarmState.totalSpent = (this.swarmState.totalSpent ?? 0) + finalAmount;
+      }
     }
 
     await this.recordEvent('BID_WON', this.swarmConfig.swarmId, agentId, {
@@ -680,9 +940,13 @@ export class SwarmController extends EventEmitter {
     agent.state.activeOffers = agent.state.activeOffers.filter(o => o.listingId !== listingId);
 
     if (this.swarmState) {
-      this.swarmState.acceptedOffers++;
-      this.swarmState.itemsAcquired++;
-      this.swarmState.totalSpent.value += finalAmount;
+      this.swarmState.acceptedOffers = (this.swarmState.acceptedOffers ?? 0) + 1;
+      this.swarmState.itemsAcquired = (this.swarmState.itemsAcquired ?? 0) + 1;
+      if (typeof this.swarmState.totalSpent === 'object') {
+        this.swarmState.totalSpent.value += finalAmount;
+      } else {
+        this.swarmState.totalSpent = (this.swarmState.totalSpent ?? 0) + finalAmount;
+      }
     }
 
     await this.recordEvent('OFFER_ACCEPTED', this.swarmConfig.swarmId, agentId, {
@@ -707,7 +971,7 @@ export class SwarmController extends EventEmitter {
   /**
    * Get current swarm status.
    */
-  getStatus(): SwarmStatus | null {
+  getStatus(): SwarmStatusReport | null {
     if (!this.swarmConfig || !this.swarmState || !this.budgetAllocator) {
       return null;
     }
@@ -718,11 +982,11 @@ export class SwarmController extends EventEmitter {
       swarmId: this.swarmConfig.swarmId,
       status: this.swarmState.status,
       activeAgents: this.swarmState.activeAgents,
-      totalBids: this.swarmState.totalBids,
-      totalOffers: this.swarmState.totalOffers,
-      wonAuctions: this.swarmState.wonAuctions,
-      acceptedOffers: this.swarmState.acceptedOffers,
-      itemsAcquired: this.swarmState.itemsAcquired,
+      totalBids: this.swarmState.totalBids ?? 0,
+      totalOffers: this.swarmState.totalOffers ?? 0,
+      wonAuctions: this.swarmState.wonAuctions ?? 0,
+      acceptedOffers: this.swarmState.acceptedOffers ?? 0,
+      itemsAcquired: this.swarmState.itemsAcquired ?? 0,
       budgetTotal: budgetStatus.total,
       budgetSpent: budgetStatus.spent,
       budgetAvailable: budgetStatus.available,
@@ -758,7 +1022,7 @@ export class SwarmController extends EventEmitter {
         agentId,
         strategy: agent.config.strategy,
         status: agent.state.status,
-        budget: agent.config.budgetAllocation.value,
+        budget: agent.config.budgetAllocation?.value ?? 0,
         spent: agent.state.totalSpent.value,
         wins: agent.state.wins,
         losses: agent.state.losses,
@@ -775,7 +1039,9 @@ export class SwarmController extends EventEmitter {
     if (!this.swarmConfig) return 0;
 
     const now = new Date();
-    const end = new Date(this.swarmConfig.timeWindow.end);
+    const timeWindow = this.swarmConfig.timeWindow ?? this.swarmConfig.campaignWindow;
+    if (!timeWindow) return 0;
+    const end = new Date(timeWindow.end);
     return Math.max(0, end.getTime() - now.getTime());
   }
 
@@ -797,18 +1063,12 @@ export class SwarmController extends EventEmitter {
       eventType,
       swarmId,
       agentId,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       data,
     };
 
-    await this.database.recordEvent({
-      event_id: event.eventId,
-      swarm_id: swarmId,
-      agent_id: agentId,
-      event_type: eventType,
-      event_data: JSON.stringify(data ?? {}),
-      timestamp: event.timestamp.toISOString(),
-    });
+    // Use the module function to record the event
+    dbRecordEvent(event);
   }
 }
 

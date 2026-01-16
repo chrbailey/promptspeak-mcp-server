@@ -111,13 +111,24 @@ export const ORDER_API = {
 
 /**
  * OAuth endpoints.
+ * NOTE: Authorization and token endpoints use DIFFERENT base URLs:
+ * - Authorization (user consent): auth.sandbox.ebay.com / auth.ebay.com
+ * - Token exchange: api.sandbox.ebay.com / api.ebay.com
  */
 export const OAUTH_ENDPOINTS = {
-  /** Authorization URL (user consent) */
+  /** Authorization URL (user consent) - uses AUTH base URL */
   authorize: '/oauth2/authorize',
-  /** Token exchange */
+  /** Token exchange - uses API base URL */
   token: '/identity/v1/oauth2/token',
 } as const;
+
+/**
+ * Get the token endpoint URL.
+ * Token requests go to the API server, not the auth server.
+ */
+export function getTokenUrl(): string {
+  return `${getApiBaseUrl()}${OAUTH_ENDPOINTS.token}`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RATE LIMITS
@@ -311,3 +322,10 @@ export function requireProductionConfirmation(): void {
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RE-EXPORT SCOPES FROM TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Re-exported for convenience - auth.ts imports these from sandbox-config
+export { REQUIRED_EBAY_SCOPES, type EbayOAuthScope } from './types.js';

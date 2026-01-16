@@ -41,7 +41,19 @@ export const DEFAULT_STRATEGY_WEIGHTS: Record<BiddingStrategy, number> = {
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD';
 
 /**
+ * Simple monetary value (for tracking amounts).
+ * Used internally for budget tracking where full MonetaryBudget config isn't needed.
+ */
+export interface Money {
+  /** The monetary value */
+  value: number;
+  /** Currency code */
+  currency: Currency;
+}
+
+/**
  * Monetary budget configuration for an agent.
+ * Includes configuration limits in addition to the amount.
  */
 export interface MonetaryBudget {
   /** Total budget allocated to this agent */
@@ -71,10 +83,14 @@ export const DEFAULT_BUDGET: Omit<MonetaryBudget, 'amount'> = {
  * Time window for agent operations.
  */
 export interface TimeWindow {
-  /** ISO 8601 start timestamp */
-  startAt: string;
-  /** ISO 8601 end timestamp */
-  endAt: string;
+  /** Start timestamp (Date or string) */
+  start: Date | string;
+  /** End timestamp (Date or string) */
+  end: Date | string;
+  /** ISO 8601 start timestamp (alias for compatibility) */
+  startAt?: string;
+  /** ISO 8601 end timestamp (alias for compatibility) */
+  endAt?: string;
   /** Optional operating hours restriction (24h format) */
   operatingHours?: {
     start: number; // 0-23
@@ -100,23 +116,31 @@ export type ListingFormat = 'AUCTION' | 'FIXED_PRICE' | 'BEST_OFFER' | 'ANY';
  * Target criteria for what items agents should pursue.
  */
 export interface TargetCriteria {
-  /** Primary search query (e.g., "mink pelts") */
-  searchQuery: string;
+  /** Primary search query (e.g., "gold bars", "silver coins") */
+  searchQuery?: string;
+  /** Search terms for the swarm (array of keywords) */
+  searchTerms?: string[];
   /** Additional search queries to expand coverage */
   additionalQueries?: string[];
   /** eBay category IDs to search within */
   categoryIds?: string[];
-  /** Price range filter */
-  priceRange: {
+  /** Minimum price filter */
+  minPrice?: number;
+  /** Maximum price filter */
+  maxPrice?: number;
+  /** Price range filter (alternative to minPrice/maxPrice) */
+  priceRange?: {
     min: number;
     max: number;
   };
   /** Acceptable item conditions */
-  conditions: ItemCondition[];
+  conditions?: ItemCondition[] | string[];
   /** Preferred listing formats */
-  listingFormats: ListingFormat[];
+  listingFormats?: ListingFormat[];
   /** Seller IDs to exclude (known problematic sellers) */
   excludeSellers?: string[];
+  /** Preferred seller IDs */
+  preferredSellers?: string[];
   /** Minimum seller feedback score */
   minSellerFeedback?: number;
   /** Geographic restrictions (shipping locations) */
@@ -124,15 +148,18 @@ export interface TargetCriteria {
 }
 
 /**
- * Default target criteria for mink pelt acquisition.
+ * Default target criteria for gold & silver precious metals acquisition.
  */
 export const DEFAULT_TARGET_CRITERIA: TargetCriteria = {
-  searchQuery: 'mink pelts',
-  additionalQueries: ['mink fur pelt', 'mink hide tanned', 'mink skin crafting'],
-  priceRange: { min: 10, max: 200 },
-  conditions: ['NEW', 'LIKE_NEW', 'VERY_GOOD', 'GOOD', 'ANY'],
+  searchQuery: 'gold silver bullion',
+  searchTerms: ['gold bars', 'silver bars', 'gold coins', 'silver coins', 'gold bullion', 'silver bullion'],
+  additionalQueries: ['1 oz gold', '1 oz silver', 'gold rounds', 'silver rounds', 'junk silver', 'silver eagle', 'gold maple leaf'],
+  minPrice: 25,      // Small silver pieces start around $25
+  maxPrice: 3000,    // 1oz gold bar range
+  priceRange: { min: 25, max: 3000 },
+  conditions: ['NEW', 'LIKE_NEW'],  // Precious metals should be pristine condition
   listingFormats: ['AUCTION', 'FIXED_PRICE', 'BEST_OFFER'],
-  minSellerFeedback: 95,
+  minSellerFeedback: 98,  // Higher trust requirement for precious metals
   shipToLocations: ['US'],
 };
 
@@ -153,7 +180,49 @@ export type MarketAgentStatus =
   | 'outbid'        // Lost auction to competitor
   | 'depleted'      // Budget exhausted
   | 'paused'        // Temporarily paused
-  | 'terminated';   // Permanently stopped
+  | 'terminated'    // Permanently stopped
+  | 'ACTIVE';       // Agent actively operating
+
+/**
+ * Active bid tracking.
+ */
+export interface ActiveBid {
+  listingId: string;
+  amount: number;
+  placedAt?: Date;
+  timestamp?: Date;
+}
+
+/**
+ * Active offer tracking.
+ */
+export interface ActiveOffer {
+  listingId: string;
+  amount: number;
+  placedAt?: Date;
+  timestamp?: Date;
+  offerId?: string;
+}
+
+/**
+ * Runtime state of a market agent (tracked during operation).
+ */
+export interface MarketAgentState {
+  /** Current operational status */
+  status: MarketAgentStatus;
+  /** Remaining budget for this agent */
+  remainingBudget: Money;
+  /** Currently active auction bids */
+  activeBids: ActiveBid[];
+  /** Currently active Best Offer negotiations */
+  activeOffers: ActiveOffer[];
+  /** Number of successful acquisitions */
+  wins: number;
+  /** Number of lost auctions */
+  losses: number;
+  /** Total amount spent */
+  totalSpent: Money;
+}
 
 /**
  * Constraints that limit agent behavior.
@@ -188,19 +257,23 @@ export interface MarketAgentConfig {
   /** Unique agent identifier (format: mkt_agent_XXXXX) */
   agentId: string;
   /** Human-readable name */
-  name: string;
+  name?: string;
   /** Assigned bidding strategy */
   strategy: BiddingStrategy;
-  /** Budget allocation */
-  budget: MonetaryBudget;
+  /** Budget allocation (Money type for runtime) */
+  budgetAllocation?: Money;
+  /** Budget configuration */
+  budget?: MonetaryBudget;
   /** Operating time window */
   timeWindow: TimeWindow;
   /** What to search for */
   targetCriteria: TargetCriteria;
   /** Behavioral constraints */
-  constraints: AgentConstraints;
+  constraints?: AgentConstraints;
   /** Parent swarm ID */
   swarmId: string;
+  /** Creation timestamp */
+  createdAt?: Date;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -216,7 +289,11 @@ export type SwarmStatus =
   | 'active'       // Agents running
   | 'paused'       // All agents paused
   | 'completed'    // Campaign ended successfully
-  | 'terminated';  // Manually stopped
+  | 'terminated'   // Manually stopped
+  | 'CREATED'      // Just created
+  | 'RUNNING'      // Running
+  | 'PAUSED'       // Paused
+  | 'TERMINATED';  // Terminated
 
 /**
  * Complete swarm configuration.
@@ -225,27 +302,33 @@ export interface SwarmConfig {
   /** Unique swarm identifier (format: swarm_XXXXX) */
   swarmId: string;
   /** Human-readable name */
-  name: string;
-  /** Total budget for entire swarm */
-  totalBudget: number;
+  name?: string;
+  /** Operating mode: COMBAT (autonomous) or RECONNAISSANCE (observe only) */
+  mode?: AgentMode;
+  /** Total budget for entire swarm (MonetaryBudget or number) */
+  totalBudget: MonetaryBudget | number;
   /** Currency for budget */
-  currency: Currency;
+  currency?: Currency;
   /** Number of agents to spawn */
   agentCount: number;
-  /** Strategy distribution weights */
-  strategyDistribution: Record<BiddingStrategy, number>;
-  /** Campaign time window */
-  campaignWindow: TimeWindow;
+  /** Strategy distribution weights (Record or Map) */
+  strategyDistribution: Record<BiddingStrategy, number> | Map<BiddingStrategy, number>;
+  /** Campaign time window (alias for timeWindow) */
+  campaignWindow?: TimeWindow;
+  /** Time window for swarm operations */
+  timeWindow?: TimeWindow;
   /** Target criteria (shared by all agents) */
   targetCriteria: TargetCriteria;
+  /** Alert configuration (for RECONNAISSANCE mode) */
+  alertConfig?: AlertConfig;
   /** Whether running in sandbox mode */
-  sandboxMode: boolean;
+  sandboxMode?: boolean;
   /** Fee reserve percentage */
-  feeReservePercent: number;
+  feeReservePercent?: number;
   /** Created by (user identifier) */
-  createdBy: string;
+  createdBy?: string;
   /** Creation timestamp */
-  createdAt: string;
+  createdAt?: Date | string;
 }
 
 /**
@@ -255,13 +338,25 @@ export interface SwarmState {
   /** Current status */
   status: SwarmStatus;
   /** Total budget spent across all agents */
-  totalSpent: number;
+  totalSpent: Money | number;
   /** Total items acquired */
-  totalAcquired: number;
+  totalAcquired?: number;
   /** Active agent count */
   activeAgents: number;
+  /** Total bids placed */
+  totalBids?: number;
+  /** Total offers submitted */
+  totalOffers?: number;
+  /** Won auctions count */
+  wonAuctions?: number;
+  /** Accepted offers count */
+  acceptedOffers?: number;
+  /** Items acquired count */
+  itemsAcquired?: number;
   /** Last activity timestamp */
   lastActivityAt?: string;
+  /** Last activity (Date type) */
+  lastActivity?: Date;
   /** Status message */
   statusMessage?: string;
 }
@@ -280,6 +375,7 @@ export type SwarmEventType =
   | 'LISTING_DISCOVERED'
   | 'LISTING_TRACKED'
   | 'LISTING_UNTRACKED'
+  | 'LISTING_EVALUATED'
   // Bid events
   | 'BID_PLACED'
   | 'BID_CONFIRMED'
@@ -295,6 +391,7 @@ export type SwarmEventType =
   | 'OFFER_EXPIRED'
   // Acquisition events
   | 'ITEM_ACQUIRED'
+  | 'CHECKOUT_INITIATED'
   | 'PAYMENT_INITIATED'
   | 'PAYMENT_COMPLETED'
   // Agent lifecycle
@@ -304,6 +401,7 @@ export type SwarmEventType =
   | 'AGENT_RESUMED'
   | 'AGENT_DEPLETED'
   | 'AGENT_TERMINATED'
+  | 'AGENT_BUDGET_EXHAUSTED'
   // Swarm lifecycle
   | 'SWARM_CREATED'
   | 'SWARM_STARTED'
@@ -314,7 +412,14 @@ export type SwarmEventType =
   | 'BUDGET_ALLOCATED'
   | 'BUDGET_SPENT'
   | 'BUDGET_REALLOCATED'
-  | 'BUDGET_EXHAUSTED';
+  | 'BUDGET_EXHAUSTED'
+  | 'SWARM_BUDGET_REALLOCATED'
+  // Error events
+  | 'ERROR'
+  | 'RATE_LIMITED'
+  // Additional offer events
+  | 'OFFER_DECLINED'
+  | 'OFFER_COUNTERED';
 
 /**
  * Base event structure for all swarm events.
@@ -328,10 +433,12 @@ export interface SwarmEventBase {
   swarmId: string;
   /** Agent that generated this event (if applicable) */
   agentId?: string;
-  /** ISO 8601 timestamp */
-  timestamp: string;
+  /** ISO 8601 timestamp or Date */
+  timestamp: string | Date;
   /** Additional event-specific data */
   metadata?: Record<string, unknown>;
+  /** Event data (alias for metadata) */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -409,6 +516,349 @@ export interface AcquisitionEvent extends SwarmEventBase {
  * Union type for all specific event types.
  */
 export type SwarmEvent = SwarmEventBase | BidEvent | OfferEvent | AcquisitionEvent;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECONNAISSANCE MODE (Market Intelligence)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Swarm operating mode.
+ * - COMBAT: Autonomous bidding and purchasing (original mode)
+ * - RECONNAISSANCE: Price intelligence gathering, no autonomous execution
+ */
+export type AgentMode = 'COMBAT' | 'RECONNAISSANCE';
+
+/**
+ * Agent roles in RECONNAISSANCE mode.
+ * Maps from combat strategies to intelligence-gathering missions.
+ */
+export type ReconRole =
+  | 'SCOUT'       // Search and discover listings (was SNIPER)
+  | 'ANALYST'     // Evaluate pricing patterns (was EARLY_AGGRESSIVE)
+  | 'NEGOTIATOR'  // Probe seller flexibility, human-approved only (was NEGOTIATOR)
+  | 'SENTRY'      // Monitor tracked listings for changes (was PASSIVE)
+  | 'COORDINATOR'; // Aggregate observations, trigger alerts (was HYBRID)
+
+/**
+ * Maps combat strategies to reconnaissance roles.
+ */
+export const STRATEGY_TO_RECON_ROLE: Record<BiddingStrategy, ReconRole> = {
+  SNIPER: 'SCOUT',
+  EARLY_AGGRESSIVE: 'ANALYST',
+  NEGOTIATOR: 'NEGOTIATOR',
+  PASSIVE: 'SENTRY',
+  HYBRID: 'COORDINATOR',
+};
+
+/**
+ * Types of observations generated in reconnaissance mode.
+ * These replace actions - agents observe and report rather than execute.
+ */
+export type ObservationType =
+  | 'LISTING_DISCOVERED'          // New listing found matching criteria
+  | 'PRICE_OBSERVED'              // Price data point recorded
+  | 'MARKET_CONDITION_DETECTED'   // Market trend or anomaly identified
+  | 'OPPORTUNITY_IDENTIFIED'      // High-confidence acquisition opportunity
+  | 'SELLER_BEHAVIOR_OBSERVED'    // Seller pattern data point
+  | 'PROBE_REQUESTED'             // Agent wants to probe seller (needs human approval)
+  | 'PROBE_EXECUTED'              // Human-approved probe was executed
+  | 'ALERT_TRIGGERED';            // Alert condition met
+
+/**
+ * Market condition assessment.
+ */
+export type MarketCondition = 'UNDERPRICED' | 'FAIR' | 'OVERPRICED' | 'UNKNOWN';
+
+/**
+ * Competition level for a listing.
+ */
+export type CompetitionLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+/**
+ * Recommended action that an agent would take (in COMBAT mode).
+ */
+export type RecommendedAction = 'BID' | 'OFFER' | 'WATCH' | 'SKIP';
+
+/**
+ * Observation record - the core data structure for reconnaissance mode.
+ * Captures what an agent observed and what it would have done.
+ */
+export interface Observation {
+  /** Unique observation identifier */
+  observationId: string;
+  /** Type of observation */
+  observationType: ObservationType;
+  /** Agent that made this observation */
+  agentId: string;
+  /** Parent swarm */
+  swarmId: string;
+  /** Related listing ID (if applicable) */
+  listingId?: string;
+
+  // What the agent would have done in COMBAT mode
+  /** Recommended action */
+  recommendedAction: RecommendedAction;
+  /** Recommended amount for bid/offer */
+  recommendedAmount?: number;
+
+  // Intelligence gathered
+  /** Market condition assessment */
+  marketCondition: MarketCondition;
+  /** Confidence in the assessment (0-1) */
+  confidenceScore: number;
+  /** Agent's reasoning for the recommendation */
+  reasoning: string;
+
+  // Context
+  /** Current price of the listing */
+  currentPrice: number;
+  /** Computed market average for similar items */
+  marketAverage?: number;
+  /** Discount percentage vs market average */
+  discountPercent?: number;
+  /** Competition level */
+  competitionLevel: CompetitionLevel;
+
+  // Listing snapshot (for historical reference)
+  /** Item title at time of observation */
+  itemTitle?: string;
+  /** Seller ID */
+  sellerId?: string;
+  /** Time remaining in auction (seconds) */
+  timeRemaining?: number;
+
+  // Metadata
+  /** ISO 8601 timestamp */
+  timestamp: string;
+  /** Additional context */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Generate a unique observation ID.
+ */
+export function generateObservationId(): string {
+  return `obs_${Date.now()}_${Math.random().toString(36).substr(2, 12)}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ALERT SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Types of alerts that can be triggered.
+ */
+export type AlertType =
+  | 'PRICE_ANOMALY'         // Listing significantly below market
+  | 'PATTERN_MATCH'         // Seller/listing matches saved criteria
+  | 'MULTI_AGENT_CONSENSUS'; // Multiple agents flagged same opportunity
+
+/**
+ * Alert severity levels.
+ */
+export type AlertSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+/**
+ * Alert status in the approval workflow.
+ */
+export type AlertStatus =
+  | 'PENDING'   // Awaiting human review
+  | 'APPROVED'  // Human approved action
+  | 'REJECTED'  // Human rejected action
+  | 'EXPIRED'   // Approval deadline passed
+  | 'EXECUTED'; // Action was taken
+
+/**
+ * Pattern matching rule for alert triggers.
+ */
+export interface PatternRule {
+  /** Unique rule identifier */
+  ruleId: string;
+  /** Human-readable name */
+  name: string;
+  /** Rule description */
+  description?: string;
+  /** Whether rule is active */
+  enabled: boolean;
+  /** Conditions to match */
+  conditions: {
+    /** Price discount threshold (%) */
+    minDiscountPercent?: number;
+    /** Minimum seller feedback score */
+    minSellerFeedback?: number;
+    /** Maximum seller feedback score (for new sellers) */
+    maxSellerFeedback?: number;
+    /** Listing formats to match */
+    listingFormats?: ListingFormat[];
+    /** Keywords to match in title */
+    titleKeywords?: string[];
+    /** Categories to match */
+    categoryIds?: string[];
+    /** Time window (hours until auction end) */
+    maxTimeRemaining?: number;
+    /** Minimum confidence score from agent */
+    minConfidence?: number;
+  };
+  /** Action to take when pattern matches */
+  action: 'ALERT' | 'PROBE_REQUEST' | 'LOG_ONLY';
+  /** Priority (higher = more important) */
+  priority: number;
+}
+
+/**
+ * Alert configuration for a swarm.
+ */
+export interface AlertConfig {
+  /** Price anomaly threshold (% below market to trigger) */
+  priceAnomalyThreshold: number;
+  /** Confidence threshold for multi-agent consensus */
+  confidenceThreshold: number;
+  /** Minimum agents required for consensus */
+  minAgentsForConsensus: number;
+  /** Pattern matching rules */
+  patternMatchRules: PatternRule[];
+  /** Whether to send webhook notifications */
+  webhookEnabled: boolean;
+  /** Webhook URL for notifications */
+  webhookUrl?: string;
+  /** Alert expiry time (hours) */
+  alertExpiryHours: number;
+}
+
+/**
+ * Default alert configuration.
+ */
+export const DEFAULT_ALERT_CONFIG: AlertConfig = {
+  priceAnomalyThreshold: 15,     // 15% below market triggers alert
+  confidenceThreshold: 0.75,     // 75% confidence required
+  minAgentsForConsensus: 3,      // 3 agents must agree
+  patternMatchRules: [],
+  webhookEnabled: false,
+  alertExpiryHours: 24,
+};
+
+/**
+ * Alert record - represents an actionable intelligence item.
+ */
+export interface Alert {
+  /** Unique alert identifier */
+  alertId: string;
+  /** Type of alert */
+  alertType: AlertType;
+  /** Severity level */
+  severity: AlertSeverity;
+  /** Parent swarm */
+  swarmId: string;
+
+  // Trigger information
+  /** Observation IDs that triggered this alert */
+  triggerObservationIds: string[];
+  /** Full observations (for convenience) */
+  triggerObservations?: Observation[];
+  /** Listing ID this alert concerns */
+  listingId: string;
+
+  // Recommendation
+  /** Recommended action */
+  recommendedAction: RecommendedAction;
+  /** Recommended amount */
+  recommendedAmount?: number;
+  /** Estimated value of the opportunity */
+  estimatedValue: number;
+  /** Combined confidence score */
+  confidence: number;
+  /** Human-readable summary */
+  summary: string;
+
+  // Approval workflow
+  /** Whether human approval is required */
+  requiresApproval: boolean;
+  /** Deadline for approval */
+  approvalDeadline?: string;
+  /** Current status */
+  status: AlertStatus;
+  /** Who resolved the alert */
+  resolvedBy?: string;
+  /** Resolution timestamp */
+  resolvedAt?: string;
+  /** Resolution notes */
+  resolutionNotes?: string;
+
+  // Timestamps
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Generate a unique alert ID.
+ */
+export function generateAlertId(): string {
+  return `alert_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SELLER INTELLIGENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Negotiation style observed from seller behavior.
+ */
+export type NegotiationStyle =
+  | 'FIRM'           // Rarely accepts offers below ask
+  | 'FLEXIBLE'       // Often accepts reasonable offers
+  | 'COUNTER_HAPPY'  // Prefers to counter rather than accept/reject
+  | 'UNKNOWN';       // Insufficient data
+
+/**
+ * Risk level assessment for a seller.
+ */
+export type SellerRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+
+/**
+ * Seller profile built from observations.
+ */
+export interface SellerProfile {
+  /** eBay seller ID */
+  sellerId: string;
+  /** eBay feedback score */
+  feedbackScore?: number;
+  /** eBay feedback percentage */
+  feedbackPercent?: number;
+
+  // Computed from observations (anti-gaming)
+  /** Total interactions observed */
+  totalInteractions: number;
+  /** Successful acquisitions from this seller */
+  successfulAcquisitions: number;
+  /** Average discount achieved */
+  avgDiscountAchieved?: number;
+  /** Observed negotiation style */
+  negotiationStyle: NegotiationStyle;
+  /** Best Offer acceptance rate */
+  bestOfferAcceptanceRate?: number;
+  /** Average response time to offers (hours) */
+  avgOfferResponseTime?: number;
+  /** Computed risk level */
+  riskLevel: SellerRiskLevel;
+
+  // Timestamps
+  /** First observed */
+  firstSeenAt: string;
+  /** Last updated */
+  lastUpdatedAt: string;
+
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Generate a seller profile ID.
+ */
+export function generateSellerProfileId(sellerId: string): string {
+  return `seller_${sellerId}`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPUTED INSIGHTS (Anti-Gaming)
@@ -562,3 +1012,10 @@ export function generateAgentId(): string {
 export function generateEventId(): string {
   return `evt_${Date.now()}_${Math.random().toString(36).substr(2, 12)}`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RE-EXPORTS FROM EBAY MODULE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Re-export eBay types for convenience - strategies and controller import from here
+export type { NormalizedListing, SearchQuery } from './ebay/types.js';

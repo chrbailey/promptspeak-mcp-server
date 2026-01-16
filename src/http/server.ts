@@ -11,6 +11,9 @@
  * Follows the modular pattern established in the MCP server refactor.
  */
 
+// Load environment variables first
+import 'dotenv/config';
+
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { initializeHttpServer, createLogger } from './server-init.js';

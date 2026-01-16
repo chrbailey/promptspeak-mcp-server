@@ -588,17 +588,34 @@ export const REQUIRED_EBAY_SCOPES: EbayOAuthScope[] = [
  * Normalized listing representation used internally.
  */
 export interface NormalizedListing {
+  /** Unique item identifier - aliased as 'id' for convenience */
   itemId: string;
+  /** Alias for itemId for convenience in strategies */
+  id: string;
   title: string;
   description?: string;
+  /** List/asking price */
   price: number;
+  /** Current price (alias for price or currentBid for auctions) */
+  currentPrice: number;
   currency: string;
+  /** Current highest bid for auctions */
   currentBid?: number;
   bidCount?: number;
+  /** Auction end time (alias for endTime) */
+  auctionEndTime?: string;
+  /** End time of listing */
   endTime?: string;
   condition: string;
   buyingOptions: string[];
+  /** Whether this is an auction listing */
+  isAuction: boolean;
+  /** Whether Best Offer is enabled */
   hasBestOffer: boolean;
+  /** Alias for hasBestOffer */
+  bestOfferEnabled: boolean;
+  /** Buy It Now price for auctions with BIN option */
+  buyItNowPrice?: number;
   bestOfferAutoAcceptPrice?: number;
   minimumBestOfferPrice?: number;
   sellerId: string;
@@ -623,19 +640,29 @@ export interface NormalizedListing {
  */
 export function normalizeEbayItem(item: EbayItemSummary | EbayItemDetail): NormalizedListing {
   const isDetail = 'description' in item;
+  const isAuction = item.buyingOptions.includes('AUCTION');
+  const hasBestOffer = item.buyingOptions.includes('BEST_OFFER');
+  const price = parseFloat(item.price.value);
+  const currentBid = item.currentBidPrice ? parseFloat(item.currentBidPrice.value) : undefined;
 
   return {
     itemId: item.itemId,
+    id: item.itemId, // Alias
     title: item.title,
     description: isDetail ? (item as EbayItemDetail).description : undefined,
-    price: parseFloat(item.price.value),
+    price,
+    currentPrice: isAuction && currentBid !== undefined ? currentBid : price,
     currency: item.price.currency,
-    currentBid: item.currentBidPrice ? parseFloat(item.currentBidPrice.value) : undefined,
+    currentBid,
     bidCount: item.bidCount,
     endTime: item.itemEndDate,
+    auctionEndTime: isAuction ? item.itemEndDate : undefined,
     condition: item.condition,
     buyingOptions: item.buyingOptions,
-    hasBestOffer: item.buyingOptions.includes('BEST_OFFER'),
+    isAuction,
+    hasBestOffer,
+    bestOfferEnabled: hasBestOffer,
+    buyItNowPrice: isAuction && item.buyingOptions.includes('FIXED_PRICE') ? price : undefined,
     bestOfferAutoAcceptPrice: isDetail && (item as EbayItemDetail).autoBestOfferPrice
       ? parseFloat((item as EbayItemDetail).autoBestOfferPrice!.value)
       : undefined,

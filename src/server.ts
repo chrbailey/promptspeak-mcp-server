@@ -8,18 +8,22 @@
  * - Delegation management (ps_delegate)
  * - State and drift monitoring (ps_state)
  * - Operator control plane (ps_config_*, ps_confidence_*)
+ * - Market intelligence resources (swarm://intelligence/*)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
-  ListToolsRequestSchema
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { buildToolRegistry } from './tools/index.js';
 import { dispatchTool } from './handlers/index.js';
 import { initializeServer, createLogger } from './server-init.js';
+import { getIntelligenceResourceRegistry } from './swarm/index.js';
 
 const logger = createLogger('Server');
 
@@ -47,6 +51,10 @@ async function main() {
   const TOOLS = buildToolRegistry();
   logger.info('Tool registry built', { toolCount: TOOLS.length });
 
+  // Initialize intelligence resource registry
+  const resourceRegistry = getIntelligenceResourceRegistry();
+  logger.info('Intelligence resource registry initialized');
+
   // Create MCP server
   const server = new Server(
     {
@@ -55,7 +63,8 @@ async function main() {
     },
     {
       capabilities: {
-        tools: {}
+        tools: {},
+        resources: {},
       }
     }
   );
@@ -68,6 +77,38 @@ async function main() {
   // Handle tool calls - uses dispatcher
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return dispatchTool(request.params.name, request.params.arguments ?? {});
+  });
+
+  // Handle list resources
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const resources = resourceRegistry.listResources();
+    return {
+      resources: resources.map(r => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description,
+        mimeType: r.mimeType,
+      })),
+    };
+  });
+
+  // Handle read resource
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const content = resourceRegistry.readResource(request.params.uri);
+
+    if (!content) {
+      throw new Error(`Resource not found: ${request.params.uri}`);
+    }
+
+    return {
+      contents: [
+        {
+          uri: content.uri,
+          mimeType: content.mimeType,
+          text: content.text,
+        },
+      ],
+    };
   });
 
   // Start server

@@ -8,6 +8,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { getConfig } from '../config.js';
 import { createLogger } from '../../core/logging/index.js';
+import {
+  PromptSpeakError,
+  ValidationError as CoreValidationError,
+  NotFoundError as CoreNotFoundError,
+  ConflictError as CoreConflictError,
+  RateLimitError as CoreRateLimitError,
+  AuthenticationError as CoreAuthenticationError,
+  ForbiddenError as CoreForbiddenError,
+  InternalError as CoreInternalError,
+} from '../../core/errors/index.js';
 
 const logger = createLogger('ErrorHandler');
 
@@ -123,6 +133,84 @@ export function errorHandler(
 
   if (err instanceof HttpError) {
     statusCode = err.statusCode;
+    response = {
+      error: err.name.replace('Error', ''),
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      requestId,
+    };
+  } else if (err instanceof CoreValidationError) {
+    // Adapt core ValidationError to HTTP 422
+    statusCode = 422;
+    response = {
+      error: 'ValidationError',
+      message: err.message,
+      code: 'VALIDATION_ERROR',
+      details: err.details,
+      requestId,
+    };
+  } else if (err instanceof CoreNotFoundError) {
+    // Adapt core NotFoundError to HTTP 404
+    statusCode = 404;
+    response = {
+      error: 'NotFound',
+      message: err.message,
+      code: 'NOT_FOUND',
+      details: { resourceType: err.resourceType, resourceId: err.resourceId },
+      requestId,
+    };
+  } else if (err instanceof CoreConflictError) {
+    // Adapt core ConflictError to HTTP 409
+    statusCode = 409;
+    response = {
+      error: 'Conflict',
+      message: err.message,
+      code: 'CONFLICT',
+      details: err.details,
+      requestId,
+    };
+  } else if (err instanceof CoreRateLimitError) {
+    // Adapt core RateLimitError to HTTP 429
+    statusCode = 429;
+    response = {
+      error: 'RateLimit',
+      message: err.message,
+      code: 'RATE_LIMIT',
+      details: { retryAfter: err.retryAfter, limit: err.limit, window: err.window },
+      requestId,
+    };
+  } else if (err instanceof CoreAuthenticationError) {
+    // Adapt core AuthenticationError to HTTP 401
+    statusCode = 401;
+    response = {
+      error: 'Unauthorized',
+      message: err.message,
+      code: 'UNAUTHORIZED',
+      requestId,
+    };
+  } else if (err instanceof CoreForbiddenError) {
+    // Adapt core ForbiddenError to HTTP 403
+    statusCode = 403;
+    response = {
+      error: 'Forbidden',
+      message: err.message,
+      code: 'FORBIDDEN',
+      details: err.resource ? { resource: err.resource } : undefined,
+      requestId,
+    };
+  } else if (err instanceof CoreInternalError) {
+    // Adapt core InternalError to HTTP 500
+    statusCode = 500;
+    response = {
+      error: 'InternalError',
+      message: config.nodeEnv === 'production' ? 'Internal server error' : err.message,
+      code: 'INTERNAL_ERROR',
+      requestId,
+    };
+  } else if (err instanceof PromptSpeakError) {
+    // Catch-all for other core errors - map by status code if available
+    statusCode = err.statusCode ?? 500;
     response = {
       error: err.name.replace('Error', ''),
       message: err.message,

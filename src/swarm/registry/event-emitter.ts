@@ -21,7 +21,7 @@ export interface RegistryEvent {
   symbol: string;
 
   /** Event timestamp */
-  timestamp: Date;
+  timestamp: Date | string;
 
   /** Source swarm ID */
   swarmId: string;

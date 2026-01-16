@@ -11,7 +11,7 @@
  *   const swarmId = await controller.createSwarm({
  *     totalBudget: { value: 500, currency: 'USD' },
  *     agentCount: 5,
- *     targetCriteria: { searchTerms: ['mink pelt'] },
+ *     targetCriteria: { searchTerms: ['gold bars', 'silver coins'] },
  *     timeWindow: { start: new Date(), end: new Date(Date.now() + 86400000) }
  *   });
  *   await controller.startSwarm();
@@ -21,7 +21,25 @@
 export * from './types.js';
 
 // Database
-export { getSwarmDatabase, SwarmDatabase } from './database.js';
+export {
+  getSwarmDatabase,
+  type SwarmDatabase,
+  // Observation operations (RECONNAISSANCE mode)
+  recordObservation,
+  queryObservations,
+  getListingObservations,
+  getHighConfidenceOpportunities,
+  // Alert operations
+  createAlert,
+  getAlert,
+  updateAlertStatus,
+  getPendingAlerts,
+  expireOverdueAlerts,
+  // Seller profile operations
+  upsertSellerProfile,
+  getSellerProfile,
+  listSellersByRisk,
+} from './database.js';
 
 // Budget management
 export { BudgetAllocator, type AgentAllocation, type SwarmBudgetStatus } from './budget-allocator.js';
@@ -74,3 +92,74 @@ export {
   getSwarmToolDefinitions,
   executeSwarmTool,
 } from './tools.js';
+
+// Observation Hooks (RECONNAISSANCE mode)
+export {
+  ObservationHookRegistry,
+  getObservationHookRegistry,
+  createObservationHookRegistry,
+  HookBuilder,
+  createHook,
+  createDatabaseSyncHook,
+  createEnhancedDatabaseSyncHook,
+  createWebhookAlertHook,
+  createSlackAlertHook,
+  createDiscordAlertHook,
+  createAlertHook,
+  createAlertHookWithEngine,
+  createPineconeSyncHook,
+  createEnhancedPineconeSyncHook,
+  flushPendingUpserts,
+  initializeDefaultHooks,
+  initializeHooksFromEnv,
+  type ObservationHook,
+  type HookFilter,
+  type HookExecutionResult,
+  type WebhookConfig,
+  type PineconeSyncConfig,
+  type InitializeHooksOptions,
+} from './hooks/index.js';
+
+// Alert Engine (RECONNAISSANCE mode)
+export {
+  AlertEngine,
+  getAlertEngine,
+  createAlertEngine,
+} from './alerts/index.js';
+
+// Vector Storage (RECONNAISSANCE mode)
+export {
+  IntelligencePineconeClient,
+  getIntelligencePineconeClient,
+  createIntelligencePineconeClient,
+  PINECONE_INDEXES,
+  INDEX_CONFIGS,
+  buildListingRecord,
+  buildPriceRecord,
+  buildSellerRecord,
+  type PineconeIndexName,
+  type ListingRecord,
+  type PriceRecord,
+  type SellerRecord,
+  type ScoredResult,
+  type SearchOptions,
+} from './vectors/index.js';
+
+// MCP Resources (RECONNAISSANCE mode)
+export {
+  IntelligenceResourceRegistry,
+  getIntelligenceResourceRegistry,
+  listIntelligenceResources,
+  readIntelligenceResource,
+  INTELLIGENCE_RESOURCES,
+  type IntelligenceResource,
+  type ResourceContent,
+} from './resources/index.js';
+
+// Intelligence Tools (RECONNAISSANCE mode)
+export {
+  intelligenceToolDefinitions,
+  getIntelligenceToolDefinitions,
+  executeIntelligenceTool,
+  isIntelligenceTool,
+} from './tools/index.js';

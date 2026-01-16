@@ -62,31 +62,17 @@ export class SniperStrategy extends BaseStrategy {
    * Evaluate whether to snipe this auction.
    */
   async evaluate(context: StrategyContext): Promise<StrategyDecision> {
-    const { listing, remainingBudget, currentTime, agentConfig } = context;
+    const { listing, remainingBudget, currentTime } = context;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PRE-FLIGHT CHECKS
+    // PRE-FLIGHT CHECKS (using inherited helper)
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Must be an auction
-    if (!listing.isAuction) {
-      return this.skipDecision('Not an auction - sniper strategy only works with auctions');
-    }
-
-    // Must have an end time
-    if (!listing.auctionEndTime) {
-      return this.skipDecision('Auction has no end time defined');
-    }
-
-    // Must meet our criteria
-    if (!this.meetsListingCriteria(listing, agentConfig)) {
-      return this.skipDecision('Listing does not meet target criteria');
-    }
-
-    // Must have budget remaining
-    if (remainingBudget.value <= 0) {
-      return this.skipDecision('No budget remaining');
-    }
+    const preFlightFailed = this.runPreFlightChecks(context, {
+      requireAuction: true,
+      requireAuctionEndTime: true,
+    });
+    if (preFlightFailed) return preFlightFailed;
 
     // ═══════════════════════════════════════════════════════════════════════
     // TIMING ANALYSIS
@@ -94,20 +80,16 @@ export class SniperStrategy extends BaseStrategy {
 
     const timeRemainingMs = this.getTimeRemainingMs(listing, currentTime);
 
-    // Auction has ended
-    if (timeRemainingMs <= 0) {
-      return this.skipDecision('Auction has already ended');
-    }
+    // Auction has ended (using inherited helper)
+    const auctionEnded = this.checkAuctionEnded(listing, currentTime);
+    if (auctionEnded) return auctionEnded;
 
     // Calculate our max bid
     const maxBid = this.calculateBidAmount(context);
 
-    // Current price is already above our max
-    if (listing.currentPrice >= maxBid) {
-      return this.skipDecision(
-        `Current price ($${listing.currentPrice}) exceeds our max bid ($${maxBid.toFixed(2)})`
-      );
-    }
+    // Current price is already above our max (using inherited helper)
+    const priceExceeded = this.checkPriceExceedsMax(listing, maxBid);
+    if (priceExceeded) return priceExceeded;
 
     // ═══════════════════════════════════════════════════════════════════════
     // SNIPE WINDOW CHECK

@@ -22,7 +22,14 @@
     "sam:rfi": "tsx demo-rfi-search.ts",
     "seed": "tsx scripts/seed-database.ts",
     "seed:dry-run": "tsx scripts/seed-database.ts --dry-run",
-    "seed:force": "tsx scripts/seed-database.ts --force"
+    "seed:force": "tsx scripts/seed-database.ts --force",
+    "test:ebay": "tsx scripts/test-ebay-sandbox.ts",
+    "intel": "tsx scripts/intel-monitor.ts",
+    "intel:status": "tsx scripts/intel-monitor.ts status",
+    "intel:alerts": "tsx scripts/intel-monitor.ts alerts",
+    "intel:opportunities": "tsx scripts/intel-monitor.ts opportunities",
+    "intel:observations": "tsx scripts/intel-monitor.ts observations",
+    "intel:sellers": "tsx scripts/intel-monitor.ts sellers"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

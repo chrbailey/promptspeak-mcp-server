@@ -9,6 +9,7 @@ import {
   getEbayConfig,
   getAuthBaseUrl,
   getAuthHeaders,
+  getTokenUrl,
   OAUTH_ENDPOINTS,
   REQUIRED_EBAY_SCOPES,
 } from './sandbox-config.js';
@@ -64,8 +65,8 @@ export class EbayAuth {
       return currentToken.accessToken;
     }
 
-    // Request new token
-    const tokenUrl = `${this.authBaseUrl}${OAUTH_ENDPOINTS.token}`;
+    // Request new token (token endpoint is on API server, not auth server)
+    const tokenUrl = getTokenUrl();
 
     const body = new URLSearchParams({
       grant_type: 'client_credentials',
@@ -86,7 +87,7 @@ export class EbayAuth {
       );
     }
 
-    const tokenData: EbayOAuthToken = await response.json();
+    const tokenData = await response.json() as EbayOAuthToken;
 
     // Store token
     currentToken = {
@@ -129,7 +130,7 @@ export class EbayAuth {
    * Call this after the user is redirected back from eBay.
    */
   async exchangeAuthorizationCode(code: string): Promise<StoredToken> {
-    const tokenUrl = `${this.authBaseUrl}${OAUTH_ENDPOINTS.token}`;
+    const tokenUrl = getTokenUrl();
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -151,7 +152,7 @@ export class EbayAuth {
       );
     }
 
-    const tokenData: EbayOAuthToken = await response.json();
+    const tokenData = await response.json() as EbayOAuthToken;
 
     // Store token
     currentToken = {
@@ -180,7 +181,7 @@ export class EbayAuth {
       throw new EbayAuthError('Refresh token has expired. User must re-authorize.');
     }
 
-    const tokenUrl = `${this.authBaseUrl}${OAUTH_ENDPOINTS.token}`;
+    const tokenUrl = getTokenUrl();
 
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -202,7 +203,7 @@ export class EbayAuth {
       );
     }
 
-    const tokenData: EbayOAuthToken = await response.json();
+    const tokenData = await response.json() as EbayOAuthToken;
 
     // Update stored token
     currentToken = {

@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { getSwarmController, CreateSwarmOptions } from './swarm-controller.js';
 import { getInsightComputer } from './registry/insight-computer.js';
-import { getSwarmDatabase } from './database.js';
+import { queryEvents } from './database.js';
 import { getRecommendedDistribution } from './strategies/index.js';
 import type { BiddingStrategy } from './types.js';
 
@@ -19,7 +19,7 @@ import type { BiddingStrategy } from './types.js';
 export const SwarmCreateSchema = z.object({
   totalBudget: z.number().min(10).max(10000).describe('Total budget in USD'),
   agentCount: z.number().min(1).max(20).optional().describe('Number of agents (default: 5)'),
-  searchTerms: z.array(z.string()).describe('Keywords to search for (e.g., ["mink pelt", "mink fur"])'),
+  searchTerms: z.array(z.string()).describe('Keywords to search for (e.g., ["gold bars", "silver coins"])'),
   maxPricePerItem: z.number().optional().describe('Maximum price per item in USD'),
   minPricePerItem: z.number().optional().describe('Minimum price per item in USD'),
   conditions: z.array(z.string()).optional().describe('Acceptable conditions (e.g., ["new", "used"])'),
@@ -345,29 +345,23 @@ Returns:
     description: 'Query event history for the swarm.',
     inputSchema: SwarmEventsSchema,
     handler: async (input: z.infer<typeof SwarmEventsSchema>) => {
-      const database = getSwarmDatabase();
-      const events = await database.getEventsForSwarm(input.swarmId, input.limit ?? 50);
-
-      // Apply filters
-      let filteredEvents = events;
-
-      if (input.eventTypes?.length) {
-        filteredEvents = filteredEvents.filter(e => input.eventTypes!.includes(e.event_type));
-      }
-
-      if (input.agentId) {
-        filteredEvents = filteredEvents.filter(e => e.agent_id === input.agentId);
-      }
+      // Use the module function to query events
+      const events = queryEvents({
+        swarmId: input.swarmId,
+        agentId: input.agentId,
+        eventTypes: input.eventTypes,
+        limit: input.limit ?? 50,
+      });
 
       return {
         success: true,
-        count: filteredEvents.length,
-        events: filteredEvents.map(e => ({
-          eventId: e.event_id,
-          type: e.event_type,
-          agentId: e.agent_id,
+        count: events.length,
+        events: events.map(e => ({
+          eventId: e.eventId,
+          type: e.eventType,
+          agentId: e.agentId,
           timestamp: e.timestamp,
-          data: JSON.parse(e.event_data),
+          data: e.metadata ?? e.data ?? {},
         })),
       };
     },

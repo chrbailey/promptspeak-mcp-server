@@ -12,7 +12,9 @@
  */
 
 import type {
+  Money,
   MonetaryBudget,
+  Currency,
   MarketAgentConfig,
   SwarmConfig,
   BiddingStrategy,
@@ -24,25 +26,27 @@ import type {
 
 /**
  * Budget allocation for a single agent.
+ * Uses Money (value + currency) for tracking actual amounts.
  */
 export interface AgentAllocation {
   agentId: string;
-  allocated: MonetaryBudget;
-  spent: MonetaryBudget;
-  reserved: MonetaryBudget; // Currently tied up in pending bids/offers
-  available: MonetaryBudget;
+  allocated: Money;
+  spent: Money;
+  reserved: Money; // Currently tied up in pending bids/offers
+  available: Money;
 }
 
 /**
  * Overall budget status for the swarm.
+ * Uses Money for tracking amounts, MonetaryBudget for config.
  */
 export interface SwarmBudgetStatus {
-  total: MonetaryBudget;
-  allocated: MonetaryBudget;
-  spent: MonetaryBudget;
-  reserved: MonetaryBudget;
-  available: MonetaryBudget;
-  feeReserve: MonetaryBudget;
+  total: Money;
+  allocated: Money;
+  spent: Money;
+  reserved: Money;
+  available: Money;
+  feeReserve: Money;
   agentAllocations: AgentAllocation[];
 }
 
@@ -83,15 +87,32 @@ export interface ReallocationResult {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export class BudgetAllocator {
-  private totalBudget: MonetaryBudget;
+  private totalBudget: Money;
+  private budgetConfig: MonetaryBudget;
   private feeReservePercent: number;
   private allocations: Map<string, AgentAllocation> = new Map();
-  private currency: string;
+  private currency: Currency;
 
   constructor(config: SwarmConfig) {
-    this.totalBudget = { ...config.totalBudget };
+    // Handle both MonetaryBudget and number types for totalBudget
+    if (typeof config.totalBudget === 'number') {
+      // Simple number budget - create MonetaryBudget from it
+      const currency = config.currency ?? 'USD';
+      this.budgetConfig = {
+        amount: config.totalBudget,
+        currency,
+        maxPerItem: config.totalBudget,
+        reservePercent: config.feeReservePercent ?? 5,
+      };
+      this.totalBudget = { value: config.totalBudget, currency };
+      this.currency = currency;
+    } else {
+      // MonetaryBudget type
+      this.budgetConfig = { ...config.totalBudget };
+      this.totalBudget = { value: config.totalBudget.amount, currency: config.totalBudget.currency };
+      this.currency = config.totalBudget.currency;
+    }
     this.feeReservePercent = config.feeReservePercent ?? 5;
-    this.currency = config.totalBudget.currency;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -503,12 +524,14 @@ export class BudgetAllocator {
    * Export state for persistence.
    */
   exportState(): {
-    totalBudget: MonetaryBudget;
+    totalBudget: Money;
+    budgetConfig: MonetaryBudget;
     feeReservePercent: number;
     allocations: AgentAllocation[];
   } {
     return {
       totalBudget: { ...this.totalBudget },
+      budgetConfig: { ...this.budgetConfig },
       feeReservePercent: this.feeReservePercent,
       allocations: Array.from(this.allocations.values()),
     };
@@ -518,13 +541,17 @@ export class BudgetAllocator {
    * Import state from persistence.
    */
   importState(state: {
-    totalBudget: MonetaryBudget;
+    totalBudget: Money;
+    budgetConfig?: MonetaryBudget;
     feeReservePercent: number;
     allocations: AgentAllocation[];
   }): void {
     this.totalBudget = { ...state.totalBudget };
     this.feeReservePercent = state.feeReservePercent;
     this.currency = state.totalBudget.currency;
+    if (state.budgetConfig) {
+      this.budgetConfig = { ...state.budgetConfig };
+    }
 
     this.allocations.clear();
     for (const allocation of state.allocations) {
