@@ -17,7 +17,7 @@
 
 import type { DirectiveSymbol } from '../../symbols/types.js';
 import { type Result, type ResultMetadata, success, failure, fromError } from '../../core/result/index.js';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger, type SecureLogger } from '../../core/security/index.js';
 import {
   AdapterError,
   CircuitBreakerError,
@@ -501,7 +501,7 @@ export class LRUCache<T> {
 export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, TRecord> {
   protected rateLimiter: SlidingWindowRateLimiter;
   protected cache: LRUCache<TRecord>;
-  protected logger = createLogger('BaseAdapter');
+  protected logger: SecureLogger = createSecureLogger('BaseAdapter');
   protected stats: AdapterStats = {
     totalRequests: 0,
     successfulRequests: 0,
@@ -540,7 +540,8 @@ export abstract class BaseGovernmentAdapter<TConfig extends BaseAdapterConfig, T
     this.rateLimiter = new SlidingWindowRateLimiter(config.rateLimit);
     this.cache = new LRUCache(config.cache);
     // Defer logger creation to allow subclass to set adapter name first
-    this.logger = createLogger(this.getAdapterName());
+    // Use SecureLogger for government data - prevents accidental PII/sensitive data leaks
+    this.logger = createSecureLogger(this.getAdapterName());
   }
 
   /**

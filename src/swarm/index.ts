@@ -89,6 +89,7 @@ export {
 // MCP Tools
 export {
   swarmTools,
+  swarmToolDefinitions,
   getSwarmToolDefinitions,
   executeSwarmTool,
 } from './tools.js';

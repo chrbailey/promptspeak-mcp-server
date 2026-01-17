@@ -13,7 +13,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { createLogger } from '../core/logging/index.js';
+import { createSecureLogger } from '../core/security/index.js';
 import { HttpConfig } from './config.js';
 
 // Subsystem imports
@@ -21,7 +21,8 @@ import { initializeDatabase, getDatabase } from '../symbols/database.js';
 import { initializeSymbolManager, getSymbolManager } from '../symbols/manager.js';
 import { ensureDefaultApiKey, initializeApiKeyTable } from '../auth/api-key.js';
 
-const logger = createLogger('HttpServerInit');
+// Use SecureLogger for HTTP server init - protects against accidental path/config leaks
+const logger = createSecureLogger('HttpServerInit');
 
 // ===============================================================================
 // TYPES
@@ -315,4 +316,6 @@ export function isHttpServerInitialized(): boolean {
 }
 
 // Re-export logging utilities for server use
+// Re-export for convenience
 export { createLogger } from '../core/logging/index.js';
+export { createSecureLogger } from '../core/security/index.js';

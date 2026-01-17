@@ -83,24 +83,18 @@ describe('Server Module Integration', () => {
       expect(stats.total).toBe(registryTools.length);
 
       // Verify individual category counts sum correctly
-      const sumOfCategories =
-        stats.validation +
-        stats.execution +
-        stats.delegation +
-        stats.state +
-        stats.config +
-        stats.confidence +
-        stats.feature +
-        stats.audit +
-        stats.hold +
-        stats.legal +
-        stats.calendar +
-        stats.symbol +
-        stats.graph +
-        stats.document +
-        stats.translation +
-        stats.orchestration +
-        stats.multiAgent;
+      // Sum all categories dynamically to avoid missing new ones
+      const knownCategories = [
+        'validation', 'execution', 'delegation', 'state', 'config',
+        'confidence', 'feature', 'audit', 'hold', 'legal', 'calendar',
+        'symbol', 'graph', 'document', 'translation', 'orchestration',
+        'multiAgent', 'swarm', 'intel'
+      ];
+
+      const sumOfCategories = knownCategories.reduce(
+        (sum, cat) => sum + (stats[cat] || 0),
+        0
+      );
 
       expect(sumOfCategories).toBe(stats.total);
     });

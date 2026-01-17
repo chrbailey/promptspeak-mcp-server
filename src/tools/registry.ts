@@ -31,7 +31,7 @@ import { documentToolDefinitions } from '../document/index.js';
 import { translationToolDefinitions } from '../translation/index.js';
 import { orchestrationToolDefinitions } from '../agents/tools.js';
 import { multiAgentToolDefinitions } from '../multi_agent/index.js';
-import { intelligenceToolDefinitions } from '../swarm/tools/index.js';
+import { swarmToolDefinitions, intelligenceToolDefinitions } from '../swarm/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION TOOLS
@@ -426,6 +426,7 @@ export {
   translationToolDefinitions,
   orchestrationToolDefinitions,
   multiAgentToolDefinitions,
+  swarmToolDefinitions,
   intelligenceToolDefinitions,
 };
 
@@ -461,12 +462,14 @@ export function buildToolRegistry(): Tool[] {
     ...translationToolDefinitions, // Translation Layer
     ...orchestrationToolDefinitions, // Agent Orchestration (MADIF)
     ...multiAgentToolDefinitions,  // Multi-Agent / Commander's Intent
+    ...swarmToolDefinitions,       // Market Agent Swarm
     ...intelligenceToolDefinitions, // Market Intelligence (Swarm)
   ];
 }
 
 /**
  * Get tool count by category for diagnostics.
+ * Category names match those in handlers/tool-registry.ts for consistency.
  */
 export function getToolStats(): Record<string, number> {
   return {
@@ -487,7 +490,8 @@ export function getToolStats(): Record<string, number> {
     translation: translationToolDefinitions.length,
     orchestration: orchestrationToolDefinitions.length,
     multiAgent: multiAgentToolDefinitions.length,
-    intelligence: intelligenceToolDefinitions.length,
+    swarm: swarmToolDefinitions.length,
+    intel: intelligenceToolDefinitions.length,
     total: buildToolRegistry().length
   };
 }

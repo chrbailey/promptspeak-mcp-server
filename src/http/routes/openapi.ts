@@ -9,9 +9,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import YAML from 'yaml';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger } from '../../core/security/index.js';
 
-const logger = createLogger('OpenAPI');
+// Use SecureLogger for OpenAPI routes - protects against path disclosure in errors
+const logger = createSecureLogger('OpenAPI');
 
 const router = Router();
 

@@ -20,9 +20,10 @@ import {
   buildPriceRecord,
 } from '../vectors/pinecone-client.js';
 import { getSellerProfile } from '../database.js';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger } from '../../core/security/index.js';
 
-const logger = createLogger('PineconeSyncHook');
+// Use SecureLogger for market intelligence - protects listing/seller/price data
+const logger = createSecureLogger('PineconeSyncHook');
 
 /**
  * Configuration for the Pinecone sync hook.

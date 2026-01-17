@@ -7,9 +7,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getConfig } from '../config.js';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger } from '../../core/security/index.js';
 
-const logger = createLogger('RequestLogger');
+// Use SecureLogger for HTTP requests - protects query params and headers
+const logger = createSecureLogger('RequestLogger');
 
 export function requestLogger(
   req: Request,

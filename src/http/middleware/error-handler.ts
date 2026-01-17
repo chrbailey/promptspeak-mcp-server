@@ -7,7 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { getConfig } from '../config.js';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger } from '../../core/security/index.js';
 import {
   PromptSpeakError,
   ValidationError as CoreValidationError,
@@ -19,7 +19,8 @@ import {
   InternalError as CoreInternalError,
 } from '../../core/errors/index.js';
 
-const logger = createLogger('ErrorHandler');
+// Use SecureLogger for error handling - error data may contain sensitive info
+const logger = createSecureLogger('ErrorHandler');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CUSTOM ERROR TYPES

@@ -369,11 +369,119 @@ Returns:
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TOOL DEFINITIONS FOR MCP REGISTRY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Swarm tool definitions in MCP Tool[] format.
+ * Used by the central registry for tool listing.
+ */
+export const swarmToolDefinitions: Tool[] = [
+  {
+    name: 'ps_swarm_create',
+    description: 'Create a new market agent swarm for autonomous eBay bidding. Deploys agents with strategies: SNIPER, EARLY_AGGRESSIVE, NEGOTIATOR, HYBRID, PASSIVE.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        totalBudget: { type: 'number', description: 'Total budget in USD (10-10000)' },
+        agentCount: { type: 'number', description: 'Number of agents (default: 5)' },
+        searchTerms: { type: 'array', items: { type: 'string' }, description: 'Keywords to search for' },
+        maxPricePerItem: { type: 'number', description: 'Maximum price per item in USD' },
+        minPricePerItem: { type: 'number', description: 'Minimum price per item in USD' },
+        conditions: { type: 'array', items: { type: 'string' }, description: 'Acceptable conditions' },
+        durationHours: { type: 'number', description: 'Duration in hours (default: 24)' },
+        strategyDistribution: { type: 'object', description: 'Custom strategy distribution' },
+      },
+      required: ['totalBudget', 'searchTerms'],
+    },
+  },
+  {
+    name: 'ps_swarm_start',
+    description: 'Start swarm operations. Agents will begin searching and bidding.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'ps_swarm_pause',
+    description: 'Pause swarm operations. Agents will stop searching but maintain their state.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'ps_swarm_terminate',
+    description: 'Terminate the swarm and compute final insights.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', description: 'Reason for termination' },
+      },
+    },
+  },
+  {
+    name: 'ps_swarm_status',
+    description: 'Get current swarm status including budget, agents, and activity.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'ps_swarm_agent_status',
+    description: 'Get detailed status for a specific agent.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        swarmId: { type: 'string', description: 'The swarm ID' },
+        agentId: { type: 'string', description: 'The agent ID' },
+      },
+      required: ['swarmId', 'agentId'],
+    },
+  },
+  {
+    name: 'ps_swarm_reallocate_budget',
+    description: 'Reallocate budget from one agent to another.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        swarmId: { type: 'string', description: 'The swarm ID' },
+        fromAgentId: { type: 'string', description: 'Agent to take budget from' },
+        toAgentId: { type: 'string', description: 'Agent to give budget to' },
+        amount: { type: 'number', description: 'Amount to reallocate' },
+      },
+      required: ['swarmId', 'fromAgentId', 'toAgentId', 'amount'],
+    },
+  },
+  {
+    name: 'ps_swarm_insights',
+    description: 'Get computed insights for the swarm including strategy rankings, cost efficiency, concentration risk, and gaming pattern detection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        swarmId: { type: 'string', description: 'The swarm ID' },
+      },
+      required: ['swarmId'],
+    },
+  },
+  {
+    name: 'ps_swarm_events',
+    description: 'Query event history for the swarm.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        swarmId: { type: 'string', description: 'The swarm ID' },
+        limit: { type: 'number', description: 'Number of events to return (default: 50)' },
+        eventTypes: { type: 'array', items: { type: 'string' }, description: 'Filter by event types' },
+        agentId: { type: 'string', description: 'Filter by agent ID' },
+      },
+      required: ['swarmId'],
+    },
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TOOL REGISTRATION HELPER
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * Get all swarm tool definitions for MCP registration.
+ * @deprecated Use swarmToolDefinitions directly
  */
 export function getSwarmToolDefinitions() {
   return Object.values(swarmTools).map(tool => ({

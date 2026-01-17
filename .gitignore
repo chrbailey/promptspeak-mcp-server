@@ -27,6 +27,7 @@ telephone-scale-*.json
 .env
 .env.local
 .env.*.local
+.env.backup.DO_NOT_COMMIT
 *.pem
 *.key
 

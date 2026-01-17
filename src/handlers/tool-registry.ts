@@ -431,6 +431,21 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     category: 'symbol',
     description: 'Format symbol for display',
   },
+  ps_symbol_verify: {
+    handler: delegated(handleSymbolTool, 'ps_symbol_verify'),
+    category: 'symbol',
+    description: 'Verify symbol epistemic status',
+  },
+  ps_symbol_list_unverified: {
+    handler: delegated(handleSymbolTool, 'ps_symbol_list_unverified'),
+    category: 'symbol',
+    description: 'List symbols pending verification',
+  },
+  ps_symbol_add_alternative: {
+    handler: delegated(handleSymbolTool, 'ps_symbol_add_alternative'),
+    category: 'symbol',
+    description: 'Add alternative symbol ID',
+  },
 
   // -------------------------------------------------------------------------
   // GRAPH TRAVERSAL TOOLS
@@ -645,6 +660,26 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     handler: delegated(handleMultiAgentTool, 'ps_mission_control'),
     category: 'multiAgent',
     description: 'Control mission execution',
+  },
+  ps_bootcamp_start: {
+    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_start'),
+    category: 'multiAgent',
+    description: 'Start Marine Agent Boot Camp for an agent',
+  },
+  ps_bootcamp_scenario: {
+    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_scenario'),
+    category: 'multiAgent',
+    description: 'Get next training scenario',
+  },
+  ps_bootcamp_submit: {
+    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_submit'),
+    category: 'multiAgent',
+    description: 'Submit scenario response',
+  },
+  ps_bootcamp_status: {
+    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_status'),
+    category: 'multiAgent',
+    description: 'Get boot camp status or certification',
   },
 
   // -------------------------------------------------------------------------

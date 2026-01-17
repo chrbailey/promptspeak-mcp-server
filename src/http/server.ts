@@ -16,9 +16,10 @@ import 'dotenv/config';
 
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { initializeHttpServer, createLogger } from './server-init.js';
+import { initializeHttpServer, createSecureLogger } from './server-init.js';
 
-const logger = createLogger('HttpServer');
+// Use SecureLogger for HTTP server - protects config paths and init details
+const logger = createSecureLogger('HttpServer');
 
 async function main(): Promise<void> {
   logger.info('PromptSpeak HTTP API Server starting...');

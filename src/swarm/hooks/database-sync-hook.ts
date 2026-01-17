@@ -8,9 +8,10 @@
 import type { Observation } from '../types.js';
 import { recordObservation } from '../database.js';
 import { createHook, type ObservationHook } from './observation-hooks.js';
-import { createLogger } from '../../core/logging/index.js';
+import { createSecureLogger } from '../../core/security/index.js';
 
-const logger = createLogger('DatabaseSyncHook');
+// Use SecureLogger for market intelligence hooks - protects seller/listing data
+const logger = createSecureLogger('DatabaseSyncHook');
 
 /**
  * Create the database sync hook.
