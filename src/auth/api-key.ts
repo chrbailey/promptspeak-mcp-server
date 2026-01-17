@@ -8,9 +8,9 @@
 import * as crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { getDatabase } from '../symbols/database.js';
-import { createLogger } from '../core/logging/index.js';
+import { createSecureLogger } from '../core/security/index.js';
 
-const logger = createLogger('ApiKeyManager');
+const logger = createSecureLogger('ApiKeyManager');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -292,8 +292,13 @@ export async function ensureDefaultApiKey(): Promise<string | null> {
       rateLimitTier: 'enterprise',
     });
 
-    logger.info('DEFAULT API KEY CREATED (save this - shown only once!)');
-    logger.info(`Key: ${keyResult.key}`);
+    // SECURITY: Never log full API keys - only log the prefix for correlation
+    // The key is returned to the caller who can display it appropriately
+    logger.unsafe.info('DEFAULT API KEY CREATED', {
+      keyPrefix: keyResult.keyPrefix,
+      userId: 'default',
+      note: 'Key returned to caller - not logged for security',
+    });
 
     return keyResult.key;
   }

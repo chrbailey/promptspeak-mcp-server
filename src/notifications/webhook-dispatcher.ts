@@ -13,9 +13,9 @@ import type {
   RiskLevel,
 } from '../agents/types.js';
 import { recordAgentAuditEvent } from '../agents/database.js';
-import { createLogger } from '../core/logging/index.js';
+import { createSecureLogger, redact } from '../core/security/index.js';
 
-const logger = createLogger('WebhookDispatcher');
+const logger = createSecureLogger('WebhookDispatcher');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -493,11 +493,13 @@ export class WebhookDispatcher {
       }
     } else {
       // Log email for debugging (SMTP not implemented)
-      logger.info('EMAIL NOTIFICATION (SMTP not configured):');
-      logger.info(`To: ${channel.email.to.join(', ')}`);
-      logger.info(`Subject: [Action Required] Agent Approval: ${payload.agent.name}`);
-      logger.info(`Approve: ${payload.approveUrl}`);
-      logger.info(`Reject: ${payload.rejectUrl}`);
+      // SECURITY: Redact email addresses and approval URLs
+      logger.safeInfo('EMAIL NOTIFICATION (SMTP not configured)', {
+        recipientCount: channel.email.to.length,
+        agentName: payload.agent.name,
+        hasApproveUrl: !!payload.approveUrl,
+        hasRejectUrl: !!payload.rejectUrl,
+      });
     }
   }
 

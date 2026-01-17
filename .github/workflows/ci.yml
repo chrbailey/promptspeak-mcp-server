@@ -35,6 +35,46 @@ jobs:
       - name: Run linter
         run: npm run lint --if-present
 
+      - name: Security - Check for sensitive logging patterns
+        run: |
+          echo "Checking for sensitive logging patterns..."
+          VIOLATIONS=0
+
+          # Pattern 1: Template literals in logger calls with sensitive field names
+          if grep -rn --include="*.ts" -E "logger\.(debug|info|warn|error)\s*\(\s*\`[^\`]*\\\$\{[^\}]*(password|secret|token|email|ssn|creditCard|apiKey|customer|invoice)" src/; then
+            echo "❌ Found template literals with sensitive field names in logger calls"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # Pattern 2: Logging entire objects that likely contain sensitive data
+          if grep -rn --include="*.ts" -E "logger\.(debug|info)\s*\(['\"].*['\"],\s*(response|payload|body|data|entity|customer|user)\s*\)" src/; then
+            echo "⚠️  Found potential logging of entire response/payload objects"
+            echo "    Consider using safeDebug() or { redactAll: true }"
+          fi
+
+          # Pattern 3: Console.log in production code (should use logger)
+          CONSOLE_COUNT=$(grep -rn --include="*.ts" "console\.(log|debug|info)" src/ --exclude-dir=__tests__ --exclude="*.test.ts" | wc -l)
+          if [ "$CONSOLE_COUNT" -gt 10 ]; then
+            echo "⚠️  Found $CONSOLE_COUNT console.log statements - prefer structured logger"
+          fi
+
+          # Pattern 4: Direct interpolation of known sensitive fields
+          if grep -rn --include="*.ts" -E "\\\$\{[^}]*(\.password|\.secret|\.token|\.apiKey|\.email|\.ssn)\}" src/; then
+            echo "❌ Found direct interpolation of sensitive object properties"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo ""
+            echo "============================================"
+            echo "❌ SECURITY CHECK FAILED: $VIOLATIONS violation(s) found"
+            echo "See docs/SECURITY_LOGGING.md for guidelines"
+            echo "============================================"
+            exit 1
+          fi
+
+          echo "✅ Security logging check passed"
+
   build:
     runs-on: ubuntu-latest
     needs: test
