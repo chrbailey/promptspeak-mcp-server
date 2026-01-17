@@ -19,6 +19,7 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from '../core/logging/index.js';
+import { LRUCache } from '../multi_agent/lru-cache.js';
 
 const logger = createLogger('SymbolManager');
 
@@ -63,61 +64,14 @@ const SYMBOL_PREFIX = 'Ξ';
 const DATABASE_FILE = 'promptspeak.db';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LRU CACHE
+// CACHE CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Simple LRU cache with maximum size and eviction
- */
-class LRUCache<K, V> {
-  private cache: Map<K, V> = new Map();
-  private maxSize: number;
+/** Default cache TTL: 5 minutes */
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-  constructor(maxSize: number = 1000) {
-    this.maxSize = maxSize;
-  }
-
-  get(key: K): V | undefined {
-    const value = this.cache.get(key);
-    if (value !== undefined) {
-      // Move to end (most recently used)
-      this.cache.delete(key);
-      this.cache.set(key, value);
-    }
-    return value;
-  }
-
-  set(key: K, value: V): void {
-    // Delete if exists (to update position)
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    // Evict oldest if at capacity
-    else if (this.cache.size >= this.maxSize) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest !== undefined) {
-        this.cache.delete(oldest);
-      }
-    }
-    this.cache.set(key, value);
-  }
-
-  has(key: K): boolean {
-    return this.cache.has(key);
-  }
-
-  delete(key: K): void {
-    this.cache.delete(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  get size(): number {
-    return this.cache.size;
-  }
-}
+/** Maximum cache size */
+const CACHE_MAX_SIZE = 1000;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYMBOL MANAGER CLASS
@@ -126,11 +80,14 @@ class LRUCache<K, V> {
 export class SymbolManager {
   private symbolsRoot: string;
   private db: SymbolDatabase;
-  private cache: LRUCache<string, DirectiveSymbol>;
+  private cache: LRUCache<DirectiveSymbol>;
 
   constructor(symbolsRoot: string) {
     this.symbolsRoot = symbolsRoot;
-    this.cache = new LRUCache<string, DirectiveSymbol>(1000);
+    this.cache = new LRUCache<DirectiveSymbol>({
+      maxSize: CACHE_MAX_SIZE,
+      ttlMs: CACHE_TTL_MS,
+    });
 
     // Ensure directories exist
     if (!fs.existsSync(symbolsRoot)) {
