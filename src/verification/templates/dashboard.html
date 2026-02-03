@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <style>
+    /* =========================================================================
+       Multi-LLM Consensus Dashboard Styles
+       ========================================================================= */
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      padding: 2rem;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Layout */
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #334155;
+    }
+
+    .header h1 {
+      font-size: 1.875rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header .timestamp {
+      color: #94a3b8;
+      font-size: 0.875rem;
+    }
+
+    /* Grid Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .grid-full {
+      grid-column: 1 / -1;
+    }
+
+    /* Cards */
+    .card {
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+    }
+
+    /* Consensus Card (Hero) */
+    .consensus-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      border: 1px solid #334155;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .consensus-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, {{consensus.statusColor}}, transparent);
+    }
+
+    .consensus-score {
+      font-size: 5rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .consensus-label {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .consensus-meta {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .consensus-meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Verification Badge */
+    .verification-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 0.875rem;
+      margin-top: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .verified {
+      background: rgba(22, 101, 52, 0.3);
+      color: #22c55e;
+      border: 1px solid #22c55e;
+    }
+
+    .not-verified {
+      background: rgba(127, 29, 29, 0.3);
+      color: #ef4444;
+      border: 1px solid #ef4444;
+    }
+
+    .needs-review {
+      background: rgba(120, 53, 15, 0.3);
+      color: #fbbf24;
+      border: 1px solid #fbbf24;
+    }
+
+    /* Provider Results */
+    .provider-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      border-bottom: 1px solid #334155;
+    }
+
+    .provider-row:last-child {
+      border-bottom: none;
+    }
+
+    .provider-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .provider-name {
+      font-weight: 600;
+      font-size: 1rem;
+      text-transform: capitalize;
+    }
+
+    .provider-model {
+      color: #64748b;
+      font-size: 0.8rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .provider-stats {
+      text-align: right;
+    }
+
+    .provider-confidence {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .provider-latency {
+      color: #64748b;
+      font-size: 0.75rem;
+    }
+
+    .provider-error {
+      color: #ef4444;
+      font-size: 0.8rem;
+      max-width: 200px;
+    }
+
+    /* Confidence/Latency Stats */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.625rem 0;
+    }
+
+    .stat-label {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    /* Progress Bar */
+    .bar-container {
+      height: 10px;
+      background: #334155;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.5s ease-out;
+    }
+
+    /* Discrepancies */
+    .discrepancy {
+      padding: 1.25rem;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      border-left: 4px solid;
+    }
+
+    .discrepancy:last-child {
+      margin-bottom: 0;
+    }
+
+    .discrepancy-high {
+      border-color: #ef4444;
+    }
+
+    .discrepancy-medium {
+      border-color: #f97316;
+    }
+
+    .discrepancy-low {
+      border-color: #eab308;
+    }
+
+    .discrepancy-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .discrepancy-field {
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9rem;
+    }
+
+    .discrepancy-severity {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .severity-high {
+      background: rgba(127, 29, 29, 0.4);
+      color: #ef4444;
+    }
+
+    .severity-medium {
+      background: rgba(120, 53, 15, 0.4);
+      color: #f97316;
+    }
+
+    .severity-low {
+      background: rgba(113, 63, 18, 0.4);
+      color: #eab308;
+    }
+
+    .discrepancy-desc {
+      color: #94a3b8;
+      font-size: 0.875rem;
+    }
+
+    .discrepancy-providers {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    .discrepancy-provider {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+    }
+
+    .discrepancy-provider-name {
+      color: #64748b;
+      min-width: 80px;
+    }
+
+    .discrepancy-provider-value {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #e2e8f0;
+    }
+
+    /* No Discrepancies */
+    .no-discrepancies {
+      text-align: center;
+      color: #22c55e;
+      padding: 2.5rem;
+      font-size: 1rem;
+    }
+
+    .no-discrepancies::before {
+      content: '\2714';
+      display: block;
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+
+      .consensus-score {
+        font-size: 3.5rem;
+      }
+
+      .consensus-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <header class="header">
+      <h1>{{title}}</h1>
+      <div class="timestamp">Generated: {{generatedAt}}</div>
+    </header>
+
+    <div class="consensus-card">
+      <div class="consensus-score" style="color: {{consensus.statusColor}};">
+        {{consensus.scorePercent}}%
+      </div>
+      <div class="consensus-label" style="color: {{consensus.statusColor}};">
+        {{consensus.statusLabel}}
+      </div>
+      <div class="consensus-meta">
+        <span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Providers: {{consensus.consensusRatio}}
+        </span>
+        <span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Duration: {{durationMs}}ms
+        </span>
+      </div>
+      <div class="verification-badge {{verificationClass}}">
+        {{verificationLabel}}
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Provider Results</h2>
+        {{#each providers}}
+        <div class="provider-row">
+          <div class="provider-info">
+            <div class="provider-name">{{provider}}</div>
+            <div class="provider-model">{{model}}</div>
+          </div>
+          <div class="provider-stats">
+            {{#if error}}
+            <div class="provider-error">{{error}}</div>
+            {{else}}
+            <div class="provider-confidence" style="color: {{confidenceColor}};">{{confidencePercent}}%</div>
+            {{/if}}
+            <div class="provider-latency">{{latencyMs}}ms</div>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+
+      <div class="card">
+        <h2>Confidence Breakdown</h2>
+        <div class="stat-row">
+          <span class="stat-label">Average</span>
+          <span class="stat-value">{{confidence.averagePercent}}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Min / Max</span>
+          <span class="stat-value">{{confidence.minPercent}}% / {{confidence.maxPercent}}%</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Spread</span>
+          <span class="stat-value">{{confidence.spreadPercent}}%</span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-fill" style="width: {{confidence.averagePercent}}%; background: {{consensus.statusColor}};"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Latency</h2>
+        <div class="stat-row">
+          <span class="stat-label">Average</span>
+          <span class="stat-value">{{latency.average}}ms</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Min / Max</span>
+          <span class="stat-value">{{latency.min}}ms / {{latency.max}}ms</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Total (parallel)</span>
+          <span class="stat-value">{{latency.total}}ms</span>
+        </div>
+      </div>
+
+      <div class="card grid-full">
+        <h2>Discrepancies ({{discrepancies.length}})</h2>
+        {{#if discrepancies.length}}
+        {{#each discrepancies}}
+        <div class="discrepancy discrepancy-{{severity}}">
+          <div class="discrepancy-header">
+            <span class="discrepancy-field">{{field}}</span>
+            <span class="discrepancy-severity severity-{{severity}}">{{severityLabel}}</span>
+          </div>
+          <div class="discrepancy-desc">{{description}}</div>
+          <div class="discrepancy-providers">
+            {{#each providers}}
+            <div class="discrepancy-provider">
+              <span class="discrepancy-provider-name">{{provider}}:</span>
+              <span class="discrepancy-provider-value">{{value}}</span>
+            </div>
+            {{/each}}
+          </div>
+        </div>
+        {{/each}}
+        {{else}}
+        <div class="no-discrepancies">
+          No discrepancies found - all providers agree
+        </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

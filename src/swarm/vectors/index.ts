@@ -29,3 +29,12 @@ export {
   type ScoredResult,
   type SearchOptions,
 } from './pinecone-client.js';
+
+// Swarm integration
+export {
+  SwarmVectorService,
+  getSwarmVectorService,
+  createSwarmVectorService,
+  resetSwarmVectorService,
+  type SwarmVectorConfig,
+} from './swarm-vectors.js';

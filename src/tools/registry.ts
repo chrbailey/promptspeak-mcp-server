@@ -32,6 +32,7 @@ import { translationToolDefinitions } from '../translation/index.js';
 import { orchestrationToolDefinitions } from '../agents/tools.js';
 import { multiAgentToolDefinitions } from '../multi_agent/index.js';
 import { swarmToolDefinitions, intelligenceToolDefinitions } from '../swarm/index.js';
+import { reconToolDefinitions } from '../handlers/recon-tools.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION TOOLS
@@ -428,6 +429,7 @@ export {
   multiAgentToolDefinitions,
   swarmToolDefinitions,
   intelligenceToolDefinitions,
+  reconToolDefinitions,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -464,6 +466,7 @@ export function buildToolRegistry(): Tool[] {
     ...multiAgentToolDefinitions,  // Multi-Agent / Commander's Intent
     ...swarmToolDefinitions,       // Market Agent Swarm
     ...intelligenceToolDefinitions, // Market Intelligence (Swarm)
+    ...reconToolDefinitions,        // Marine Recon Agent
   ];
 }
 
@@ -492,6 +495,7 @@ export function getToolStats(): Record<string, number> {
     multiAgent: multiAgentToolDefinitions.length,
     swarm: swarmToolDefinitions.length,
     intel: intelligenceToolDefinitions.length,
+    recon: reconToolDefinitions.length,
     total: buildToolRegistry().length
   };
 }

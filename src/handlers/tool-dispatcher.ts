@@ -26,6 +26,7 @@
  * - Multi-Agent: ps_intent_create, ps_mission_create, ps_mission_status, etc.
  * - Swarm: ps_swarm_create, ps_swarm_start, ps_swarm_status, etc.
  * - Intel: ps_intel_list_opportunities, ps_intel_query_market, etc.
+ * - Recon: ps_recon_create, ps_recon_process, ps_recon_status, ps_recon_complete
  *
  * ===============================================================================
  */

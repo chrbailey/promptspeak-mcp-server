@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptSpeak Ops Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-fade-out { animation: fadeOut 0.3s ease-out; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <!-- Header -->
+  <header class="bg-gray-900 text-white py-4 px-6 shadow-lg">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold">Ξ PromptSpeak Ops Center</h1>
+        <p class="text-gray-400 text-sm">Agent Management & Monitoring</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="connection-status" class="px-3 py-1 bg-gray-700 rounded-full text-sm">
+          Connecting...
+        </span>
+        <button onclick="opsCenterHandlers.refreshRoster()"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+          Refresh
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-6 py-8">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Total</p>
+        <p id="stat-total" class="text-2xl font-bold">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Online</p>
+        <p id="stat-online" class="text-2xl font-bold text-green-600">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Offline</p>
+        <p id="stat-offline" class="text-2xl font-bold text-gray-500">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Paused</p>
+        <p id="stat-paused" class="text-2xl font-bold text-yellow-500">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Compromised</p>
+        <p id="stat-compromised" class="text-2xl font-bold text-red-600">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Avg Score</p>
+        <p id="stat-avg-compromise" class="text-2xl font-bold">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Active Threats</p>
+        <p id="stat-active-threats" class="text-2xl font-bold text-orange-500">-</p>
+      </div>
+      <div class="bg-white rounded-lg p-4 shadow">
+        <p class="text-xs text-gray-500 uppercase">Critical</p>
+        <p id="stat-critical-threats" class="text-2xl font-bold text-red-600">-</p>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Agent Roster -->
+      <div class="lg:col-span-2 bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h2 class="text-lg font-semibold">Agent Roster</h2>
+          <div class="flex gap-2">
+            <select id="filter-status" class="text-sm border rounded px-2 py-1"
+                    onchange="opsCenterHandlers.refreshRoster()">
+              <option value="">All Status</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+              <option value="paused">Paused</option>
+              <option value="compromised">Compromised</option>
+            </select>
+          </div>
+        </div>
+        <div id="agent-roster" class="p-4 max-h-[600px] overflow-y-auto">
+          <p class="text-gray-500 text-center py-8">Loading agents...</p>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="space-y-6">
+        <!-- Agent Details -->
+        <div id="agent-details" class="bg-white rounded-lg shadow hidden">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Frame Push -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-4">Push Frame to Agents</h3>
+          <textarea id="frame-input"
+                    class="w-full h-32 border rounded-lg p-3 text-sm font-mono"
+                    placeholder="Enter PromptSpeak frame..."></textarea>
+          <div class="mt-4 flex gap-2">
+            <button onclick="opsCenterHandlers.pushToAllAgents()"
+                    class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+              Push to All Agents
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+          <div class="space-y-2">
+            <button onclick="opsCenterHandlers.checkStale()"
+                    class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-left">
+              🔍 Check for Stale Agents
+            </button>
+            <button onclick="location.href='dashboard.html'"
+                    class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-left">
+              📊 Open Dashboard
+            </button>
+            <button onclick="location.href='mission-briefing.html'"
+                    class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-left">
+              🎯 Mission Briefing
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Notifications Container -->
+  <div id="notifications"></div>
+
+  <!-- Scripts -->
+  <script>
+    // Configure API endpoints
+    window.API_BASE = 'http://localhost:3000';
+    window.WS_BASE = 'ws://localhost:3000';
+  </script>
+  <script src="js/api-client.js"></script>
+  <script src="js/event-handlers.js"></script>
+  <script>
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      opsCenterHandlers.init();
+
+      // Update connection status
+      const statusEl = document.getElementById('connection-status');
+      const { eventStream } = window.PromptSpeakAPI;
+
+      eventStream.on('connected', () => {
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'px-3 py-1 bg-green-600 rounded-full text-sm';
+      });
+
+      eventStream.on('reconnect_failed', () => {
+        statusEl.textContent = 'Disconnected';
+        statusEl.className = 'px-3 py-1 bg-red-600 rounded-full text-sm';
+      });
+    });
+  </script>
+</body>
+</html>

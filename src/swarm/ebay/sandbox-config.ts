@@ -242,6 +242,15 @@ export const REQUIRED_ENV_VARS = [
 ] as const;
 
 /**
+ * Required environment variables for PRODUCTION mode.
+ */
+export const PRODUCTION_REQUIRED_ENV_VARS = [
+  ...REQUIRED_ENV_VARS,
+  'EBAY_PRODUCTION_CLIENT_ID',
+  'EBAY_PRODUCTION_CLIENT_SECRET',
+] as const;
+
+/**
  * Optional environment variables.
  */
 export const OPTIONAL_ENV_VARS = [
@@ -251,23 +260,80 @@ export const OPTIONAL_ENV_VARS = [
   'EBAY_TOKEN_ENCRYPTION_KEY',
   'EBAY_RATE_LIMIT_PER_MINUTE',
   'EBAY_RATE_LIMIT_PER_DAY',
+  'EBAY_MODE', // 'sandbox' | 'production'
+  'EBAY_PRODUCTION_CONFIRMED', // Must be 'true' for production operations
 ] as const;
+
+/**
+ * eBay operation mode.
+ */
+export type EbayMode = 'sandbox' | 'production';
+
+/**
+ * Get the configured eBay mode.
+ */
+export function getEbayMode(): EbayMode {
+  const mode = process.env.EBAY_MODE?.toLowerCase();
+  if (mode === 'production') return 'production';
+  return 'sandbox';
+}
 
 /**
  * Validate that required environment variables are set.
  */
-export function validateEbayConfig(): { valid: boolean; missing: string[] } {
+export function validateEbayConfig(): { valid: boolean; missing: string[]; mode: EbayMode } {
   const missing: string[] = [];
+  const mode = getEbayMode();
 
+  // Always require base credentials
   for (const envVar of REQUIRED_ENV_VARS) {
     if (!process.env[envVar]) {
       missing.push(envVar);
     }
   }
 
+  // Production mode has additional requirements
+  if (mode === 'production') {
+    // Production requires separate credentials (can be same as sandbox, but explicit)
+    if (!process.env.EBAY_PRODUCTION_CLIENT_ID && !process.env.EBAY_CLIENT_ID) {
+      missing.push('EBAY_PRODUCTION_CLIENT_ID');
+    }
+    if (!process.env.EBAY_PRODUCTION_CLIENT_SECRET && !process.env.EBAY_CLIENT_SECRET) {
+      missing.push('EBAY_PRODUCTION_CLIENT_SECRET');
+    }
+  }
+
   return {
     valid: missing.length === 0,
     missing,
+    mode,
+  };
+}
+
+/**
+ * Check if production mode is properly confirmed.
+ */
+export function isProductionConfirmed(): boolean {
+  return process.env.EBAY_PRODUCTION_CONFIRMED === 'true';
+}
+
+/**
+ * Get credentials for the current mode.
+ * Production can use separate credentials or fall back to sandbox credentials.
+ */
+export function getCredentials(): { clientId: string; clientSecret: string } {
+  const mode = getEbayMode();
+
+  if (mode === 'production') {
+    return {
+      clientId: process.env.EBAY_PRODUCTION_CLIENT_ID || process.env.EBAY_CLIENT_ID!,
+      clientSecret: process.env.EBAY_PRODUCTION_CLIENT_SECRET || process.env.EBAY_CLIENT_SECRET!,
+    };
+  }
+
+  return {
+    clientId: process.env.EBAY_CLIENT_ID!,
+    clientSecret: process.env.EBAY_CLIENT_SECRET!,
   };
 }
 
@@ -280,12 +346,17 @@ export function getEbayConfig() {
     throw new Error(`Missing required eBay environment variables: ${validation.missing.join(', ')}`);
   }
 
+  const credentials = getCredentials();
+  const mode = getEbayMode();
+
   return {
-    clientId: process.env.EBAY_CLIENT_ID!,
-    clientSecret: process.env.EBAY_CLIENT_SECRET!,
+    clientId: credentials.clientId,
+    clientSecret: credentials.clientSecret,
     redirectUri: process.env.EBAY_REDIRECT_URI || 'http://localhost:3000/api/v1/ebay/callback',
     marketplace: getMarketplaceId(),
     sandbox: isSandboxMode(),
+    mode,
+    productionConfirmed: isProductionConfirmed(),
     apiBaseUrl: getApiBaseUrl(),
     authBaseUrl: getAuthBaseUrl(),
     rateLimits: getRateLimits(),

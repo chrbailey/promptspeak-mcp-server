@@ -31,6 +31,9 @@ let db: Database.Database | null = null;
  * Initialize the agent database with all required tables.
  */
 export function initializeAgentDatabase(dbPath?: string): Database.Database {
+  if (db) {
+    db.close();
+  }
   const resolvedPath = dbPath || join(__dirname, '../../data/agents.db');
 
   db = new Database(resolvedPath);

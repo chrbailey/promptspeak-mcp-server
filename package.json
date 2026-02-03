@@ -7,9 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "start:http": "node dist/http/server.js",
     "dev": "tsx watch src/server.ts",
-    "dev:http": "tsx watch src/http/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:stress": "vitest run tests/stress --reporter=verbose",
@@ -29,11 +27,16 @@
     "intel:alerts": "tsx scripts/intel-monitor.ts alerts",
     "intel:opportunities": "tsx scripts/intel-monitor.ts opportunities",
     "intel:observations": "tsx scripts/intel-monitor.ts observations",
-    "intel:sellers": "tsx scripts/intel-monitor.ts sellers"
+    "intel:sellers": "tsx scripts/intel-monitor.ts sellers",
+    "demo": "tsx src/swarm/demo/swarm-demo.ts",
+    "demo:quick": "tsx src/swarm/demo/swarm-demo.ts --agents=3 --quiet",
+    "demo:full": "tsx src/swarm/demo/swarm-demo.ts --agents=5 --verbose"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@cbailey/types-shared": "file:../../@types-shared",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@pinecone-database/pinecone": "^6.1.4",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",
@@ -45,6 +48,7 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^6.9.16",
     "uuid": "^13.0.0",
+    "ws": "^8.19.0",
     "yaml": "^2.8.2",
     "zod": "^3.22.4"
   },
@@ -58,6 +62,7 @@
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^6.4.17",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
     "docx": "^9.5.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",

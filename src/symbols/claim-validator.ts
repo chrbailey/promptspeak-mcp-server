@@ -20,16 +20,14 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-import type {
-  ClaimType,
-  ClaimValidationResult,
-  EpistemicMetadata,
-  EvidenceBasis,
-} from './epistemic-types.js';
 import {
+  ClaimType,
   CLAIM_TYPE_REQUIREMENTS,
   adjustConfidenceForEvidence,
   createDefaultEpistemicMetadata,
+  type ClaimValidationResult,
+  type EpistemicMetadata,
+  type EvidenceBasis,
 } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -209,7 +207,7 @@ export class ClaimValidator {
     providedEvidence?: Partial<EvidenceBasis>
   ): ClaimValidationResult {
     const triggeredPatterns: string[] = [];
-    let detectedClaimType: ClaimType = 'FACTUAL';
+    let detectedClaimType: ClaimType = ClaimType.FACTUAL;
     let hasUnverifiedAccusations = false;
     let hasOverconfidentLanguage = false;
 
@@ -222,7 +220,7 @@ export class ClaimValidator {
     for (const { pattern, description } of ACCUSATORY_PATTERNS) {
       if (pattern.test(content)) {
         triggeredPatterns.push(description);
-        detectedClaimType = 'ACCUSATORY';
+        detectedClaimType = ClaimType.ACCUSATORY;
         hasUnverifiedAccusations = true;
       }
     }
@@ -240,34 +238,34 @@ export class ClaimValidator {
     // ─────────────────────────────────────────────────────────────────────────
     // Detect other claim types (only if not already ACCUSATORY)
     // ─────────────────────────────────────────────────────────────────────────
-    if (detectedClaimType !== 'ACCUSATORY') {
+    if (detectedClaimType !== ClaimType.ACCUSATORY) {
       // Check CAUSAL
       for (const { pattern, description } of CAUSAL_PATTERNS) {
         if (pattern.test(content)) {
           triggeredPatterns.push(description);
-          detectedClaimType = 'CAUSAL';
+          detectedClaimType = ClaimType.CAUSAL;
           break;
         }
       }
     }
 
-    if (detectedClaimType === 'FACTUAL') {
+    if (detectedClaimType === ClaimType.FACTUAL) {
       // Check DIAGNOSTIC
       for (const { pattern, description } of DIAGNOSTIC_PATTERNS) {
         if (pattern.test(content)) {
           triggeredPatterns.push(description);
-          detectedClaimType = 'DIAGNOSTIC';
+          detectedClaimType = ClaimType.DIAGNOSTIC;
           break;
         }
       }
     }
 
-    if (detectedClaimType === 'FACTUAL') {
+    if (detectedClaimType === ClaimType.FACTUAL) {
       // Check PREDICTIVE
       for (const { pattern, description } of PREDICTIVE_PATTERNS) {
         if (pattern.test(content)) {
           triggeredPatterns.push(description);
-          detectedClaimType = 'PREDICTIVE';
+          detectedClaimType = ClaimType.PREDICTIVE;
           break;
         }
       }

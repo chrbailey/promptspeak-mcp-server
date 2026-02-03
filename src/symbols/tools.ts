@@ -26,7 +26,7 @@ import {
   verifySymbolUsage,
 } from './sanitizer.js';
 import { getAuditLogger } from './audit.js';
-import type { EpistemicStatus, EpistemicMetadata } from './epistemic-types.js';
+import { EpistemicStatus, type EpistemicMetadata } from './epistemic-types.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS
@@ -580,12 +580,11 @@ function renderConfidenceBar(confidence: number): string {
  */
 function getStatusEmoji(status: EpistemicStatus): string {
   const map: Record<EpistemicStatus, string> = {
-    'HYPOTHESIS': '❓',
-    'INFERENCE': '🔍',
-    'OBSERVATION': '👁️',
-    'CORROBORATED': '✓✓',
-    'VERIFIED': '✅',
-    'AXIOMATIC': '📐',
+    [EpistemicStatus.HYPOTHESIS]: '❓',
+    [EpistemicStatus.SUPPORTED]: '🔍',
+    [EpistemicStatus.CORROBORATED]: '✓✓',
+    [EpistemicStatus.VERIFIED]: '✅',
+    [EpistemicStatus.ESTABLISHED]: '📐',
   };
   return map[status] || '❓';
 }

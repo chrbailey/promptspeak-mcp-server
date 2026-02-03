@@ -164,3 +164,27 @@ export {
   executeIntelligenceTool,
   isIntelligenceTool,
 } from './tools/index.js';
+
+// Demo utilities
+export {
+  // Main demo runner
+  runSwarmDemo,
+  type DemoConfig,
+  type DemoResults,
+  type StrategyEvaluation,
+  type VectorPrepResult,
+  type BidRecommendation,
+  type DemoSummary,
+  // Helper functions (for testing)
+  createDemoAgents,
+  prepareVectorRecords,
+  evaluateWithAllStrategies,
+  generateRecommendation,
+  calculateSummary,
+  // Fixtures
+  SAMPLE_LISTINGS,
+  SAMPLE_SELLER_PROFILES,
+  MARKET_AVERAGES,
+  getMarketContextForListing,
+  generateSampleObservation,
+} from './demo/index.js';

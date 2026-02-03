@@ -144,7 +144,7 @@ export type {
 } from './boot-camp.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MCP TOOL EXPORTS
+// MCP TOOL EXPORTS (Legacy tools.ts)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export {
@@ -180,3 +180,32 @@ export {
   handleBootCampStatus,
   handleMultiAgentTool,
 } from './tools.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMANDER'S INTENT TOOLS (New pattern with mcpSuccess/mcpFailure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Tool definitions
+  INTENT_TOOLS,
+
+  // Tool handlers (use mcpSuccess/mcpFailure pattern)
+  handleMissionCreate as handleIntentMissionCreate,
+  handleMissionStatus as handleIntentMissionStatus,
+  handleMissionComplete as handleIntentMissionComplete,
+  handleAgentRegister as handleIntentAgentRegister,
+  handleAgentHeartbeat as handleIntentAgentHeartbeat,
+  handleIntentConsult as handleIntentConsultation,
+} from './intent-tools.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL DISPATCHER
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  dispatchIntentTool,
+  isIntentTool,
+  getIntentToolNames,
+  getIntentToolDefinitions,
+  getIntentToolCount,
+} from './tool-dispatcher.js';

@@ -105,3 +105,55 @@ export {
 } from './calendar-types.js';
 
 export type { ICalGeneratorConfig } from './ical-generator.js';
+
+// Calendar integration exports
+export {
+  CalendarIntegration,
+  createCalendarIntegration,
+  processDocumentsToICal,
+  extractDeadlinesFromDocument,
+  lookupFRCPDeadline,
+  getDeadlinesForRule,
+} from './calendar-integration.js';
+
+export type {
+  DocumentInput,
+  DocumentResult,
+  BatchResult,
+  CourtRulesConfig,
+  CalendarIntegrationConfig,
+} from './calendar-integration.js';
+
+// Calendar MCP tools exports
+export {
+  calendarToolDefinitions,
+  PS_LEGAL_EXTRACT_DEADLINES_TOOL,
+  PS_LEGAL_GENERATE_ICAL_TOOL,
+  PS_LEGAL_DEADLINE_SUMMARY_TOOL,
+  handleCalendarTool,
+  handleExtractDeadlines,
+  handleGenerateICal,
+  handleDeadlineSummary,
+  isCalendarTool,
+  getCalendarToolDefinitions,
+} from './calendar-tools.js';
+
+// Batch parsing exports
+export {
+  CourtListenerBatchParser,
+  getBatchParser,
+  createBatchParser,
+  generateCaseSymbol,
+  generateCourtSymbol,
+  generateOpinionSymbol,
+} from './batch-parser.js';
+
+export type {
+  BatchConfig,
+  Opinion,
+  Docket,
+  Court,
+  BatchProgress,
+  BatchResult,
+  LegalSymbol,
+} from './batch-parser.js';

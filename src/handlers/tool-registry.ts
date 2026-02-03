@@ -75,6 +75,7 @@ import { handleOrchestrationTool } from '../agents/tools.js';
 import { handleMultiAgentTool } from '../multi_agent/index.js';
 import { executeSwarmTool } from '../swarm/tools.js';
 import { executeIntelligenceTool } from '../swarm/tools/index.js';
+import { handleReconTool } from './recon-tools.js';
 
 // ============================================================================
 // TYPES
@@ -102,7 +103,8 @@ export type ToolCategory =
   | 'orchestration'
   | 'multiAgent'
   | 'swarm'
-  | 'intel';
+  | 'intel'
+  | 'recon';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type ToolArgs = Record<string, unknown>;
@@ -764,6 +766,30 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     category: 'intel',
     description: 'Get seller profile',
   },
+
+  // -------------------------------------------------------------------------
+  // MARINE RECON AGENT TOOLS
+  // -------------------------------------------------------------------------
+  ps_recon_create: {
+    handler: delegated(handleReconTool, 'ps_recon_create'),
+    category: 'recon',
+    description: 'Create a new Marine Recon mission symbol',
+  },
+  ps_recon_process: {
+    handler: delegated(handleReconTool, 'ps_recon_process'),
+    category: 'recon',
+    description: 'Process an incoming message in a recon mission',
+  },
+  ps_recon_status: {
+    handler: delegated(handleReconTool, 'ps_recon_status'),
+    category: 'recon',
+    description: 'Get recon mission status and summary',
+  },
+  ps_recon_complete: {
+    handler: delegated(handleReconTool, 'ps_recon_complete'),
+    category: 'recon',
+    description: 'Complete or abort a recon mission',
+  },
 };
 
 // ============================================================================
@@ -803,6 +829,7 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     multiAgent: [],
     swarm: [],
     intel: [],
+    recon: [],
   };
 
   for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {
