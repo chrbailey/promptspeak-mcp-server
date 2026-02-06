@@ -47,13 +47,13 @@ import { CATEGORY_PREFIX } from './types.js';
 import { validateSymbolContent, type FullValidationResult } from './sanitizer.js';
 import { getAuditLogger, initializeAuditLogger } from './audit.js';
 import { initializeDatabase, getDatabase, type SymbolDatabase } from './database.js';
-import type { EpistemicMetadata } from '@cbailey/types-shared/epistemic';
+import type { EpistemicMetadata } from './epistemic-types.js';
+import { createDefaultEpistemicMetadata } from './epistemic-types.js';
 import {
   runValidationPipeline,
   runSecurityValidation,
   type ValidatableContent,
 } from './validation-pipeline.js';
-import { createDefaultEpistemicMetadata } from '@cbailey/types-shared/epistemic';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS

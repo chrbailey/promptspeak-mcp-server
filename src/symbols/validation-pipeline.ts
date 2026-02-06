@@ -20,7 +20,7 @@ import { validateSymbolContent, type FullValidationResult } from './sanitizer.js
 import { getAuditLogger } from './audit.js';
 import type { SymbolDatabase } from './database.js';
 import type { CreateSymbolRequest } from './types.js';
-import type { EpistemicMetadata } from '@cbailey/types-shared/epistemic';
+import type { EpistemicMetadata } from './epistemic-types.js';
 
 const logger = createLogger('ValidationPipeline');
 

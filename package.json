@@ -17,7 +17,6 @@
     "seed:force": "tsx scripts/seed-database.ts --force"
   },
   "dependencies": {
-    "@cbailey/types-shared": "file:../../@types-shared",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@pinecone-database/pinecone": "^6.1.4",
     "better-sqlite3": "^12.5.0",
