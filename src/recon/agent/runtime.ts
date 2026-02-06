@@ -558,9 +558,9 @@ export class ReconAgentRuntime {
       message_count: this.state.conversation.length,
       our_message_count: this.state.conversation.filter(m => m.speaker === 'us').length,
       their_message_count: this.state.conversation.filter(m => m.speaker === 'them').length,
-      last_speaker: this.state.conversation.length > 0
+      last_speaker: (this.state.conversation.length > 0
         ? this.state.conversation[this.state.conversation.length - 1].speaker === 'us' ? 'us' : 'them'
-        : 'us',
+        : 'us') as 'us' | 'them',
     };
 
     this.symbol = updateSymbolState(this.symbol, {

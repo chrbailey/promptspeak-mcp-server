@@ -357,19 +357,16 @@ export class CourtListenerBatchParser {
     const startTime = Date.now();
 
     while (nextUrl) {
-      const result = await this.fetchWithRetry<{
-        count: number;
-        next: string | null;
-        results: Opinion[];
-      }>(nextUrl);
+      type OpinionPage = { count: number; next: string | null; results: Opinion[] };
+      const result: Result<OpinionPage> = await this.fetchWithRetry<OpinionPage>(nextUrl);
 
       if (!result.success) {
-        logger.error('Failed to fetch opinions', { error: result.error.message });
+        logger.error(`Failed to fetch opinions: ${result.error.message}`);
         failed++;
         break;
       }
 
-      const data = result.data;
+      const data: OpinionPage = result.data;
       total = data.count;
       nextUrl = data.next;
 
@@ -425,18 +422,15 @@ export class CourtListenerBatchParser {
     const startTime = Date.now();
 
     while (nextUrl) {
-      const result = await this.fetchWithRetry<{
-        count: number;
-        next: string | null;
-        results: Docket[];
-      }>(nextUrl);
+      type DocketPage = { count: number; next: string | null; results: Docket[] };
+      const result: Result<DocketPage> = await this.fetchWithRetry<DocketPage>(nextUrl);
 
       if (!result.success) {
-        logger.error('Failed to fetch dockets', { error: result.error.message });
+        logger.error(`Failed to fetch dockets: ${result.error.message}`);
         break;
       }
 
-      const data = result.data;
+      const data: DocketPage = result.data;
       total = data.count;
       nextUrl = data.next;
 

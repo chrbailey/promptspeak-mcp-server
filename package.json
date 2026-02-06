@@ -1,9 +1,41 @@
 {
   "name": "promptspeak-mcp-server",
   "version": "0.1.0",
-  "description": "PromptSpeak MCP Server - Gatekeeper for AI Agent Control",
+  "description": "Pre-execution governance for AI agents. Intercepts MCP tool calls before execution with deterministic blocking, human-in-the-loop holds, and behavioral drift detection.",
   "type": "module",
   "main": "dist/server.js",
+  "bin": {
+    "promptspeak-mcp-server": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "ai-governance",
+    "agent-governance",
+    "ai-safety",
+    "pre-execution-blocking",
+    "human-in-the-loop",
+    "drift-detection",
+    "model-context-protocol",
+    "ai-agent-framework",
+    "circuit-breaker",
+    "tool-validation"
+  ],
+  "author": "Christopher Bailey <chris@erpaccess.com>",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/chrbailey/promptspeak",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrbailey/promptspeak-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chrbailey/promptspeak-mcp-server/issues"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",

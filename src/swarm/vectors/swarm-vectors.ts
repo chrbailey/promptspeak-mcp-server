@@ -247,11 +247,7 @@ export class SwarmVectorService {
   buildBidRecommendationQueries(
     listing: NormalizedListing,
     currentObservation: Observation
-  ): {
-    similarListings: ReturnType<typeof this.buildSimilarListingsQuery>;
-    pricePatterns: ReturnType<typeof this.buildPricePatternQuery>;
-    sellerBehavior: ReturnType<typeof this.buildSimilarSellersQuery>;
-  } {
+  ): Record<string, unknown> {
     return {
       similarListings: this.buildSimilarToListingQuery(listing, {
         topK: 5,

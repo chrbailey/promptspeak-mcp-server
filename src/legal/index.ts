@@ -141,6 +141,5 @@ export type {
   Docket,
   Court,
   BatchProgress,
-  BatchResult,
   LegalSymbol,
 } from './batch-parser.js';

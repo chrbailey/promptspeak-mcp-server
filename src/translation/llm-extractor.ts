@@ -7,12 +7,16 @@
 
 // @anthropic-ai/sdk removed - LLM extraction requires reinstalling the package
 // Runtime stub: silently constructs so singleton doesn't crash; methods throw on actual use
+interface AnthropicResponse {
+  content: Array<{ type: string; text: string }>;
+  usage?: { input_tokens: number; output_tokens: number };
+}
 class Anthropic {
   constructor(_opts: Record<string, unknown>) {
     // No-op: allows LLMExtractor to instantiate without crashing
   }
   messages = {
-    create: async (): Promise<never> => {
+    create: async (_opts?: Record<string, unknown>): Promise<AnthropicResponse> => {
       throw new Error('@anthropic-ai/sdk has been removed. Reinstall the package to use LLM extraction.');
     },
   };

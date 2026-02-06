@@ -43,7 +43,6 @@ async function main() {
       errors: initResult.errors,
       policyLoader: initResult.subsystems.policyLoader.initialized,
       symbolManager: initResult.subsystems.symbolManager.initialized,
-      agentSystem: initResult.subsystems.agentSystem.initialized,
     });
   }
 
