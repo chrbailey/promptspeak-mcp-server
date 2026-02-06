@@ -5,7 +5,18 @@
 // This enables accurate compilation of complex task descriptions into symbols.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import Anthropic from '@anthropic-ai/sdk';
+// @anthropic-ai/sdk removed - LLM extraction requires reinstalling the package
+// Runtime stub: silently constructs so singleton doesn't crash; methods throw on actual use
+class Anthropic {
+  constructor(_opts: Record<string, unknown>) {
+    // No-op: allows LLMExtractor to instantiate without crashing
+  }
+  messages = {
+    create: async (): Promise<never> => {
+      throw new Error('@anthropic-ai/sdk has been removed. Reinstall the package to use LLM extraction.');
+    },
+  };
+}
 import type { Extracted5WH } from './types.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -18,10 +18,9 @@
 import { createLogger } from '../core/logging/index.js';
 import { validateSymbolContent, type FullValidationResult } from './sanitizer.js';
 import { getAuditLogger } from './audit.js';
-import { getClaimValidator } from './claim-validator.js';
 import type { SymbolDatabase } from './database.js';
 import type { CreateSymbolRequest } from './types.js';
-import type { EpistemicMetadata } from './epistemic-types.js';
+import type { EpistemicMetadata } from '@cbailey/types-shared/epistemic';
 
 const logger = createLogger('ValidationPipeline');
 
@@ -167,79 +166,14 @@ export function runSecurityValidation(
  */
 export function runEpistemicValidation(
   content: ValidatableContent,
-  db: SymbolDatabase
+  _db: SymbolDatabase
 ): EpistemicValidationResult {
-  const claimValidator = getClaimValidator();
-
-  // Run claim detection
-  const claimValidation = claimValidator.validateSymbol(
-    {
-      who: content.who,
-      what: content.what,
-      why: content.why,
-      where: content.where,
-      when: content.when,
-      commanders_intent: content.commanders_intent,
-      requirements: content.requirements,
-      tags: content.tags,
-    },
-    content.epistemic?.evidence_basis
-  );
-
-  // Generate or merge epistemic metadata
-  let metadata: EpistemicMetadata;
-
-  if (content.epistemic) {
-    // User provided epistemic metadata - use as base but may override
-    metadata = claimValidator.generateEpistemicMetadata(
-      claimValidation,
-      content.epistemic as Partial<EpistemicMetadata>
-    );
-
-    // If user claims cross-reference but validator found accusations, still flag
-    if (
-      claimValidation.has_unverified_accusations &&
-      !content.epistemic.evidence_basis?.cross_references_performed
-    ) {
-      metadata.requires_human_review = true;
-      metadata.review_reason = claimValidation.reason;
-      metadata.confidence = Math.min(
-        metadata.confidence,
-        claimValidation.recommended_confidence
-      );
-    }
-  } else {
-    // Auto-generate epistemic metadata
-    metadata = claimValidator.generateEpistemicMetadata(claimValidation);
-  }
-
-  // Log and audit if flagged for human review
-  if (claimValidation.requires_human_review) {
-    logger.info('Symbol flagged for human review', {
-      symbolId: content.symbolId,
-      claimType: claimValidation.detected_claim_type,
-      confidence: metadata.confidence,
-      reason: claimValidation.reason,
-      triggeredPatterns: claimValidation.triggered_patterns,
-    });
-
-    db.insertAuditEntry({
-      eventType: 'EPISTEMIC_FLAG',
-      symbolId: content.symbolId,
-      riskScore: Math.round((1 - metadata.confidence) * 100),
-      details: {
-        claimType: claimValidation.detected_claim_type,
-        confidence: metadata.confidence,
-        triggeredPatterns: claimValidation.triggered_patterns,
-        suggestedSources: claimValidation.suggested_sources,
-      },
-    });
-  }
+  // ClaimValidator was removed - return default epistemic metadata
+  const metadata: EpistemicMetadata = (content.epistemic ?? {}) as EpistemicMetadata;
 
   return {
     metadata,
-    requiresHumanReview: claimValidation.requires_human_review,
-    reviewReason: claimValidation.reason,
+    requiresHumanReview: false,
   };
 }
 

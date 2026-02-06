@@ -15,7 +15,8 @@
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getSAMOpportunitiesAdapter, type SAMOpportunity } from '../government/index.js';
+// government module removed
+type SAMOpportunity = Record<string, unknown>;
 import { createLogger } from '../core/logging/index.js';
 
 const logger = createLogger('NAICSMonitor');
@@ -161,7 +162,8 @@ export interface MonitorResult {
 }
 
 export async function runMonitor(config: MonitorConfig = DEFAULT_CONFIG): Promise<MonitorResult> {
-  const adapter = getSAMOpportunitiesAdapter();
+  // government module removed - this monitor is non-functional
+  throw new Error('SAM.gov government module has been removed');
 
   console.log('═══════════════════════════════════════════════════════════════════════════');
   console.log('  SAM.gov NAICS Opportunity Monitor');

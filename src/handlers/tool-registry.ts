@@ -68,10 +68,8 @@ import { ps_audit_get } from '../tools/index.js';
 import { handleHoldTool } from '../tools/index.js';
 import { handleLegalTool } from '../tools/index.js';
 import { handleCalendarTool } from '../tools/index.js';
-import { handleSymbolTool, handleGraphTool } from '../symbols/index.js';
-import { handleDocumentTool } from '../document/index.js';
+import { handleSymbolTool } from '../symbols/index.js';
 import { handleTranslationTool } from '../translation/index.js';
-import { handleOrchestrationTool } from '../agents/tools.js';
 import { handleMultiAgentTool } from '../multi_agent/index.js';
 import { executeSwarmTool } from '../swarm/tools.js';
 import { executeIntelligenceTool } from '../swarm/tools/index.js';
@@ -97,10 +95,7 @@ export type ToolCategory =
   | 'legal'
   | 'calendar'
   | 'symbol'
-  | 'graph'
-  | 'document'
   | 'translation'
-  | 'orchestration'
   | 'multiAgent'
   | 'swarm'
   | 'intel'
@@ -450,79 +445,6 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   },
 
   // -------------------------------------------------------------------------
-  // GRAPH TRAVERSAL TOOLS
-  // -------------------------------------------------------------------------
-  ps_graph_relate: {
-    handler: delegated(handleGraphTool, 'ps_graph_relate'),
-    category: 'graph',
-    description: 'Create relationship between symbols',
-  },
-  ps_graph_related: {
-    handler: delegated(handleGraphTool, 'ps_graph_related'),
-    category: 'graph',
-    description: 'Get related symbols',
-  },
-  ps_graph_neighborhood: {
-    handler: delegated(handleGraphTool, 'ps_graph_neighborhood'),
-    category: 'graph',
-    description: 'Get symbol neighborhood',
-  },
-  ps_graph_path: {
-    handler: delegated(handleGraphTool, 'ps_graph_path'),
-    category: 'graph',
-    description: 'Find path between symbols',
-  },
-  ps_graph_shortest_path: {
-    handler: delegated(handleGraphTool, 'ps_graph_shortest_path'),
-    category: 'graph',
-    description: 'Find shortest path between symbols',
-  },
-  ps_graph_centrality: {
-    handler: delegated(handleGraphTool, 'ps_graph_centrality'),
-    category: 'graph',
-    description: 'Calculate symbol centrality',
-  },
-  ps_graph_stats: {
-    handler: delegated(handleGraphTool, 'ps_graph_stats'),
-    category: 'graph',
-    description: 'Get graph statistics',
-  },
-  ps_graph_delete_relationship: {
-    handler: delegated(handleGraphTool, 'ps_graph_delete_relationship'),
-    category: 'graph',
-    description: 'Delete relationship',
-  },
-  ps_graph_batch_relate: {
-    handler: delegated(handleGraphTool, 'ps_graph_batch_relate'),
-    category: 'graph',
-    description: 'Batch create relationships',
-  },
-
-  // -------------------------------------------------------------------------
-  // DOCUMENT PROCESSING TOOLS
-  // -------------------------------------------------------------------------
-  ps_document_process: {
-    handler: delegated(handleDocumentTool, 'ps_document_process'),
-    category: 'document',
-    description: 'Process document for symbols',
-  },
-  ps_document_batch: {
-    handler: delegated(handleDocumentTool, 'ps_document_batch'),
-    category: 'document',
-    description: 'Batch process documents',
-  },
-  ps_document_company_symbols: {
-    handler: delegated(handleDocumentTool, 'ps_document_company_symbols'),
-    category: 'document',
-    description: 'Extract company symbols from document',
-  },
-  ps_document_stats: {
-    handler: delegated(handleDocumentTool, 'ps_document_stats'),
-    category: 'document',
-    description: 'Get document processing statistics',
-  },
-
-  // -------------------------------------------------------------------------
   // TRANSLATION LAYER TOOLS
   // -------------------------------------------------------------------------
   ps_frame_translate: {
@@ -549,75 +471,6 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     handler: delegated(handleTranslationTool, 'ps_opacity_stats'),
     category: 'translation',
     description: 'Get opacity resolution statistics',
-  },
-
-  // -------------------------------------------------------------------------
-  // AGENT ORCHESTRATION TOOLS (MADIF)
-  // -------------------------------------------------------------------------
-  ps_orch_query: {
-    handler: delegated(handleOrchestrationTool, 'ps_orch_query'),
-    category: 'orchestration',
-    description: 'Query orchestrator',
-  },
-  ps_orch_propose_agent: {
-    handler: delegated(handleOrchestrationTool, 'ps_orch_propose_agent'),
-    category: 'orchestration',
-    description: 'Propose new agent',
-  },
-  ps_orch_status: {
-    handler: delegated(handleOrchestrationTool, 'ps_orch_status'),
-    category: 'orchestration',
-    description: 'Get orchestrator status',
-  },
-  ps_orch_abort: {
-    handler: delegated(handleOrchestrationTool, 'ps_orch_abort'),
-    category: 'orchestration',
-    description: 'Abort orchestration',
-  },
-  ps_agent_list_proposals: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_list_proposals'),
-    category: 'orchestration',
-    description: 'List agent proposals',
-  },
-  ps_agent_approve: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_approve'),
-    category: 'orchestration',
-    description: 'Approve agent proposal',
-  },
-  ps_agent_reject: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_reject'),
-    category: 'orchestration',
-    description: 'Reject agent proposal',
-  },
-  ps_agent_list: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_list'),
-    category: 'orchestration',
-    description: 'List registered agents',
-  },
-  ps_agent_get: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_get'),
-    category: 'orchestration',
-    description: 'Get agent details',
-  },
-  ps_agent_enable: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_enable'),
-    category: 'orchestration',
-    description: 'Enable agent',
-  },
-  ps_agent_disable: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_disable'),
-    category: 'orchestration',
-    description: 'Disable agent',
-  },
-  ps_agent_terminate: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_terminate'),
-    category: 'orchestration',
-    description: 'Terminate agent',
-  },
-  ps_agent_metrics: {
-    handler: delegated(handleOrchestrationTool, 'ps_agent_metrics'),
-    category: 'orchestration',
-    description: 'Get agent metrics',
   },
 
   // -------------------------------------------------------------------------
@@ -822,10 +675,7 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     legal: [],
     calendar: [],
     symbol: [],
-    graph: [],
-    document: [],
     translation: [],
-    orchestration: [],
     multiAgent: [],
     swarm: [],
     intel: [],

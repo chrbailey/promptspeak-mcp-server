@@ -76,8 +76,3 @@ export {
   resetGraphManager,
 } from './graph-manager.js';
 
-// Graph MCP Tools
-export {
-  graphToolDefinitions,
-  handleGraphTool,
-} from './graph-tools.js';

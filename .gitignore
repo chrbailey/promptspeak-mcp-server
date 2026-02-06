@@ -6,17 +6,7 @@ coverage/
 
 # Test artifacts
 logs/
-audit-test-*.json
-clean-clean-test-*.json
-protected-protected-test-*.json
-dynamic-experiment-*.json
-real-experiment-*.json
-telephone-experiment-*.json
-telephone-scale-*.json
 *-results.json
-!comprehensive-test-results.json
-!red-team-results.json
-!drift-detection-results.json
 
 # SQLite database (local data)
 *.db
@@ -31,10 +21,7 @@ telephone-scale-*.json
 *.pem
 *.key
 
-# Test files (temporary)
-test-*.ts
-
-# Business/Strategy documents (keep private)
+# Business/Strategy documents (private)
 ACQUIHIRE-*.md
 ACQUIHIRE-*.pdf
 SUBMISSION-PACKAGE.md
@@ -48,9 +35,69 @@ acquihire-*.ts
 data/
 output/
 
-# Temporary analysis scripts
-rank-opportunities.py
+# Experiment/analysis scripts (not part of core server)
+*-experiment.ts
+*-test.ts
+*-benchmark.ts
+*-validation.ts
+*-stress-test.ts
+test-*.ts
 debug-*.ts
 investigate-*.ts
 quick-*.ts
 save-*.ts
+rank-opportunities.py
+search-ai-opportunities.ts
+run-naics-monitor.ts
+monitor-courtlistener.ts
+generate-legal-opinion.ts
+initialize-knowledge-symbols.ts
+demo-rfi-search.ts
+clean-agent-test.ts
+
+# Experiment result reports (not part of core docs)
+ADVERSARIAL-TEST-RESULTS.md
+ATTACK-VECTORS-REFERENCE.md
+CHAOS-TEST-ANALYSIS.md
+CHAOS-TEST-README.md
+COMPREHENSIVE_SYMBOL_TEST_REPORT.md
+COMPREHENSIVE_TEST_REPORT.md
+DEMO_EXAMPLES.md
+DEMO_PROMPTSPEAK_REGISTRY.md
+DRIFT_DETECTION_RESULTS.md
+HYPOTHESIS.md
+INDEX-ADVERSARIAL-TEST.md
+LEGAL-MVP-VALIDATION-REPORT.md
+QUICK-START-ADVERSARIAL-TEST.md
+README-ADVERSARIAL-TEST.md
+RESEARCH_COMPARISON.md
+RESEARCH_PAPER.md
+RESULTS_ANALYSIS.md
+SECURITY_IMPLEMENTATION_REPORT.md
+SUPPLEMENTARY_MATERIALS.md
+SYMBOL_DESIGN_ENHANCEMENT.md
+SYMBOL_VISUAL.md
+SYSTEM_VALIDATION_REPORT.md
+TECHNICAL_ANALYSIS.md
+TECHNICAL_ANALYSIS_V2.md
+TEST_PLAN.md
+TEST_RESULTS.md
+VALIDATION_REPORT.md
+scheduled-retest-report.md
+
+# HTML visualization files
+SYMBOL_DETAILS.html
+SYMBOL_FLOW.html
+SYMBOL_VISUAL.html
+
+# Shell scripts (local tooling)
+*.sh
+
+# OpenAPI spec (generated)
+openapi.yaml
+
+# Frontend (separate concern)
+frontend/
+
+# Scheduler (local config)
+scheduler/

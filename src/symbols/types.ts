@@ -22,10 +22,10 @@
  */
 
 // Epistemic uncertainty types
-import type { EpistemicMetadata, EvidenceBasis } from './epistemic-types.js';
+import type { EpistemicMetadata, EvidenceBasis } from '@cbailey/types-shared/epistemic';
 
 // Re-export epistemic types for convenience
-export type { EpistemicMetadata, EvidenceBasis } from './epistemic-types.js';
+export type { EpistemicMetadata, EvidenceBasis } from '@cbailey/types-shared/epistemic';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYMBOL CATEGORIES v2.0 (MECE Taxonomy)

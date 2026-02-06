@@ -114,14 +114,12 @@ describe('Server Module Integration', () => {
       const result = await initializeServer({
         skipPolicyLoader: true,
         skipSymbolManager: true,
-        skipAgentSystem: true,
       });
 
       // All subsystems skipped - success but nothing initialized
       expect(result.errors).toHaveLength(0);
       expect(result.subsystems.policyLoader.initialized).toBe(false);
       expect(result.subsystems.symbolManager.initialized).toBe(false);
-      expect(result.subsystems.agentSystem.initialized).toBe(false);
     });
 
     it('should return structured initialization result', async () => {
@@ -138,7 +136,6 @@ describe('Server Module Integration', () => {
       // Verify subsystems structure
       expect(result.subsystems).toHaveProperty('policyLoader');
       expect(result.subsystems).toHaveProperty('symbolManager');
-      expect(result.subsystems).toHaveProperty('agentSystem');
     });
   });
 

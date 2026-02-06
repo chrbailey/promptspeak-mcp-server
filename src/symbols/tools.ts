@@ -26,7 +26,7 @@ import {
   verifySymbolUsage,
 } from './sanitizer.js';
 import { getAuditLogger } from './audit.js';
-import { EpistemicStatus, type EpistemicMetadata } from './epistemic-types.js';
+import { EpistemicStatus, type EpistemicMetadata } from '@cbailey/types-shared/epistemic';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOOL DEFINITIONS

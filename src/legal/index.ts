@@ -124,19 +124,6 @@ export type {
   CalendarIntegrationConfig,
 } from './calendar-integration.js';
 
-// Calendar MCP tools exports
-export {
-  calendarToolDefinitions,
-  PS_LEGAL_EXTRACT_DEADLINES_TOOL,
-  PS_LEGAL_GENERATE_ICAL_TOOL,
-  PS_LEGAL_DEADLINE_SUMMARY_TOOL,
-  handleCalendarTool,
-  handleExtractDeadlines,
-  handleGenerateICal,
-  handleDeadlineSummary,
-  isCalendarTool,
-  getCalendarToolDefinitions,
-} from './calendar-tools.js';
 
 // Batch parsing exports
 export {

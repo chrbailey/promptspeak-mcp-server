@@ -9,7 +9,6 @@
  * Subsystems initialized:
  * - Policy loader: Loads and merges policy files from disk
  * - Symbol manager: Manages directive symbol registry (SQLite-backed)
- * - MADIF agent system: Multi-Agent Data Intelligence Framework
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
@@ -22,7 +21,7 @@ import { fileURLToPath } from 'url';
 import { initializePolicyLoader, getPolicyLoader, type PolicyLoader } from './policies/loader.js';
 import { operatorConfig } from './operator/config.js';
 import { initializeSymbolManager, getSymbolManager, type SymbolManager } from './symbols/index.js';
-import { initializeAgentSystem, isAgentSystemInitialized } from './agents/integration.js';
+
 
 const logger = createLogger('ServerInit');
 
@@ -35,16 +34,11 @@ export interface ServerConfig {
   policiesRoot?: string;
   /** Root directory for symbol registry */
   symbolsRoot?: string;
-  /** Path to agent database */
-  agentDbPath?: string;
-  /** Webhook callback URL for agent system */
-  webhookCallbackUrl?: string;
   /** Whether to skip subsystem initialization (for testing) */
   skipSubsystems?: boolean;
   /** Skip individual subsystems */
   skipPolicyLoader?: boolean;
   skipSymbolManager?: boolean;
-  skipAgentSystem?: boolean;
 }
 
 export interface SubsystemStatus {
@@ -58,14 +52,12 @@ export interface InitializationResult {
   subsystems: {
     policyLoader: SubsystemStatus;
     symbolManager: SubsystemStatus;
-    agentSystem: SubsystemStatus;
   };
   errors: string[];
   /** Reference to initialized subsystems for direct access */
   instances: {
     policyLoader?: PolicyLoader;
     symbolManager?: SymbolManager;
-    agentSystem?: Awaited<ReturnType<typeof initializeAgentSystem>>;
   };
 }
 
@@ -76,14 +68,13 @@ export interface InitializationResult {
 /**
  * Get default paths relative to the module location.
  */
-function getDefaultPaths(): Required<Pick<ServerConfig, 'policiesRoot' | 'symbolsRoot' | 'agentDbPath'>> {
+function getDefaultPaths(): Required<Pick<ServerConfig, 'policiesRoot' | 'symbolsRoot'>> {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
   return {
     policiesRoot: path.join(__dirname, '..', 'policies'),
     symbolsRoot: path.join(__dirname, '..', 'symbols'),
-    agentDbPath: path.join(__dirname, '..', 'data', 'agents.db'),
   };
 }
 
@@ -165,42 +156,6 @@ function initializeSymbols(symbolsRoot: string): SubsystemStatus & { instance?: 
   }
 }
 
-/**
- * Initialize the MADIF agent system.
- * Sets up the multi-agent orchestration framework.
- */
-async function initializeAgents(
-  dbPath: string,
-  webhookCallbackUrl?: string
-): Promise<SubsystemStatus & { instance?: Awaited<ReturnType<typeof initializeAgentSystem>> }> {
-  try {
-    logger.info('Initializing MADIF agent system', { dbPath });
-
-    const agentSystem = await initializeAgentSystem({
-      dbPath,
-      webhookCallbackUrl,
-    });
-
-    logger.info('MADIF agent system initialized');
-
-    return {
-      initialized: true,
-      details: {
-        databasePath: dbPath,
-        webhookConfigured: !!webhookCallbackUrl,
-      },
-      instance: agentSystem,
-    };
-  } catch (error) {
-    const msg = `Agent system failed: ${error instanceof Error ? error.message : String(error)}`;
-    logger.error(msg, error instanceof Error ? error : undefined);
-    return {
-      initialized: false,
-      error: msg,
-    };
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -239,7 +194,6 @@ export async function initializeServer(
     subsystems: {
       policyLoader: { initialized: false },
       symbolManager: { initialized: false },
-      agentSystem: { initialized: false },
     },
     errors: [],
     instances: {},
@@ -255,13 +209,11 @@ export async function initializeServer(
   const paths = {
     policiesRoot: config.policiesRoot ?? defaults.policiesRoot,
     symbolsRoot: config.symbolsRoot ?? defaults.symbolsRoot,
-    agentDbPath: config.agentDbPath ?? defaults.agentDbPath,
   };
 
   logger.info('Beginning server initialization', {
     policiesRoot: paths.policiesRoot,
     symbolsRoot: paths.symbolsRoot,
-    agentDbPath: paths.agentDbPath,
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -307,27 +259,6 @@ export async function initializeServer(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Initialize MADIF agent system
-  // ─────────────────────────────────────────────────────────────────────────
-  if (!config.skipAgentSystem) {
-    const agentResult = await initializeAgents(paths.agentDbPath, config.webhookCallbackUrl);
-    result.subsystems.agentSystem = {
-      initialized: agentResult.initialized,
-      error: agentResult.error,
-      details: agentResult.details,
-    };
-    if (agentResult.instance) {
-      result.instances.agentSystem = agentResult.instance;
-    }
-    if (!agentResult.initialized && agentResult.error) {
-      result.errors.push(agentResult.error);
-    }
-  } else {
-    logger.info('Skipping agent system initialization');
-    result.subsystems.agentSystem = { initialized: false, error: 'Skipped by configuration' };
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // Final status
   // ─────────────────────────────────────────────────────────────────────────
   result.success = result.errors.length === 0;
@@ -339,7 +270,6 @@ export async function initializeServer(
       errors: result.errors,
       policyLoader: result.subsystems.policyLoader.initialized,
       symbolManager: result.subsystems.symbolManager.initialized,
-      agentSystem: result.subsystems.agentSystem.initialized,
     });
   }
 
@@ -358,7 +288,7 @@ export function isServerInitialized(): boolean {
     // Check if all core subsystems are available
     getPolicyLoader();
     getSymbolManager();
-    return isAgentSystemInitialized();
+    return true;
   } catch {
     return false;
   }

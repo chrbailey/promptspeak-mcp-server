@@ -26,10 +26,8 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { holdToolDefinitions } from './ps_hold.js';
 import { legalToolDefinitions } from './ps_legal.js';
 import { calendarToolDefinitions } from './ps_calendar.js';
-import { symbolToolDefinitions, graphToolDefinitions } from '../symbols/index.js';
-import { documentToolDefinitions } from '../document/index.js';
+import { symbolToolDefinitions } from '../symbols/index.js';
 import { translationToolDefinitions } from '../translation/index.js';
-import { orchestrationToolDefinitions } from '../agents/tools.js';
 import { multiAgentToolDefinitions } from '../multi_agent/index.js';
 import { swarmToolDefinitions, intelligenceToolDefinitions } from '../swarm/index.js';
 import { reconToolDefinitions } from '../handlers/recon-tools.js';
@@ -422,10 +420,7 @@ export {
   legalToolDefinitions,
   calendarToolDefinitions,
   symbolToolDefinitions,
-  graphToolDefinitions,
-  documentToolDefinitions,
   translationToolDefinitions,
-  orchestrationToolDefinitions,
   multiAgentToolDefinitions,
   swarmToolDefinitions,
   intelligenceToolDefinitions,
@@ -459,10 +454,7 @@ export function buildToolRegistry(): Tool[] {
     ...legalToolDefinitions,       // Legal Citation Verification
     ...calendarToolDefinitions,    // Legal Calendar
     ...symbolToolDefinitions,      // Directive Symbol Registry
-    ...graphToolDefinitions,       // Graph Traversal
-    ...documentToolDefinitions,    // Document Processing Agent
     ...translationToolDefinitions, // Translation Layer
-    ...orchestrationToolDefinitions, // Agent Orchestration (MADIF)
     ...multiAgentToolDefinitions,  // Multi-Agent / Commander's Intent
     ...swarmToolDefinitions,       // Market Agent Swarm
     ...intelligenceToolDefinitions, // Market Intelligence (Swarm)
@@ -488,10 +480,7 @@ export function getToolStats(): Record<string, number> {
     legal: legalToolDefinitions.length,
     calendar: calendarToolDefinitions.length,
     symbol: symbolToolDefinitions.length,
-    graph: graphToolDefinitions.length,
-    document: documentToolDefinitions.length,
     translation: translationToolDefinitions.length,
-    orchestration: orchestrationToolDefinitions.length,
     multiAgent: multiAgentToolDefinitions.length,
     swarm: swarmToolDefinitions.length,
     intel: intelligenceToolDefinitions.length,
