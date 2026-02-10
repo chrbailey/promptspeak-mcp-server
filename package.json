@@ -4,7 +4,17 @@
   "mcpName": "io.github.ahgentopps/promptspeak",
   "description": "Pre-execution governance for AI agents. Intercepts MCP tool calls before execution with deterministic blocking, human-in-the-loop holds, and behavioral drift detection.",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "import": "./dist/server.js"
+    }
+  },
   "bin": {
     "promptspeak-mcp-server": "dist/server.js"
   },
