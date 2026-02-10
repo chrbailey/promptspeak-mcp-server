@@ -28,14 +28,14 @@
     "tool-validation"
   ],
   "author": "Christopher Bailey <chris@erpaccess.com>",
-  "license": "SEE LICENSE IN LICENSE",
-  "homepage": "https://github.com/chrbailey/promptspeak",
+  "license": "MIT",
+  "homepage": "https://github.com/chrbailey/promptspeak-mcp-server",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chrbailey/promptspeak.git"
+    "url": "git+https://github.com/chrbailey/promptspeak-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/chrbailey/promptspeak/issues"
+    "url": "https://github.com/chrbailey/promptspeak-mcp-server/issues"
   },
   "scripts": {
     "build": "tsc",
