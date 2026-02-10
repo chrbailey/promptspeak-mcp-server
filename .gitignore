@@ -7,6 +7,9 @@ coverage/
 # Test artifacts
 logs/
 *-results.json
+*_RESULTS.json
+test-briefs/
+test-fixtures/
 
 # SQLite database (local data)
 *.db
@@ -38,9 +41,14 @@ output/
 # Experiment/analysis scripts (not part of core server)
 *-experiment.ts
 *-test.ts
+*-tests.ts
 *-benchmark.ts
 *-validation.ts
 *-stress-test.ts
+*-suite.ts
+comprehensive-*.ts
+scheduled-*.ts
+validate-*.ts
 test-*.ts
 debug-*.ts
 investigate-*.ts
@@ -92,6 +100,16 @@ SYMBOL_VISUAL.html
 
 # Shell scripts (local tooling)
 *.sh
+
+# Local scripts and skills
+scripts/
+skills/
+
+# Runtime config
+server.json
+
+# Unused prototypes
+src/symbols/simple-retrieval.ts
 
 # OpenAPI spec (generated)
 openapi.yaml
