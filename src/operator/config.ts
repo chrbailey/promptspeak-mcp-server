@@ -12,6 +12,7 @@ import type {
   OperatorConfig,
   ExecutionControlConfig,
 } from '../types/index.js';
+import { CLAMP_BOUNDS } from '../governance/governance.config.js';
 
 // Default confidence thresholds
 const DEFAULT_THRESHOLDS: ConfidenceThresholds = {
@@ -19,6 +20,18 @@ const DEFAULT_THRESHOLDS: ConfidenceThresholds = {
   postAudit: 0.90,
   coverageMinimum: 0.80,
   driftThreshold: 0.15,
+};
+
+// Immutable minimum floors — no config overlay can go below these
+// (Fixes DAT-006: confidence threshold set to 0.0 via MCP tool)
+//
+// driftThreshold floor is sourced from governance.config.ts CLAMP_BOUNDS
+// to maintain a single source of truth for governance minimums.
+const IMMUTABLE_THRESHOLD_FLOORS: Record<string, number> = {
+  preExecute: 0.50,
+  postAudit: 0.50,
+  coverageMinimum: 0.30,
+  driftThreshold: CLAMP_BOUNDS.driftThreshold.min, // 0.02 — single source of truth
 };
 
 // Default execution control config
@@ -144,7 +157,8 @@ export class OperatorConfigManager {
    * Set a specific confidence threshold.
    */
   setThreshold(key: keyof ConfidenceThresholds, value: number): void {
-    const clampedValue = Math.max(0, Math.min(1, value));
+    const floor = IMMUTABLE_THRESHOLD_FLOORS[key] ?? 0;
+    const clampedValue = Math.max(floor, Math.min(1, value));
     this.config.confidenceThresholds[key] = clampedValue;
     this.notifyListeners();
   }
@@ -155,8 +169,9 @@ export class OperatorConfigManager {
   setThresholds(thresholds: Partial<ConfidenceThresholds>): void {
     for (const [key, value] of Object.entries(thresholds)) {
       if (key in this.config.confidenceThresholds && typeof value === 'number') {
+        const floor = IMMUTABLE_THRESHOLD_FLOORS[key] ?? 0;
         this.config.confidenceThresholds[key as keyof ConfidenceThresholds] =
-          Math.max(0, Math.min(1, value));
+          Math.max(floor, Math.min(1, value));
       }
     }
     this.notifyListeners();

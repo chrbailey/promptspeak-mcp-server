@@ -7,6 +7,13 @@
 
 import type { CircuitBreakerState, DriftAlert } from '../types/index.js';
 import { generateAlertId } from '../utils/hash.js';
+import type { TrustState, CalibrationMetrics, AutonomyLevel } from '../governance/types.js';
+import {
+  createInitialTrustState,
+  processCalibrationWindow,
+  summarizeTrustState,
+  isActionPermitted,
+} from '../governance/autonomy-controller.js';
 
 export interface CircuitBreakerConfig {
   failureThreshold: number;     // Number of failures before opening
@@ -27,6 +34,9 @@ export class CircuitBreaker {
   private config: CircuitBreakerConfig;
   private alerts: DriftAlert[] = [];
   private enabled: boolean = true;
+
+  // Autonomy trust state per agent (ported from AETHER)
+  private trustStates: Map<string, TrustState> = new Map();
 
   constructor(config?: Partial<CircuitBreakerConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -188,6 +198,9 @@ export class CircuitBreaker {
     state.openedAt = Date.now();
     state.reason = reason;
     state.successCount = 0;
+
+    // Circuit breaker OPEN → demote autonomy level (fast descent)
+    this.demoteTrustOnCircuitOpen(agentId);
   }
 
   /**
@@ -247,6 +260,7 @@ export class CircuitBreaker {
    */
   clearAgent(agentId: string): void {
     this.states.delete(agentId);
+    this.trustStates.delete(agentId);
   }
 
   /**
@@ -255,6 +269,7 @@ export class CircuitBreaker {
   clearAll(): void {
     this.states.clear();
     this.alerts = [];
+    this.trustStates.clear();
   }
 
   /**
@@ -278,6 +293,113 @@ export class CircuitBreaker {
       totalAlerts: this.alerts.length,
       criticalAlerts: this.alerts.filter(a => a.severity === 'critical').length,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUTONOMY TRUST LEVEL (ported from AETHER)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get trust state for an agent (creates initial state if none exists).
+   */
+  getTrustState(agentId: string): TrustState {
+    if (!this.trustStates.has(agentId)) {
+      this.trustStates.set(agentId, createInitialTrustState());
+    }
+    return this.trustStates.get(agentId)!;
+  }
+
+  /**
+   * Get the current autonomy level for an agent.
+   */
+  getAutonomyLevel(agentId: string): AutonomyLevel {
+    return this.getTrustState(agentId).level;
+  }
+
+  /**
+   * Process a calibration window for an agent's trust level.
+   * This is the main integration point: circuit breaker events
+   * drive trust level transitions.
+   */
+  processCalibration(
+    agentId: string,
+    windowMetrics: CalibrationMetrics,
+    criticalMiss: boolean = false,
+    immutableViolation: boolean = false,
+  ): TrustState {
+    const currentState = this.getTrustState(agentId);
+    const newState = processCalibrationWindow(
+      currentState,
+      windowMetrics,
+      criticalMiss,
+      immutableViolation,
+    );
+    this.trustStates.set(agentId, newState);
+    return newState;
+  }
+
+  /**
+   * Demote trust level when circuit opens (fast descent).
+   * Circuit breaker OPEN → treat as critical miss for autonomy.
+   *
+   * NOTE: Uses synthetic calibration metrics (windowSize=0) to trigger
+   * descent without polluting real calibration statistics. The
+   * windowSize=0 means totalPredictions is not inflated by synthetic events.
+   * The trigger in the transition log is tagged 'circuit_breaker_demotion'.
+   */
+  demoteTrustOnCircuitOpen(agentId: string): TrustState {
+    const currentState = this.getTrustState(agentId);
+    // Synthetic metrics: windowSize=0 so totalPredictions is not inflated.
+    // ECE=1.0 to signal worst-case, but the criticalMiss flag is what
+    // actually drives the demotion in processCalibrationWindow.
+    const syntheticMetrics: CalibrationMetrics = {
+      ece: 1.0,
+      mce: 1.0,
+      brierScore: 1.0,
+      windowSize: 0, // Synthetic — don't inflate totalPredictions
+      windowStart: new Date().toISOString(),
+      windowEnd: new Date().toISOString(),
+      buckets: [],
+    };
+    const newState = processCalibrationWindow(
+      currentState,
+      syntheticMetrics,
+      true, // critical miss — triggers immediate one-level descent
+      false,
+    );
+    this.trustStates.set(agentId, newState);
+    return newState;
+  }
+
+  /**
+   * Get trust summary for an agent.
+   */
+  getTrustSummary(agentId: string): string {
+    return summarizeTrustState(this.getTrustState(agentId));
+  }
+
+  /**
+   * Check if agent's trust level permits a specific action.
+   */
+  isTrustLevelSufficient(agentId: string, requiredLevel: AutonomyLevel): boolean {
+    return isActionPermitted(this.getTrustState(agentId), requiredLevel);
+  }
+
+  /**
+   * Reset trust state for an agent (e.g., after manual review).
+   */
+  resetTrustState(agentId: string): void {
+    this.trustStates.set(agentId, createInitialTrustState());
+  }
+
+  /**
+   * Get all trust states.
+   */
+  getAllTrustStates(): Array<{ agentId: string; state: TrustState }> {
+    return Array.from(this.trustStates.entries()).map(([agentId, state]) => ({
+      agentId,
+      state,
+    }));
   }
 }
 
