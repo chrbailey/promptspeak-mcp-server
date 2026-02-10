@@ -19,7 +19,7 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from '../core/logging/index.js';
-import { LRUCache } from '../multi_agent/lru-cache.js';
+import { LRUCache } from '../core/utils/lru-cache.js';
 
 const logger = createLogger('SymbolManager');
 

@@ -1,6 +1,7 @@
 {
   "name": "promptspeak-mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "mcpName": "io.github.ahgentopps/promptspeak",
   "description": "Pre-execution governance for AI agents. Intercepts MCP tool calls before execution with deterministic blocking, human-in-the-loop holds, and behavioral drift detection.",
   "type": "module",
   "main": "dist/server.js",
@@ -31,10 +32,10 @@
   "homepage": "https://github.com/chrbailey/promptspeak",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chrbailey/promptspeak-mcp-server.git"
+    "url": "git+https://github.com/chrbailey/promptspeak.git"
   },
   "bugs": {
-    "url": "https://github.com/chrbailey/promptspeak-mcp-server/issues"
+    "url": "https://github.com/chrbailey/promptspeak/issues"
   },
   "scripts": {
     "build": "tsc",

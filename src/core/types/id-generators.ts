@@ -68,33 +68,6 @@ export function createIdGenerator(
 // -----------------------------------------------------------------------------
 // These match existing patterns in the codebase for backwards compatibility
 
-/** Generate a swarm ID */
-export const generateSwarmId = createIdGenerator('swarm');
-
-/** Generate an agent ID */
-export const generateAgentId = createIdGenerator('agent');
-
-/** Generate an event ID */
-export const generateEventId = createIdGenerator('evt');
-
-/** Generate an observation ID */
-export const generateObservationId = createIdGenerator('obs');
-
-/** Generate an alert ID */
-export const generateAlertId = createIdGenerator('alert');
-
-/** Generate a boot camp ID */
-export const generateBootCampId = createIdGenerator('bc');
-
-/** Generate a recruit ID */
-export const generateRecruitId = createIdGenerator('recruit');
-
-/** Generate a mission ID */
-export const generateMissionId = createIdGenerator('mission');
-
-/** Generate an intent ID */
-export const generateIntentId = createIdGenerator('intent');
-
 /** Generate a correlation ID for request tracing */
 export const generateCorrelationId = createIdGenerator('corr', 8);
 

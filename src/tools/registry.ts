@@ -16,7 +16,7 @@
  * - FEATURE_TOOLS: Feature flags (ps_feature_*)
  * - AUDIT_TOOLS: Audit logging (ps_audit_*)
  *
- * External tool definitions are imported from their respective modules.
+ * External tool definitions (hold, symbol) are imported from their modules.
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -24,13 +24,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 // Import external tool definitions
 import { holdToolDefinitions } from './ps_hold.js';
-import { legalToolDefinitions } from './ps_legal.js';
-import { calendarToolDefinitions } from './ps_calendar.js';
 import { symbolToolDefinitions } from '../symbols/index.js';
-import { translationToolDefinitions } from '../translation/index.js';
-import { multiAgentToolDefinitions } from '../multi_agent/index.js';
-import { swarmToolDefinitions, intelligenceToolDefinitions } from '../swarm/index.js';
-import { reconToolDefinitions } from '../handlers/recon-tools.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION TOOLS
@@ -417,14 +411,7 @@ export const AUDIT_TOOLS: Tool[] = [
 
 export {
   holdToolDefinitions,
-  legalToolDefinitions,
-  calendarToolDefinitions,
   symbolToolDefinitions,
-  translationToolDefinitions,
-  multiAgentToolDefinitions,
-  swarmToolDefinitions,
-  intelligenceToolDefinitions,
-  reconToolDefinitions,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -451,14 +438,7 @@ export function buildToolRegistry(): Tool[] {
 
     // External tool definitions
     ...holdToolDefinitions,        // Hold Management (Human-in-the-Loop)
-    ...legalToolDefinitions,       // Legal Citation Verification
-    ...calendarToolDefinitions,    // Legal Calendar
     ...symbolToolDefinitions,      // Directive Symbol Registry
-    ...translationToolDefinitions, // Translation Layer
-    ...multiAgentToolDefinitions,  // Multi-Agent / Commander's Intent
-    ...swarmToolDefinitions,       // Market Agent Swarm
-    ...intelligenceToolDefinitions, // Market Intelligence (Swarm)
-    ...reconToolDefinitions,        // Marine Recon Agent
   ];
 }
 
@@ -477,14 +457,7 @@ export function getToolStats(): Record<string, number> {
     feature: FEATURE_TOOLS.length,
     audit: AUDIT_TOOLS.length,
     hold: holdToolDefinitions.length,
-    legal: legalToolDefinitions.length,
-    calendar: calendarToolDefinitions.length,
     symbol: symbolToolDefinitions.length,
-    translation: translationToolDefinitions.length,
-    multiAgent: multiAgentToolDefinitions.length,
-    swarm: swarmToolDefinitions.length,
-    intel: intelligenceToolDefinitions.length,
-    recon: reconToolDefinitions.length,
     total: buildToolRegistry().length
   };
 }

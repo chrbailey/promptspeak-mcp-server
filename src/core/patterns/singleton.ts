@@ -4,7 +4,7 @@
  * ===============================================================================
  *
  * Reusable singleton pattern implementation to reduce boilerplate.
- * Used across: SwarmEventBus, HookRegistry, SwarmController, BootCampController, etc.
+ * Used across: HookRegistry, SymbolManager, etc.
  *
  * Usage:
  *   const [getInstance, resetInstance] = createSingleton(() => new MyClass());

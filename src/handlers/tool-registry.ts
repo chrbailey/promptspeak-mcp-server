@@ -66,14 +66,7 @@ import { ps_audit_get } from '../tools/index.js';
 // ============================================================================
 
 import { handleHoldTool } from '../tools/index.js';
-import { handleLegalTool } from '../tools/index.js';
-import { handleCalendarTool } from '../tools/index.js';
 import { handleSymbolTool } from '../symbols/index.js';
-import { handleTranslationTool } from '../translation/index.js';
-import { handleMultiAgentTool } from '../multi_agent/index.js';
-import { executeSwarmTool } from '../swarm/tools.js';
-import { executeIntelligenceTool } from '../swarm/tools/index.js';
-import { handleReconTool } from './recon-tools.js';
 
 // ============================================================================
 // TYPES
@@ -92,14 +85,7 @@ export type ToolCategory =
   | 'feature'
   | 'audit'
   | 'hold'
-  | 'legal'
-  | 'calendar'
-  | 'symbol'
-  | 'translation'
-  | 'multiAgent'
-  | 'swarm'
-  | 'intel'
-  | 'recon';
+  | 'symbol';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type ToolArgs = Record<string, unknown>;
@@ -328,64 +314,6 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   },
 
   // -------------------------------------------------------------------------
-  // LEGAL CITATION VERIFICATION TOOLS
-  // -------------------------------------------------------------------------
-  ps_legal_verify: {
-    handler: delegated(handleLegalTool, 'ps_legal_verify'),
-    category: 'legal',
-    description: 'Verify legal citation',
-  },
-  ps_legal_verify_batch: {
-    handler: delegated(handleLegalTool, 'ps_legal_verify_batch'),
-    category: 'legal',
-    description: 'Batch verify legal citations',
-  },
-  ps_legal_extract: {
-    handler: delegated(handleLegalTool, 'ps_legal_extract'),
-    category: 'legal',
-    description: 'Extract citations from text',
-  },
-  ps_legal_check: {
-    handler: delegated(handleLegalTool, 'ps_legal_check'),
-    category: 'legal',
-    description: 'Check citation format',
-  },
-  ps_legal_config: {
-    handler: delegated(handleLegalTool, 'ps_legal_config'),
-    category: 'legal',
-    description: 'Configure legal settings',
-  },
-  ps_legal_stats: {
-    handler: delegated(handleLegalTool, 'ps_legal_stats'),
-    category: 'legal',
-    description: 'Get legal verification statistics',
-  },
-
-  // -------------------------------------------------------------------------
-  // CALENDAR TOOLS
-  // -------------------------------------------------------------------------
-  ps_calendar_extract: {
-    handler: delegated(handleCalendarTool, 'ps_calendar_extract'),
-    category: 'calendar',
-    description: 'Extract calendar events',
-  },
-  ps_calendar_export: {
-    handler: delegated(handleCalendarTool, 'ps_calendar_export'),
-    category: 'calendar',
-    description: 'Export calendar',
-  },
-  ps_calendar_calculate: {
-    handler: delegated(handleCalendarTool, 'ps_calendar_calculate'),
-    category: 'calendar',
-    description: 'Calculate deadline dates',
-  },
-  ps_calendar_frcp: {
-    handler: delegated(handleCalendarTool, 'ps_calendar_frcp'),
-    category: 'calendar',
-    description: 'Calculate FRCP deadlines',
-  },
-
-  // -------------------------------------------------------------------------
   // SYMBOL REGISTRY TOOLS
   // -------------------------------------------------------------------------
   ps_symbol_create: {
@@ -444,205 +372,6 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     description: 'Add alternative symbol ID',
   },
 
-  // -------------------------------------------------------------------------
-  // TRANSLATION LAYER TOOLS
-  // -------------------------------------------------------------------------
-  ps_frame_translate: {
-    handler: delegated(handleTranslationTool, 'ps_frame_translate'),
-    category: 'translation',
-    description: 'Translate frame to PromptSpeak',
-  },
-  ps_nl_compile: {
-    handler: delegated(handleTranslationTool, 'ps_nl_compile'),
-    category: 'translation',
-    description: 'Compile natural language to PromptSpeak',
-  },
-  ps_nl_decompile: {
-    handler: delegated(handleTranslationTool, 'ps_nl_decompile'),
-    category: 'translation',
-    description: 'Decompile PromptSpeak to natural language',
-  },
-  ps_opacity_resolve: {
-    handler: delegated(handleTranslationTool, 'ps_opacity_resolve'),
-    category: 'translation',
-    description: 'Resolve opaque references',
-  },
-  ps_opacity_stats: {
-    handler: delegated(handleTranslationTool, 'ps_opacity_stats'),
-    category: 'translation',
-    description: 'Get opacity resolution statistics',
-  },
-
-  // -------------------------------------------------------------------------
-  // MULTI-AGENT / COMMANDER'S INTENT TOOLS
-  // -------------------------------------------------------------------------
-  ps_intent_create: {
-    handler: delegated(handleMultiAgentTool, 'ps_intent_create'),
-    category: 'multiAgent',
-    description: 'Create commander\'s intent',
-  },
-  ps_intent_get: {
-    handler: delegated(handleMultiAgentTool, 'ps_intent_get'),
-    category: 'multiAgent',
-    description: 'Get intent details',
-  },
-  ps_intent_consult: {
-    handler: delegated(handleMultiAgentTool, 'ps_intent_consult'),
-    category: 'multiAgent',
-    description: 'Consult intent for decision',
-  },
-  ps_agent_register: {
-    handler: delegated(handleMultiAgentTool, 'ps_agent_register'),
-    category: 'multiAgent',
-    description: 'Register agent with intent',
-  },
-  ps_agent_bind: {
-    handler: delegated(handleMultiAgentTool, 'ps_agent_bind'),
-    category: 'multiAgent',
-    description: 'Bind agent to mission',
-  },
-  ps_mission_create: {
-    handler: delegated(handleMultiAgentTool, 'ps_mission_create'),
-    category: 'multiAgent',
-    description: 'Create mission',
-  },
-  ps_mission_status: {
-    handler: delegated(handleMultiAgentTool, 'ps_mission_status'),
-    category: 'multiAgent',
-    description: 'Get mission status',
-  },
-  ps_mission_control: {
-    handler: delegated(handleMultiAgentTool, 'ps_mission_control'),
-    category: 'multiAgent',
-    description: 'Control mission execution',
-  },
-  ps_bootcamp_start: {
-    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_start'),
-    category: 'multiAgent',
-    description: 'Start Marine Agent Boot Camp for an agent',
-  },
-  ps_bootcamp_scenario: {
-    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_scenario'),
-    category: 'multiAgent',
-    description: 'Get next training scenario',
-  },
-  ps_bootcamp_submit: {
-    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_submit'),
-    category: 'multiAgent',
-    description: 'Submit scenario response',
-  },
-  ps_bootcamp_status: {
-    handler: delegated(handleMultiAgentTool, 'ps_bootcamp_status'),
-    category: 'multiAgent',
-    description: 'Get boot camp status or certification',
-  },
-
-  // -------------------------------------------------------------------------
-  // MARKET AGENT SWARM TOOLS
-  // -------------------------------------------------------------------------
-  ps_swarm_create: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_create'),
-    category: 'swarm',
-    description: 'Create market agent swarm',
-  },
-  ps_swarm_start: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_start'),
-    category: 'swarm',
-    description: 'Start swarm execution',
-  },
-  ps_swarm_pause: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_pause'),
-    category: 'swarm',
-    description: 'Pause swarm execution',
-  },
-  ps_swarm_terminate: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_terminate'),
-    category: 'swarm',
-    description: 'Terminate swarm',
-  },
-  ps_swarm_status: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_status'),
-    category: 'swarm',
-    description: 'Get swarm status',
-  },
-  ps_swarm_agent_status: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_agent_status'),
-    category: 'swarm',
-    description: 'Get individual agent status',
-  },
-  ps_swarm_reallocate_budget: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_reallocate_budget'),
-    category: 'swarm',
-    description: 'Reallocate swarm budget',
-  },
-  ps_swarm_insights: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_insights'),
-    category: 'swarm',
-    description: 'Get swarm insights',
-  },
-  ps_swarm_events: {
-    handler: delegated(executeSwarmTool, 'ps_swarm_events'),
-    category: 'swarm',
-    description: 'Get swarm events',
-  },
-
-  // -------------------------------------------------------------------------
-  // MARKET INTELLIGENCE TOOLS (RECONNAISSANCE mode)
-  // -------------------------------------------------------------------------
-  ps_intel_list_opportunities: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_list_opportunities'),
-    category: 'intel',
-    description: 'List market opportunities',
-  },
-  ps_intel_query_market: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_query_market'),
-    category: 'intel',
-    description: 'Query market data',
-  },
-  ps_intel_get_alerts: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_get_alerts'),
-    category: 'intel',
-    description: 'Get market alerts',
-  },
-  ps_intel_approve_probe: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_approve_probe'),
-    category: 'intel',
-    description: 'Approve market probe',
-  },
-  ps_intel_reject_probe: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_reject_probe'),
-    category: 'intel',
-    description: 'Reject market probe',
-  },
-  ps_intel_seller_profile: {
-    handler: delegated(executeIntelligenceTool, 'ps_intel_seller_profile'),
-    category: 'intel',
-    description: 'Get seller profile',
-  },
-
-  // -------------------------------------------------------------------------
-  // MARINE RECON AGENT TOOLS
-  // -------------------------------------------------------------------------
-  ps_recon_create: {
-    handler: delegated(handleReconTool, 'ps_recon_create'),
-    category: 'recon',
-    description: 'Create a new Marine Recon mission symbol',
-  },
-  ps_recon_process: {
-    handler: delegated(handleReconTool, 'ps_recon_process'),
-    category: 'recon',
-    description: 'Process an incoming message in a recon mission',
-  },
-  ps_recon_status: {
-    handler: delegated(handleReconTool, 'ps_recon_status'),
-    category: 'recon',
-    description: 'Get recon mission status and summary',
-  },
-  ps_recon_complete: {
-    handler: delegated(handleReconTool, 'ps_recon_complete'),
-    category: 'recon',
-    description: 'Complete or abort a recon mission',
-  },
 };
 
 // ============================================================================
@@ -672,14 +401,7 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     feature: [],
     audit: [],
     hold: [],
-    legal: [],
-    calendar: [],
     symbol: [],
-    translation: [],
-    multiAgent: [],
-    swarm: [],
-    intel: [],
-    recon: [],
   };
 
   for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {

@@ -16,5 +16,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "src/scheduler", "src/**/__tests__", "src/legal/batch-parser.ts", "src/recon/agent/runtime.ts"]
+  "exclude": ["node_modules", "dist", "tests", "src/scheduler"]
 }

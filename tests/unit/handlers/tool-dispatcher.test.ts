@@ -31,7 +31,7 @@ describe('Tool Dispatcher', () => {
     it('should return number of registered tools', () => {
       const count = getToolCount();
       expect(typeof count).toBe('number');
-      expect(count).toBeGreaterThan(50); // We know there are 87 tools
+      expect(count).toBeGreaterThan(30); // Core governance tools (~41 after slimming)
     });
   });
 

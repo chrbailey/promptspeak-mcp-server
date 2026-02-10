@@ -87,28 +87,6 @@ export {
   handleHoldStats
 } from './ps_hold.js';
 
-// Legal citation verification tools
-export {
-  legalToolDefinitions,
-  handleLegalTool,
-  handleLegalVerify,
-  handleLegalVerifyBatch,
-  handleLegalExtract,
-  handleLegalCheck,
-  handleLegalConfig,
-  handleLegalStats
-} from './ps_legal.js';
-
-// Legal calendar tools
-export {
-  calendarToolDefinitions,
-  handleCalendarTool,
-  handleCalendarExtract,
-  handleCalendarExport,
-  handleCalendarCalculate,
-  handleCalendarFRCP,
-} from './ps_calendar.js';
-
 // Tool Registry (centralized tool definitions)
 export {
   buildToolRegistry,

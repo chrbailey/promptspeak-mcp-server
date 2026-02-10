@@ -14,7 +14,7 @@ npm run build
 ## Test
 
 ```bash
-npm test          # 951 tests
+npm test          # ~490 tests
 npm run test:stress  # Concurrent load tests
 ```
 
@@ -69,14 +69,9 @@ src/
 ├── symbols/          # SQLite-backed entity registry
 ├── policies/         # Policy file loader + overlay system
 ├── operator/         # Operator configuration
-├── translation/      # Natural language ↔ symbolic frame translation
-├── legal/            # Citation verification
-├── multi_agent/      # Commander's Intent coordination
-├── swarm/            # Market operation coordination
-├── recon/            # Intelligence processing
 ├── tools/            # MCP tool implementations
 ├── handlers/         # Tool dispatch + metadata registry
-└── core/             # Logging, errors, result patterns
+└── core/             # Logging, errors, result patterns, utilities
 ```
 
 ## Performance
@@ -86,7 +81,7 @@ src/
 | Validation latency | 0.103ms avg (P95: 0.121ms) |
 | Operations/second | 6,977 |
 | Holds/second | 33,333 |
-| Test coverage | 951 tests, 30 test files |
+| Test coverage | ~490 tests, 14 test files |
 
 ## Requirements
 
@@ -95,4 +90,4 @@ src/
 
 ## License
 
-Copyright 2025-2026 ERP Access, Inc. All rights reserved.
+MIT License. See [LICENSE](../LICENSE).
