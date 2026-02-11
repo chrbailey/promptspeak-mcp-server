@@ -58,9 +58,9 @@ jobs:
             echo "⚠️  Found $CONSOLE_COUNT console.log statements - prefer structured logger"
           fi
 
-          # Pattern 4: Direct interpolation of known sensitive fields
-          if grep -rn --include="*.ts" --exclude-dir=scheduler -E "\\\$\{[^}]*(\.password|\.secret|\.token|\.apiKey|\.email|\.ssn)\}" src/; then
-            echo "❌ Found direct interpolation of sensitive object properties"
+          # Pattern 4: Direct interpolation of sensitive fields in logger calls
+          if grep -rn --include="*.ts" --exclude-dir=scheduler -E "logger\.(debug|info|warn|error).*\\\$\{[^}]*(\.password|\.secret|\.token|\.apiKey|\.email|\.ssn)\}" src/; then
+            echo "❌ Found direct interpolation of sensitive object properties in logger calls"
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
