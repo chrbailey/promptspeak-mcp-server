@@ -29,17 +29,19 @@
     "ai-governance",
     "agent-governance",
     "ai-safety",
-    "pre-execution-blocking",
+    "pre-execution-governance",
     "human-in-the-loop",
     "drift-detection",
     "model-context-protocol",
     "ai-agent-framework",
     "circuit-breaker",
-    "tool-validation"
+    "tool-validation",
+    "claude",
+    "anthropic"
   ],
   "author": "Christopher Bailey <chris@erpaccess.com>",
   "license": "MIT",
-  "homepage": "https://github.com/chrbailey/promptspeak-mcp-server",
+  "homepage": "https://github.com/chrbailey/promptspeak-mcp-server#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chrbailey/promptspeak-mcp-server.git"
@@ -49,12 +51,14 @@
   },
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
+    "prebuild": "rm -rf dist",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:stress": "vitest run tests/stress --reporter=verbose",
-    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build && npm test",
     "seed": "tsx scripts/seed-database.ts",
     "seed:dry-run": "tsx scripts/seed-database.ts --dry-run",
     "seed:force": "tsx scripts/seed-database.ts --force"
