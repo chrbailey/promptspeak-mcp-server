@@ -1,0 +1,4 @@
+*.mp4
+*.cast
+# Override root *.sh exclusion — demo scripts should be tracked
+!*.sh

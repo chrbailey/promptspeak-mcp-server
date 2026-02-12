@@ -4,6 +4,8 @@
 
 AI agents call tools (file writes, API requests, shell commands) with no validation layer between intent and execution. A prompt injection, hallucinated argument, or drifting goal can trigger irreversible actions. PromptSpeak intercepts every MCP tool call, validates it against deterministic rules, and blocks or holds risky operations for human approval — in 0.1ms, before anything executes.
 
+![PromptSpeak Governance Demo](demo/promptspeak-demo.gif)
+
 
 ## When to use this
 
