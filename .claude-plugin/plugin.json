@@ -1,0 +1,8 @@
+{
+  "name": "promptspeak",
+  "version": "0.2.0",
+  "description": "Pre-execution governance for AI agents. Intercepts MCP tool calls with deterministic blocking, human-in-the-loop holds, and behavioral drift detection.",
+  "author": "Christopher Bailey <chris@erpaccess.com>",
+  "homepage": "https://github.com/chrbailey/promptspeak-mcp-server",
+  "license": "MIT"
+}

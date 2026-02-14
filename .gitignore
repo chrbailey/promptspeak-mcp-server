@@ -101,9 +101,12 @@ SYMBOL_VISUAL.html
 # Shell scripts (local tooling)
 *.sh
 
-# Local scripts and skills
+# Local scripts
 scripts/
-skills/
+
+# Legacy skill prompts (not Claude Code plugin skills)
+skills/legal-review.md
+skills/legal-review.prompt.md
 
 # Runtime config
 server.json
