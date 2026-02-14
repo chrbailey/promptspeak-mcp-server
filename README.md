@@ -16,15 +16,11 @@ AI agents call tools (file writes, API requests, shell commands) with no validat
 - You operate in a regulated domain (legal, financial, healthcare) where agent actions must be deterministically constrained.
 
 
-## Quick start
+## Install
 
-```bash
-npm install promptspeak-mcp-server
-```
+### Claude Code
 
-### Claude Desktop / Claude Code
-
-Add to your MCP configuration (`claude_desktop_config.json` or `.claude/settings.json`):
+Add to `~/.claude/settings.json` (or project-level `.claude/settings.json`):
 
 ```json
 {
@@ -35,6 +31,29 @@ Add to your MCP configuration (`claude_desktop_config.json` or `.claude/settings
     }
   }
 }
+```
+
+Restart Claude Code. All 41 governance tools are immediately available.
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "promptspeak": {
+      "command": "npx",
+      "args": ["promptspeak-mcp-server"]
+    }
+  }
+}
+```
+
+### As a library
+
+```bash
+npm install promptspeak-mcp-server
 ```
 
 ### From source
@@ -67,7 +86,7 @@ Agent calls tool
 Stages 1-5 are **pre-execution** — the tool never runs if any check fails. Stages 7-8 are **post-execution** — they detect drift and can halt the agent for future calls.
 
 
-## MCP tools (40)
+## MCP tools (41)
 
 ### Core governance
 
