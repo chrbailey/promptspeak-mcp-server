@@ -108,8 +108,7 @@ scripts/
 skills/legal-review.md
 skills/legal-review.prompt.md
 
-# Runtime config
-server.json
+# Runtime config (server.json tracked — required by MCP registry publisher)
 
 # Unused prototypes
 src/symbols/simple-retrieval.ts
