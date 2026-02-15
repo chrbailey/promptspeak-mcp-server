@@ -121,3 +121,4 @@ frontend/
 
 # Scheduler (local config)
 scheduler/
+.mcpregistry_*

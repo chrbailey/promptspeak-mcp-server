@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.chrbailey/promptspeak",
-  "description": "Pre-execution governance for AI agents. Intercepts and validates every agent tool call through an 8-stage pipeline before execution with risk classification, behavioral drift detection, hold queues, and audit trail.",
+  "description": "Pre-execution governance for AI agents. Validates tool calls before they execute.",
   "repository": {
     "url": "https://github.com/chrbailey/promptspeak-mcp-server",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "promptspeak-mcp-server",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "transport": {
         "type": "stdio"
       }
