@@ -122,6 +122,34 @@ export const EXECUTION_TOOLS: Tool[] = [
       },
       required: ['agentId', 'frame', 'action']
     }
+  },
+  {
+    name: 'ps_execute_batch',
+    description: 'Execute multiple actions under a single frame. Supports sequential or parallel execution with optional stop-on-failure.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        agentId: { type: 'string', description: 'Unique identifier for the executing agent' },
+        frame: { type: 'string', description: 'The governing PromptSpeak frame for all actions' },
+        actions: {
+          type: 'array',
+          items: {
+            type: 'object' as const,
+            properties: {
+              tool: { type: 'string', description: 'The tool/action to execute' },
+              arguments: { type: 'object' as const, description: 'Arguments for the tool' },
+              description: { type: 'string' }
+            },
+            required: ['tool', 'arguments']
+          },
+          description: 'Array of actions to execute under the frame'
+        },
+        parentFrame: { type: 'string', description: 'Parent frame if part of delegation chain' },
+        stopOnFirstFailure: { type: 'boolean', description: 'Stop executing remaining actions on first failure (sequential only)' },
+        parallel: { type: 'boolean', description: 'Execute all actions in parallel instead of sequentially' }
+      },
+      required: ['agentId', 'frame', 'actions']
+    }
   }
 ];
 
@@ -218,6 +246,30 @@ export const STATE_TOOLS: Tool[] = [
         reason: { type: 'string' }
       },
       required: ['agentId', 'reason']
+    }
+  },
+  {
+    name: 'ps_state_recalibrate',
+    description: 'Recalibrate agent drift baseline. Optionally provide a new baseline configuration.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        agentId: { type: 'string', description: 'Agent to recalibrate' },
+        newBaseline: {
+          type: 'object' as const,
+          properties: {
+            frame: { type: 'string', description: 'Baseline frame' },
+            expectedBehavior: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Expected behavior patterns'
+            }
+          },
+          required: ['frame', 'expectedBehavior'],
+          description: 'Optional new baseline configuration. If omitted, recalibrates from current state.'
+        }
+      },
+      required: ['agentId']
     }
   },
   {

@@ -10,11 +10,11 @@ PromptSpeak is a **pre-execution governance layer for AI agents**. It intercepts
 
 ## Project Status (Feb 2026)
 
-- **v0.2.0 pushed** to `chrbailey/promptspeak-mcp-server` (public)
+- **v0.2.1 published** to `chrbailey/promptspeak-mcp-server` (public)
 - **563 tests passing** across 16 test files, CI green (Node 20 + 22)
 - **~16K lines of core governance code** (down from 82K)
 - **MIT licensed**, 4 Dependabot PRs merged, demo GIF in README
-- **npm package prepped** (335KB) — pending `npm login && npm publish`
+- **npm package published** as `promptspeak-mcp-server`
 
 ---
 
@@ -96,15 +96,15 @@ Example: `⊕◊▶β` = "strict financial execute secondary-agent"
 
 ---
 
-## MCP Tools (~41 tools)
+## MCP Tools (42 tools)
 
 ### Core Governance
 | Tool | Purpose |
 |------|---------|
 | `ps_validate` / `ps_validate_batch` | Validate frame(s) |
-| `ps_execute` / `ps_execute_dry_run` | Execute with governance |
+| `ps_execute` / `ps_execute_dry_run` / `ps_execute_batch` | Execute with governance |
 | `ps_delegate` / `ps_delegate_revoke` | Delegation management |
-| `ps_state_halt` / `ps_state_resume` | Circuit breaker control |
+| `ps_state_halt` / `ps_state_resume` / `ps_state_recalibrate` | Circuit breaker control |
 | `ps_hold_list` / `ps_hold_approve` / `ps_hold_reject` | Human-in-the-loop |
 
 ### Configuration + Monitoring

@@ -16,17 +16,7 @@
  * - Features: ps_feature_set, ps_feature_get
  * - Audit: ps_audit_get
  * - Hold Management: ps_hold_list, ps_hold_approve, ps_hold_reject, etc.
- * - Legal: ps_legal_verify, ps_legal_extract, etc.
- * - Calendar: ps_calendar_extract, ps_calendar_export, etc.
  * - Symbols: ps_symbol_create, ps_symbol_get, ps_symbol_update, etc.
- * - Graph: ps_graph_relate, ps_graph_related, ps_graph_neighborhood, etc.
- * - Document: ps_document_process, ps_document_batch, etc.
- * - Translation: ps_frame_translate, ps_nl_compile, ps_nl_decompile, etc.
- * - Orchestration: ps_orch_query, ps_orch_propose_agent, ps_agent_list, etc.
- * - Multi-Agent: ps_intent_create, ps_mission_create, ps_mission_status, etc.
- * - Swarm: ps_swarm_create, ps_swarm_start, ps_swarm_status, etc.
- * - Intel: ps_intel_list_opportunities, ps_intel_query_market, etc.
- * - Recon: ps_recon_create, ps_recon_process, ps_recon_status, ps_recon_complete
  *
  * ===============================================================================
  */

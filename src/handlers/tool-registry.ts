@@ -23,7 +23,7 @@
 import { ps_validate, ps_validate_batch } from '../tools/index.js';
 
 // Execution tools
-import { ps_execute, ps_execute_dry_run } from '../tools/index.js';
+import { ps_execute, ps_execute_batch, ps_execute_dry_run } from '../tools/index.js';
 
 // Delegation tools
 import { ps_delegate, ps_delegate_revoke, ps_delegate_list } from '../tools/index.js';
@@ -153,6 +153,11 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     handler: (args) => ps_execute_dry_run(args as any),
     category: 'execution',
     description: 'Preview directive execution without side effects',
+  },
+  ps_execute_batch: {
+    handler: async (args) => ps_execute_batch(args as any),
+    category: 'execution',
+    description: 'Execute multiple actions under a single frame',
   },
 
   // -------------------------------------------------------------------------
