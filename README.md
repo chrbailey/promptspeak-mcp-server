@@ -209,6 +209,11 @@ src/
 - No external services required — SQLite for symbols, in-memory for everything else
 
 
+## Related Projects
+
+- **[deeptrend](https://github.com/chrbailey/deeptrend)** — Structured AI trend feed for autonomous agents. Curated from 14+ sources, synthesized via LLM Counsel, published every 6h as JSON Feed, RSS, and `llms.txt`. Designed as a data source for agent monitoring pipelines.
+
+
 ## License
 
 MIT
