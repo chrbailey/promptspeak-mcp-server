@@ -120,3 +120,6 @@ frontend/
 scheduler/
 
 .mcpregistry_*
+
+# Git worktrees
+.worktrees/
