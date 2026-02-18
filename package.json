@@ -53,6 +53,7 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "prebuild": "rm -rf dist",
+    "postbuild": "chmod +x dist/server.js",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "vitest run",
