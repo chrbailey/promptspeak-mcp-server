@@ -87,6 +87,20 @@ export {
   handleHoldStats
 } from './ps_hold.js';
 
+// Security enforcement tools
+export {
+  securityToolDefinitions,
+  handleSecurityTool,
+  handleSecurityScan,
+  handleSecurityGate,
+  handleSecurityConfig,
+  resetSecurityPatterns,
+  type SecurityScanRequest,
+  type SecurityGateResult,
+  type GateDecision,
+  type SecurityConfigResult,
+} from './ps_security.js';
+
 // Tool Registry (centralized tool definitions)
 export {
   buildToolRegistry,
