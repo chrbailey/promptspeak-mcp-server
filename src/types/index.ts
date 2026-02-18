@@ -888,3 +888,53 @@ export interface HoldRequestWithChecklist extends HoldRequest {
 export interface HoldDecisionWithChecklist extends HoldDecision {
   checklistCompletion?: ChecklistCompletionSummary;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECURITY SCANNING TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Severity levels that drive enforcement behavior */
+export type SecuritySeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+export type SecurityPatternCategory =
+  | 'injection'
+  | 'secrets'
+  | 'authentication'
+  | 'configuration'
+  | 'governance';
+
+/** A single detection pattern */
+export interface SecurityPattern {
+  id: string;
+  name: string;
+  description: string;
+  severity: SecuritySeverity;
+  pattern: string;
+  category: SecurityPatternCategory;
+  enabled: boolean;
+  falsePositiveRate?: number;
+}
+
+/** A single finding from scanning */
+export interface SecurityFinding {
+  patternId: string;
+  severity: SecuritySeverity;
+  match: string;
+  line?: number;
+  context?: string;
+  suggestion?: string;
+}
+
+/** Result of a scan */
+export interface SecurityScanResult {
+  findings: SecurityFinding[];
+  scannedAt: string;
+  contentLength: number;
+  patternsChecked: number;
+  enforcement: {
+    blocked: SecurityFinding[];
+    held: SecurityFinding[];
+    warned: SecurityFinding[];
+    logged: SecurityFinding[];
+  };
+}
