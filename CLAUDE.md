@@ -4,7 +4,7 @@
 
 Pre-execution governance layer for AI agents. Intercepts MCP tool calls, validates against deterministic rules, blocks or holds risky operations for human approval. Validation latency: 0.103ms avg.
 
-**v0.2.1** — 658 tests, 45 MCP tools, 16K lines, MIT licensed, published as `promptspeak-mcp-server`.
+**v0.3.0** — 658 tests, 45 MCP tools, 16K lines, MIT licensed, published as `promptspeak-mcp-server`.
 
 ## Architecture
 
