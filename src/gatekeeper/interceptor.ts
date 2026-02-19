@@ -13,15 +13,18 @@ import type {
 } from '../types/index.js';
 import { generateAuditId } from '../utils/hash.js';
 import { CoverageCalculator } from './coverage.js';
+import { SecurityScanner } from '../security/scanner.js';
 
 export class ActionInterceptor {
   private coverageCalculator: CoverageCalculator;
+  private securityScanner: SecurityScanner;
   private thresholds: ConfidenceThresholds;
   private auditLog: AuditLogEntry[] = [];
   private rateLimitTracker: Map<string, { count: number; windowStart: number }> = new Map();
 
   constructor(thresholds?: ConfidenceThresholds) {
     this.coverageCalculator = new CoverageCalculator();
+    this.securityScanner = new SecurityScanner();
     this.thresholds = thresholds || {
       preExecute: 0.85,
       postAudit: 0.90,
@@ -149,6 +152,44 @@ export class ActionInterceptor {
       );
     }
 
+    // Check 6: Security scan on write actions
+    if (this.isWriteAction(proposedTool) && typeof proposedArgs?.content === 'string') {
+      const scanResult = this.securityScanner.scan(proposedArgs.content as string);
+
+      if (scanResult.enforcement.blocked.length > 0) {
+        return this.createDecision(
+          false,
+          `Security: ${scanResult.enforcement.blocked.length} critical finding(s) — ${scanResult.enforcement.blocked.map(f => f.patternId).join(', ')}`,
+          resolvedFrame.raw,
+          proposedTool,
+          coverage.confidence,
+          timestamp,
+          auditId,
+          agentId
+        );
+      }
+
+      if (scanResult.enforcement.held.length > 0) {
+        return this.createDecision(
+          false,
+          `Security: ${scanResult.enforcement.held.length} high-severity finding(s) held for review — ${scanResult.enforcement.held.map(f => f.patternId).join(', ')}`,
+          resolvedFrame.raw,
+          proposedTool,
+          coverage.confidence,
+          timestamp,
+          auditId,
+          agentId
+        );
+      }
+
+      if (scanResult.enforcement.warned.length > 0) {
+        this.logAudit(auditId, timestamp, agentId, 'execute', resolvedFrame.raw, 'warning', {
+          tool: proposedTool,
+          securityWarnings: scanResult.enforcement.warned.map(f => f.patternId),
+        });
+      }
+    }
+
     // All checks passed
     this.logAudit(auditId, timestamp, agentId, 'execute', resolvedFrame.raw, 'allowed', {
       tool: proposedTool,
@@ -203,6 +244,13 @@ export class ActionInterceptor {
     }
 
     return pattern === toolName;
+  }
+
+  /**
+   * Check if a tool is a write-type action that should trigger security scanning.
+   */
+  private isWriteAction(tool: string): boolean {
+    return ['write_file', 'edit_file', 'create_file', 'patch_file'].includes(tool);
   }
 
   /**

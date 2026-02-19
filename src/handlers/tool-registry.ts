@@ -66,6 +66,7 @@ import { ps_audit_get } from '../tools/index.js';
 // ============================================================================
 
 import { handleHoldTool } from '../tools/index.js';
+import { handleSecurityTool } from '../tools/index.js';
 import { handleSymbolTool } from '../symbols/index.js';
 
 // ============================================================================
@@ -85,7 +86,8 @@ export type ToolCategory =
   | 'feature'
   | 'audit'
   | 'hold'
-  | 'symbol';
+  | 'symbol'
+  | 'security';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type ToolArgs = Record<string, unknown>;
@@ -377,6 +379,25 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
     description: 'Add alternative symbol ID',
   },
 
+  // -------------------------------------------------------------------------
+  // SECURITY ENFORCEMENT TOOLS
+  // -------------------------------------------------------------------------
+  ps_security_scan: {
+    handler: delegated(handleSecurityTool, 'ps_security_scan'),
+    category: 'security',
+    description: 'Scan code for security vulnerabilities',
+  },
+  ps_security_gate: {
+    handler: delegated(handleSecurityTool, 'ps_security_gate'),
+    category: 'security',
+    description: 'Scan and enforce — block critical, hold high, warn medium',
+  },
+  ps_security_config: {
+    handler: delegated(handleSecurityTool, 'ps_security_config'),
+    category: 'security',
+    description: 'Configure security patterns — enable, disable, change severity',
+  },
+
 };
 
 // ============================================================================
@@ -407,6 +428,7 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     audit: [],
     hold: [],
     symbol: [],
+    security: [],
   };
 
   for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {

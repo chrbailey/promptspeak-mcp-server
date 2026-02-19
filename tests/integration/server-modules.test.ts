@@ -88,7 +88,7 @@ describe('Server Module Integration', () => {
         'validation', 'execution', 'delegation', 'state', 'config',
         'confidence', 'feature', 'audit', 'hold', 'legal', 'calendar',
         'symbol', 'graph', 'document', 'translation', 'orchestration',
-        'multiAgent', 'swarm', 'intel', 'recon'
+        'multiAgent', 'swarm', 'intel', 'recon', 'security'
       ];
 
       const sumOfCategories = knownCategories.reduce(

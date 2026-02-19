@@ -24,6 +24,7 @@ import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 // Import external tool definitions
 import { holdToolDefinitions } from './ps_hold.js';
+import { securityToolDefinitions } from './ps_security.js';
 import { symbolToolDefinitions } from '../symbols/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -463,6 +464,7 @@ export const AUDIT_TOOLS: Tool[] = [
 
 export {
   holdToolDefinitions,
+  securityToolDefinitions,
   symbolToolDefinitions,
 };
 
@@ -490,6 +492,7 @@ export function buildToolRegistry(): Tool[] {
 
     // External tool definitions
     ...holdToolDefinitions,        // Hold Management (Human-in-the-Loop)
+    ...securityToolDefinitions,    // Security Enforcement
     ...symbolToolDefinitions,      // Directive Symbol Registry
   ];
 }
@@ -509,6 +512,7 @@ export function getToolStats(): Record<string, number> {
     feature: FEATURE_TOOLS.length,
     audit: AUDIT_TOOLS.length,
     hold: holdToolDefinitions.length,
+    security: securityToolDefinitions.length,
     symbol: symbolToolDefinitions.length,
     total: buildToolRegistry().length
   };
