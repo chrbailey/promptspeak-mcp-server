@@ -225,7 +225,7 @@ export async function handleSecurityTool(
 ): Promise<unknown> {
   switch (name) {
     case 'ps_security_scan':
-      return handleSecurityScan(args as Parameters<typeof handleSecurityScan>[0]);
+      return handleSecurityScan(args as unknown as Parameters<typeof handleSecurityScan>[0]);
     case 'ps_security_gate':
       return handleSecurityGate(args as Parameters<typeof handleSecurityGate>[0]);
     case 'ps_security_config':
