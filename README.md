@@ -33,7 +33,7 @@ Add to `~/.claude/settings.json` (or project-level `.claude/settings.json`):
 }
 ```
 
-Restart Claude Code. All 41 governance tools are immediately available.
+Restart Claude Code. All 45 governance tools are immediately available.
 
 ### Claude Desktop
 
@@ -66,7 +66,7 @@ npm start
 ```
 
 
-## How it works: 8-stage validation pipeline
+## How it works: 9-stage validation pipeline
 
 Every tool call passes through this pipeline. If any stage fails, execution is blocked.
 
@@ -78,15 +78,47 @@ Agent calls tool
   ├─ 3. Drift Prediction ─── Pre-flight behavioral anomaly detection
   ├─ 4. Hold Check ────────── Risky operations held for human approval
   ├─ 5. Interceptor ───────── Final permission gate (confidence thresholds)
-  ├─ 6. Tool Execution ────── Only reached if all 5 pre-checks pass
-  ├─ 7. Post-Audit ────────── Confirms behavior matched prediction
-  └─ 8. Immediate Action ──── Halts agent if critical drift detected post-execution
+  ├─ 6. Security Scan ─────── Scans write actions for vulnerabilities (see below)
+  ├─ 7. Tool Execution ────── Only reached if all 6 pre-checks pass
+  ├─ 8. Post-Audit ────────── Confirms behavior matched prediction
+  └─ 9. Immediate Action ──── Halts agent if critical drift detected post-execution
 ```
 
-Stages 1-5 are **pre-execution** — the tool never runs if any check fails. Stages 7-8 are **post-execution** — they detect drift and can halt the agent for future calls.
+Stages 1-6 are **pre-execution** — the tool never runs if any check fails. Stages 8-9 are **post-execution** — they detect drift and can halt the agent for future calls.
 
 
-## MCP tools (41)
+## Security scanning
+
+When an agent writes code (`write_file`, `edit_file`, `create_file`, `patch_file`), the content is scanned against 10 detection patterns before execution. Severity determines enforcement:
+
+| Severity | Enforcement | What it catches |
+|----------|-------------|-----------------|
+| **CRITICAL** | **Blocked** — execution denied | SQL injection via template literals, hardcoded API keys/passwords/tokens |
+| **HIGH** | **Held** — queued for human review | Security-related TODOs, logging sensitive data, insecure defaults (`cors()`, `0.0.0.0`, `debug: true`) |
+| **MEDIUM** | **Warned** — logged, execution continues | Empty catch blocks, hedging comments ("probably works"), disabled tests |
+| **LOW** | **Logged** — no enforcement | `DROP TABLE`, `rm -rf` (flagged for awareness) |
+
+### What works (tested)
+
+All claims below are backed by passing tests (95 tests across 4 test files):
+
+- **Pattern detection works.** Each of the 10 patterns is tested for true positives AND false positives. Example: `api_key = "sk-1234567890abcdef"` is caught; `API_KEY = process.env.API_KEY` is not. SQL injection catches `\`SELECT * FROM users WHERE id = ${id}\`` but not parameterized queries (`db.query("SELECT * FROM users WHERE id = ?", [id])`).
+- **Severity enforcement works.** Critical findings block execution. High findings hold for review. Medium findings warn but allow. Tested end-to-end through the interceptor pipeline.
+- **Only write actions are scanned.** `read_file` and other non-write actions pass through without scanning, even if their arguments contain vulnerable code. Tested.
+- **Runtime configuration works.** Patterns can be enabled/disabled and severity can be changed at runtime via `ps_security_config`. A disabled pattern stops firing immediately. Changing a pattern from medium to critical makes it block instead of warn. Tested end-to-end.
+- **Performance is fine.** 100-line file scans complete in under 10ms. Tested.
+- **Multiple findings in one file work.** A file with 6 different vulnerability types correctly classifies each into the right severity bucket. Tested.
+
+### What does NOT work yet
+
+- **No hold queue integration for HIGH findings.** The interceptor blocks HIGH-severity findings (returns `allowed: false`) but does not create an actual hold in the HoldManager. This means `ps_hold_list` won't show security holds, and there's no approve/reject flow for them. The `ps_security_gate` tool reports `decision: "held"` but this is informational only — there's no pending hold to act on. **Why:** Wiring into HoldManager requires an `ExecuteRequest` object and a `HoldReason` type extension. Both are doable but weren't in scope for the initial implementation.
+- **No auto-scan on `ps_execute`.** The security scan only triggers in the interceptor's `intercept()` method for direct tool calls. If an agent uses `ps_execute` (the governed execution path), the scan runs only if the inner tool is a write action AND the content is passed as a top-level arg. Nested argument structures may bypass scanning. **Why:** `ps_execute` wraps tool calls in its own argument schema; the scanner checks `proposedArgs.content`, not deeply nested fields.
+- **No file-path-based scanning.** The scanner only examines content passed as arguments. It cannot scan files already on disk — it doesn't read from the filesystem. **Why:** The scanner is a pure function that takes a string. Adding filesystem access would change the security model.
+- **Patterns are regex-based, not AST-aware.** The patterns use regular expressions, which means they can't understand code structure. A hardcoded secret inside a test fixture or a SQL injection in a comment will still trigger. False positive rates range from 25-70% depending on the pattern (documented per-pattern). **Why:** AST parsing would add dependencies and complexity. Regex is fast and good enough for a governance layer that holds for human review rather than silently blocking.
+- **No persistence.** Pattern configuration changes (enable/disable, severity changes) are in-memory only. They reset when the server restarts. **Why:** The rest of PromptSpeak's config is also in-memory. Persistence would need the SQLite layer or a config file, neither of which was in scope.
+
+
+## MCP tools (45)
 
 ### Core governance
 
@@ -157,6 +189,14 @@ Stages 1-5 are **pre-execution** — the tool never runs if any check fails. Sta
 | `ps_symbol_list_unverified` | When auditing stale data | List symbols needing verification |
 | `ps_symbol_add_alternative` | When an entity has aliases | Add alternative identifier |
 
+### Security enforcement
+
+| Tool | When to call it | What it does |
+|------|----------------|--------------|
+| `ps_security_scan` | When checking code for vulnerabilities | Scan content, return findings by severity |
+| `ps_security_gate` | When enforcing security policy on writes | Scan + enforce: block/hold/warn/allow |
+| `ps_security_config` | When tuning detection patterns | List, enable, disable, change severity of patterns |
+
 ### Audit
 
 | Tool | When to call it | What it does |
@@ -180,12 +220,16 @@ src/
 │   ├── baseline.ts         # Behavioral baseline comparison
 │   ├── tripwire.ts         # Anomaly tripwires
 │   └── monitor.ts          # Continuous monitoring
+├── security/         # Security vulnerability scanning
+│   ├── patterns.ts   #   10 detection patterns (regex-based)
+│   └── scanner.ts    #   Scanner engine + severity classification
 ├── symbols/          # SQLite-backed entity registry (11 CRUD tools)
 ├── policies/         # Policy file loader + overlay system
 ├── operator/         # Operator configuration
 ├── tools/            # MCP tool implementations
 │   ├── registry.ts   #   29 core tools
-│   └── ps_hold.ts    #   5 hold tools
+│   ├── ps_hold.ts    #   5 hold tools
+│   └── ps_security.ts#   3 security tools
 ├── handlers/         # Tool dispatch + metadata registry
 ├── core/             # Logging, errors, result patterns
 └── server.ts         # MCP server entry point (stdio transport)
@@ -199,7 +243,8 @@ src/
 | Validation latency | 0.103ms avg (P95: 0.121ms) |
 | Operations/second | 6,977 |
 | Holds/second | 33,333 |
-| Test suite | 563 tests, 16 test files |
+| Security scan (100 lines) | < 10ms |
+| Test suite | 658 tests, 21 test files |
 
 
 ## Requirements
