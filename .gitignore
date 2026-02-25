@@ -123,3 +123,9 @@ scheduler/
 
 # Git worktrees
 .worktrees/
+
+# Claude Code local state
+.claude/
+
+# Private planning docs
+docs/plans/
