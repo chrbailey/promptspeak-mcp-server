@@ -28,6 +28,109 @@ import { securityToolDefinitions } from './ps_security.js';
 import { symbolToolDefinitions } from '../symbols/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GRAMMAR TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const GRAMMAR_TOOLS: Tool[] = [
+  {
+    name: 'ps_parse',
+    description: 'Parse a PromptSpeak EBNF expression into an AST. Returns AST tree and metadata (verb count, pipes, branches).',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        expression: { type: 'string', description: 'PromptSpeak expression (e.g., "::analyze{document}[security]|format:json")' },
+      },
+      required: ['expression'],
+    },
+  },
+  {
+    name: 'ps_expand',
+    description: 'Expand a PromptSpeak expression to natural English. Used by safety filters for human-readable action descriptions.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        expression: { type: 'string', description: 'PromptSpeak expression to expand' },
+      },
+      required: ['expression'],
+    },
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGISTRY TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const REGISTRY_TOOLS: Tool[] = [
+  {
+    name: 'ps_registry_lookup',
+    description: 'Resolve a verb symbol to its full definition, including aliases.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbol: { type: 'string', description: 'Verb symbol (e.g., "::analyze")' },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'ps_registry_propose',
+    description: 'Submit a new verb for review. Created with status: proposed.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbol: { type: 'string', description: 'Verb symbol (e.g., "::myverb")' },
+        namespace: { type: 'string', description: 'Namespace (e.g., "ps:custom")' },
+        category: { type: 'string', enum: ['verb', 'modifier', 'pattern', 'primitive'], description: 'Verb category' },
+        definition: { type: 'string', description: 'Semantic definition of the verb' },
+        safety_class: { type: 'string', enum: ['unrestricted', 'monitored', 'restricted', 'blocked'], description: 'Safety classification' },
+      },
+      required: ['symbol', 'namespace', 'definition'],
+    },
+  },
+  {
+    name: 'ps_registry_status',
+    description: 'Check the lifecycle state and safety classification of a verb.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbol: { type: 'string', description: 'Verb symbol to check' },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'ps_registry_namespace',
+    description: 'List all verbs registered in a namespace.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        namespace: { type: 'string', description: 'Namespace to list (e.g., "ps:core", "ps:gov")' },
+      },
+      required: ['namespace'],
+    },
+  },
+  {
+    name: 'ps_registry_audit',
+    description: 'Get full change history for a verb (registrations, transitions, updates).',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        symbol: { type: 'string', description: 'Verb symbol to audit' },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'ps_registry_version',
+    description: 'Get current spec version, verb count, and registry statistics.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION TOOLS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -491,6 +594,12 @@ export function buildToolRegistry(): Tool[] {
     ...AUDIT_TOOLS,
 
     // External tool definitions
+    // Grammar tools
+    ...GRAMMAR_TOOLS,
+    // Registry tools
+    ...REGISTRY_TOOLS,
+
+    // External tool definitions
     ...holdToolDefinitions,        // Hold Management (Human-in-the-Loop)
     ...securityToolDefinitions,    // Security Enforcement
     ...symbolToolDefinitions,      // Directive Symbol Registry
@@ -511,6 +620,8 @@ export function getToolStats(): Record<string, number> {
     confidence: CONFIDENCE_TOOLS.length,
     feature: FEATURE_TOOLS.length,
     audit: AUDIT_TOOLS.length,
+    grammar: GRAMMAR_TOOLS.length,
+    registry: REGISTRY_TOOLS.length,
     hold: holdToolDefinitions.length,
     security: securityToolDefinitions.length,
     symbol: symbolToolDefinitions.length,

@@ -101,6 +101,28 @@ export {
   type SecurityConfigResult,
 } from './ps_security.js';
 
+// Grammar tools
+export {
+  ps_parse,
+  ps_expand,
+  type ParseRequest,
+  type ParseResult,
+  type ExpandRequest,
+  type ExpandResult,
+} from './ps_grammar.js';
+
+// Verb registry tools
+export {
+  setRegistryDB,
+  getRegistryDB,
+  ps_registry_lookup,
+  ps_registry_propose,
+  ps_registry_status,
+  ps_registry_namespace,
+  ps_registry_audit,
+  ps_registry_version,
+} from './ps_registry.js';
+
 // Tool Registry (centralized tool definitions)
 export {
   buildToolRegistry,
@@ -112,5 +134,7 @@ export {
   CONFIG_TOOLS,
   CONFIDENCE_TOOLS,
   FEATURE_TOOLS,
-  AUDIT_TOOLS
+  AUDIT_TOOLS,
+  GRAMMAR_TOOLS,
+  REGISTRY_TOOLS,
 } from './registry.js';

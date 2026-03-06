@@ -61,6 +61,19 @@ import { ps_feature_set, ps_feature_get } from '../tools/index.js';
 // Audit tools
 import { ps_audit_get } from '../tools/index.js';
 
+// Grammar tools
+import { ps_parse, ps_expand } from '../tools/ps_grammar.js';
+
+// Registry tools
+import {
+  ps_registry_lookup,
+  ps_registry_propose,
+  ps_registry_status,
+  ps_registry_namespace,
+  ps_registry_audit,
+  ps_registry_version,
+} from '../tools/ps_registry.js';
+
 // ============================================================================
 // IMPORTS - Delegated Handlers
 // ============================================================================
@@ -87,7 +100,9 @@ export type ToolCategory =
   | 'audit'
   | 'hold'
   | 'symbol'
-  | 'security';
+  | 'security'
+  | 'grammar'
+  | 'registry';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type ToolArgs = Record<string, unknown>;
@@ -380,6 +395,54 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   },
 
   // -------------------------------------------------------------------------
+  // GRAMMAR TOOLS
+  // -------------------------------------------------------------------------
+  ps_parse: {
+    handler: (args) => ps_parse(args as any),
+    category: 'grammar',
+    description: 'Parse PromptSpeak EBNF expression into AST',
+  },
+  ps_expand: {
+    handler: (args) => ps_expand(args as any),
+    category: 'grammar',
+    description: 'Expand PromptSpeak expression to English',
+  },
+
+  // -------------------------------------------------------------------------
+  // VERB REGISTRY TOOLS
+  // -------------------------------------------------------------------------
+  ps_registry_lookup: {
+    handler: (args) => ps_registry_lookup(args as any),
+    category: 'registry',
+    description: 'Resolve verb to full definition',
+  },
+  ps_registry_propose: {
+    handler: (args) => ps_registry_propose(args as any),
+    category: 'registry',
+    description: 'Submit new verb for review',
+  },
+  ps_registry_status: {
+    handler: (args) => ps_registry_status(args as any),
+    category: 'registry',
+    description: 'Check verb lifecycle state',
+  },
+  ps_registry_namespace: {
+    handler: (args) => ps_registry_namespace(args as any),
+    category: 'registry',
+    description: 'List verbs in namespace',
+  },
+  ps_registry_audit: {
+    handler: (args) => ps_registry_audit(args as any),
+    category: 'registry',
+    description: 'Get verb change history',
+  },
+  ps_registry_version: {
+    handler: () => ps_registry_version(),
+    category: 'registry',
+    description: 'Get spec version and stats',
+  },
+
+  // -------------------------------------------------------------------------
   // SECURITY ENFORCEMENT TOOLS
   // -------------------------------------------------------------------------
   ps_security_scan: {
@@ -429,6 +492,8 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     hold: [],
     symbol: [],
     security: [],
+    grammar: [],
+    registry: [],
   };
 
   for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {
