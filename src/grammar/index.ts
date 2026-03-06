@@ -8,3 +8,4 @@ export { NodeType, type ActionNode, type TargetNode, type FilterNode, type Modif
 export { tokenize, TokenType, type Token } from './lexer.js';
 export { parse, ParseError } from './parser.js';
 export { expand } from './expander.js';
+export { validateExpression, type ExpressionValidationReport, type VerbCheckResult, type ExpressionDecision } from './governance.js';
