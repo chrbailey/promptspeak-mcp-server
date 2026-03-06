@@ -562,6 +562,40 @@ export const AUDIT_TOOLS: Tool[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HANDSHAKE TOOLS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const HANDSHAKE_TOOLS: Tool[] = [
+  {
+    name: 'ps_handshake_initiate',
+    description: 'Start a PromptSpeak verification handshake. Returns probe expression to send to remote agent.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'ps_handshake_respond',
+    description: 'Handle an incoming PromptSpeak handshake probe. Parses, validates, and echoes confirmation.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        input: { type: 'string', description: 'The handshake probe expression to respond to' },
+      },
+      required: ['input'],
+    },
+  },
+  {
+    name: 'ps_capability_get',
+    description: 'Report this server\'s PromptSpeak capabilities (version, verb count, namespaces).',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EXTERNAL TOOL DEFINITIONS (re-exported for convenience)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -598,6 +632,8 @@ export function buildToolRegistry(): Tool[] {
     ...GRAMMAR_TOOLS,
     // Registry tools
     ...REGISTRY_TOOLS,
+    // Handshake tools
+    ...HANDSHAKE_TOOLS,
 
     // External tool definitions
     ...holdToolDefinitions,        // Hold Management (Human-in-the-Loop)
@@ -622,6 +658,7 @@ export function getToolStats(): Record<string, number> {
     audit: AUDIT_TOOLS.length,
     grammar: GRAMMAR_TOOLS.length,
     registry: REGISTRY_TOOLS.length,
+    handshake: HANDSHAKE_TOOLS.length,
     hold: holdToolDefinitions.length,
     security: securityToolDefinitions.length,
     symbol: symbolToolDefinitions.length,

@@ -74,6 +74,13 @@ import {
   ps_registry_version,
 } from '../tools/ps_registry.js';
 
+// Handshake tools
+import {
+  ps_handshake_initiate,
+  ps_handshake_respond,
+  ps_capability_get,
+} from '../tools/ps_handshake.js';
+
 // ============================================================================
 // IMPORTS - Delegated Handlers
 // ============================================================================
@@ -102,7 +109,8 @@ export type ToolCategory =
   | 'symbol'
   | 'security'
   | 'grammar'
-  | 'registry';
+  | 'registry'
+  | 'handshake';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type ToolArgs = Record<string, unknown>;
@@ -443,6 +451,25 @@ export const TOOL_REGISTRY: Record<string, ToolEntry> = {
   },
 
   // -------------------------------------------------------------------------
+  // HANDSHAKE TOOLS
+  // -------------------------------------------------------------------------
+  ps_handshake_initiate: {
+    handler: () => ps_handshake_initiate(),
+    category: 'handshake',
+    description: 'Start PromptSpeak verification handshake',
+  },
+  ps_handshake_respond: {
+    handler: (args) => ps_handshake_respond(args as any),
+    category: 'handshake',
+    description: 'Respond to handshake probe',
+  },
+  ps_capability_get: {
+    handler: () => ps_capability_get(),
+    category: 'handshake',
+    description: 'Get server capabilities',
+  },
+
+  // -------------------------------------------------------------------------
   // SECURITY ENFORCEMENT TOOLS
   // -------------------------------------------------------------------------
   ps_security_scan: {
@@ -494,6 +521,7 @@ export function getToolsByCategory(): Record<ToolCategory, string[]> {
     security: [],
     grammar: [],
     registry: [],
+    handshake: [],
   };
 
   for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {

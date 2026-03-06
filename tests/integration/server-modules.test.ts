@@ -89,7 +89,7 @@ describe('Server Module Integration', () => {
         'confidence', 'feature', 'audit', 'hold', 'legal', 'calendar',
         'symbol', 'graph', 'document', 'translation', 'orchestration',
         'multiAgent', 'swarm', 'intel', 'recon', 'security',
-        'grammar', 'registry'
+        'grammar', 'registry', 'handshake'
       ];
 
       const sumOfCategories = knownCategories.reduce(

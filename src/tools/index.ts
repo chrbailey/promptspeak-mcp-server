@@ -123,6 +123,15 @@ export {
   ps_registry_version,
 } from './ps_registry.js';
 
+// Handshake tools
+export {
+  setHandshakeProtocol,
+  getHandshakeProtocol,
+  ps_handshake_initiate,
+  ps_handshake_respond,
+  ps_capability_get,
+} from './ps_handshake.js';
+
 // Tool Registry (centralized tool definitions)
 export {
   buildToolRegistry,
@@ -137,4 +146,5 @@ export {
   AUDIT_TOOLS,
   GRAMMAR_TOOLS,
   REGISTRY_TOOLS,
+  HANDSHAKE_TOOLS,
 } from './registry.js';
