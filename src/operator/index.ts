@@ -176,6 +176,15 @@ export interface ConfidenceSetResult {
   message: string;
 }
 
+// Safety floors per threshold — prevents bypassing governance via ps_confidence_set (DAT-006)
+const CONFIDENCE_FLOORS: Record<string, number> = {
+  parseConfidence: 0.50,
+  coverageConfidence: 0.50,
+  chainConfidence: 0.40,
+  driftThreshold: 0.02,
+  tripwireThreshold: 0.10,
+};
+
 export function ps_confidence_set(request: ConfidenceSetRequest): ConfidenceSetResult {
   const thresholds = operatorConfig.getThresholds();
   const previousValue = thresholds[request.threshold];
@@ -188,6 +197,18 @@ export function ps_confidence_set(request: ConfidenceSetRequest): ConfidenceSetR
       previousValue,
       newValue: previousValue,
       message: 'Value must be between 0 and 1'
+    };
+  }
+
+  // Enforce safety floor — cannot set below minimum (red team CRITICAL-003 / DAT-006)
+  const floor = CONFIDENCE_FLOORS[request.threshold] ?? 0.10;
+  if (request.value < floor) {
+    return {
+      success: false,
+      threshold: request.threshold,
+      previousValue,
+      newValue: previousValue,
+      message: `Value ${request.value} is below safety floor ${floor} for '${request.threshold}'. Floor cannot be bypassed.`
     };
   }
 

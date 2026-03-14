@@ -114,6 +114,14 @@ export function normalizeUnicode(content: string): string {
   // This converts fullwidth chars, compatibility chars, etc.
   let normalized = content.normalize('NFKC');
 
+  // Step 1.5: Decode HTML entities (catches &#105;gnore → ignore, ENC-009)
+  normalized = normalized.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+  normalized = normalized.replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+  normalized = normalized.replace(/&(lt|gt|amp|quot|apos|nbsp);/gi, (_, entity) => {
+    const map: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' };
+    return map[entity.toLowerCase()] || '';
+  });
+
   // Step 2: Remove invisible/zero-width characters
   for (const char of INVISIBLE_CHARS) {
     normalized = normalized.split(char).join('');
@@ -307,6 +315,40 @@ const CRITICAL_INJECTION_PATTERNS: Array<{ pattern: RegExp; description: string 
   // DAN-style attacks
   { pattern: /\bDAN\b.*\bmode\b/i, description: 'DAN mode attack' },
   { pattern: /do\s+anything\s+now/i, description: 'DAN variant' },
+
+  // ── Red team wave 2: patterns for 31 bypass vectors ──────────────────
+
+  // JSON override keys (INJ-006)
+  { pattern: /__system_override|override_governance|admin_override|system_role/i, description: 'JSON override key injection' },
+
+  // Script tag injection (INJ-007)
+  { pattern: /<script\b[^>]*>/i, description: 'Script tag injection' },
+
+  // Fake tool/system responses (INJ-010)
+  { pattern: /"?result"?\s*:\s*\{[^}]*"?status"?\s*:/i, description: 'Fake tool response' },
+
+  // Conditional instruction injection — indirect data poisoning (INJ-004)
+  { pattern: /when\s+(asked|prompted|queried)\s+(about|regarding)\b.*\b(always|must|should)\s+(respond|reply|say|answer)/i, description: 'Conditional instruction injection' },
+
+  // Authority impersonation without override keywords (SOC-001, SOC-005)
+  { pattern: /\bI\s+am\s+(the|an?)\s+(administrator|system\s*admin|root\s*user|operator)\b/i, description: 'Authority impersonation' },
+  { pattern: /\b(authorized\s+by|override\s+code|maintenance\s+window|emergency\s+access)\b/i, description: 'Authority claim' },
+  { pattern: /\b(developer|debug|testing)\s+mode\b.*\b(enabled?|activated?|active)\b/i, description: 'Developer mode claim' },
+
+  // Pre-authorization claims (SOC-003)
+  { pattern: /\b(pre-?authorized|has\s+(already\s+)?authorized|proceed\s+without\s+confirmation|already\s+approved)\b/i, description: 'Pre-authorization claim' },
+
+  // Helpful framing disguising override (SOC-006)
+  { pattern: /\bto\s+better\s+serve\s+(the\s+)?user\b/i, description: 'Helpful framing override' },
+
+  // Fake compliance/standard citations (SOC-008)
+  { pattern: /\b(NIST|ISO\s*\d+|SOC\s*2|PCI[\s-]?DSS|HIPAA)\s+(requires?|mandates?|states?|specifies?)\s+(that\s+)?(you|the\s+system|all\s+models?)\b/i, description: 'Fake compliance citation' },
+
+  // Fake governance/safety failure messages (STR-005)
+  { pattern: /\b(governance|safety|security|guard)\s*(system|layer|check|module)?\s*(has\s+)?(failed|crashed|disabled|error|unavailable|bypassed)\b/i, description: 'Fake governance failure' },
+
+  // YAML frontmatter config override (STR-006)
+  { pattern: /^---\s*\n[\s\S]{0,200}?(override|admin|system_prompt|role:\s*system)/im, description: 'YAML frontmatter exploit' },
 ];
 
 /**
@@ -332,6 +374,20 @@ const SUSPICIOUS_PATTERNS: Array<{ pattern: RegExp; description: string; severit
   { pattern: /```\s*(system|admin|root)/i, description: 'Code block role injection', severity: 'HIGH' },
   { pattern: /\[INST\]|\[\/INST\]/i, description: 'Llama-style injection', severity: 'CRITICAL' },
   { pattern: /<\|im_start\|>|<\|im_end\|>/i, description: 'ChatML injection', severity: 'CRITICAL' },
+
+  // ── Red team wave 2: structural & encoding bypass patterns ──────────
+
+  // Markdown table cell injection (STR-009)
+  { pattern: /\|[^|]*\b(ignore|override|bypass|forget)\s+(all\s+)?(instructions?|rules?|safety)\b[^|]*\|/i, description: 'Table cell injection', severity: 'HIGH' },
+
+  // Code block escape with override intent (STR-010)
+  { pattern: /```[\s\S]{0,500}?(ignore|override|bypass|forget)\s+(all\s+)?(instructions?|rules?|restrictions?)/i, description: 'Code block escape', severity: 'HIGH' },
+
+  // Emoji verb substitution (ENC-008) — common emoji-for-word swaps
+  { pattern: /🔓\s*(all|every|safety)|🛑\s*(safety|guard|rules)|⚡\s*(override|bypass)/i, description: 'Emoji verb substitution', severity: 'HIGH' },
+
+  // <system> wrapper (supplemental — catches variants not in CRITICAL list)
+  { pattern: /<\/?system>/i, description: 'System tag wrapper', severity: 'HIGH' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
