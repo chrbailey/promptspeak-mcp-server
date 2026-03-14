@@ -24,82 +24,14 @@ test-fixtures/
 *.pem
 *.key
 
-# Business/Strategy documents (private)
-ACQUIHIRE-*.md
-ACQUIHIRE-*.pdf
-SUBMISSION-PACKAGE.md
-PRODUCT_MARKET_FIT_ANALYSIS.md
-X-TWITTER-THREAD.md
-LINKEDIN-ARTICLE.txt
-acquihire-*.md
-acquihire-*.ts
+# Organized subdirectories (local only, not part of core server)
+experiments/
+business/
+test-results/
 
 # Runtime data directories
 data/
 output/
-
-# Experiment/analysis scripts (not part of core server)
-*-experiment.ts
-*-test.ts
-*-tests.ts
-*-benchmark.ts
-*-validation.ts
-*-stress-test.ts
-*-suite.ts
-comprehensive-*.ts
-scheduled-*.ts
-validate-*.ts
-test-*.ts
-debug-*.ts
-investigate-*.ts
-quick-*.ts
-save-*.ts
-rank-opportunities.py
-search-ai-opportunities.ts
-run-naics-monitor.ts
-monitor-courtlistener.ts
-generate-legal-opinion.ts
-initialize-knowledge-symbols.ts
-demo-rfi-search.ts
-clean-agent-test.ts
-
-# Experiment result reports (not part of core docs)
-ADVERSARIAL-TEST-RESULTS.md
-ATTACK-VECTORS-REFERENCE.md
-CHAOS-TEST-ANALYSIS.md
-CHAOS-TEST-README.md
-COMPREHENSIVE_SYMBOL_TEST_REPORT.md
-COMPREHENSIVE_TEST_REPORT.md
-DEMO_EXAMPLES.md
-DEMO_PROMPTSPEAK_REGISTRY.md
-DRIFT_DETECTION_RESULTS.md
-HYPOTHESIS.md
-INDEX-ADVERSARIAL-TEST.md
-LEGAL-MVP-VALIDATION-REPORT.md
-QUICK-START-ADVERSARIAL-TEST.md
-README-ADVERSARIAL-TEST.md
-RESEARCH_COMPARISON.md
-RESEARCH_PAPER.md
-RESULTS_ANALYSIS.md
-SECURITY_IMPLEMENTATION_REPORT.md
-SUPPLEMENTARY_MATERIALS.md
-SYMBOL_DESIGN_ENHANCEMENT.md
-SYMBOL_VISUAL.md
-SYSTEM_VALIDATION_REPORT.md
-TECHNICAL_ANALYSIS.md
-TECHNICAL_ANALYSIS_V2.md
-TEST_PLAN.md
-TEST_RESULTS.md
-VALIDATION_REPORT.md
-scheduled-retest-report.md
-
-# HTML visualization files
-SYMBOL_DETAILS.html
-SYMBOL_FLOW.html
-SYMBOL_VISUAL.html
-
-# Shell scripts (local tooling)
-*.sh
 
 # Local scripts
 scripts/
