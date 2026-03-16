@@ -8,6 +8,7 @@
 import type { CircuitBreakerState, DriftAlert } from '../types/index.js';
 import { generateAlertId } from '../utils/hash.js';
 import type { TrustState, CalibrationMetrics, AutonomyLevel } from '../governance/types.js';
+import type { GovernanceDatabase } from '../persistence/database.js';
 import {
   createInitialTrustState,
   processCalibrationWindow,
@@ -35,11 +36,45 @@ export class CircuitBreaker {
   private alerts: DriftAlert[] = [];
   private enabled: boolean = true;
 
+  // Optional persistence layer (in-memory if not attached)
+  private db: GovernanceDatabase | null = null;
+
   // Autonomy trust state per agent (ported from AETHER)
   private trustStates: Map<string, TrustState> = new Map();
 
   constructor(config?: Partial<CircuitBreakerConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * Attach a persistence database. Loads circuit breaker state from disk.
+   */
+  attachDb(db: GovernanceDatabase): void {
+    this.db = db;
+    this.loadFromDb();
+  }
+
+  /**
+   * Load persisted circuit breaker state into memory.
+   * Only loads agents that were in non-closed state (open/half-open),
+   * since closed is the default and doesn't need persistence.
+   */
+  private loadFromDb(): void {
+    if (!this.db) return;
+
+    const persisted = this.db.getAllCircuitBreakers();
+    for (const state of persisted) {
+      this.states.set(state.agentId, state);
+    }
+  }
+
+  /** Persist current state for an agent to disk */
+  private persistState(agentId: string): void {
+    if (!this.db) return;
+    const state = this.states.get(agentId);
+    if (state) {
+      this.db.saveCircuitBreaker(state);
+    }
   }
 
   /**
@@ -89,6 +124,7 @@ export class CircuitBreaker {
           // Move to half-open
           state.state = 'half-open';
           state.successCount = 0;
+          this.persistState(agentId);
           return true;
         }
         return false;
@@ -132,6 +168,8 @@ export class CircuitBreaker {
         // Ignore successes when open (shouldn't happen)
         break;
     }
+
+    this.persistState(agentId);
   }
 
   /**
@@ -161,6 +199,8 @@ export class CircuitBreaker {
         state.openedAt = Date.now();
         break;
     }
+
+    this.persistState(agentId);
   }
 
   /**
@@ -199,6 +239,8 @@ export class CircuitBreaker {
     state.reason = reason;
     state.successCount = 0;
 
+    this.persistState(agentId);
+
     // Circuit breaker OPEN → demote autonomy level (fast descent)
     this.demoteTrustOnCircuitOpen(agentId);
   }
@@ -214,6 +256,8 @@ export class CircuitBreaker {
     state.openedAt = undefined;
     state.lastFailure = undefined;
     state.reason = undefined;
+
+    this.persistState(agentId);
   }
 
   /**
@@ -223,6 +267,8 @@ export class CircuitBreaker {
     const state = this.getState(agentId);
     state.state = 'half-open';
     state.successCount = 0;
+
+    this.persistState(agentId);
   }
 
   /**
@@ -261,6 +307,9 @@ export class CircuitBreaker {
   clearAgent(agentId: string): void {
     this.states.delete(agentId);
     this.trustStates.delete(agentId);
+    if (this.db) {
+      this.db.deleteCircuitBreaker(agentId);
+    }
   }
 
   /**
@@ -270,6 +319,9 @@ export class CircuitBreaker {
     this.states.clear();
     this.alerts = [];
     this.trustStates.clear();
+    if (this.db) {
+      this.db.clearAllCircuitBreakers();
+    }
   }
 
   /**

@@ -606,6 +606,57 @@ export class Gatekeeper {
           },
         };
       }
+
+      // Legal domain hold check (◇ frames)
+      if (this.holdManager.isLegalDomainFrame(frame)) {
+        const legalHoldCheck = this.holdManager.shouldHoldLegal(request, {
+          isLegalDomain: true,
+        });
+
+        if (legalHoldCheck) {
+          const legalHoldRequest = this.holdManager.createHold(
+            request,
+            legalHoldCheck.reason,
+            legalHoldCheck.severity,
+            {
+              ...legalHoldCheck.evidence,
+              predictedDrift: predictedDriftScore,
+              frame,
+              tool,
+              agentId,
+            },
+            legalHoldCheck.customExpiryMs
+          );
+
+          preFlightCheck.held = true;
+          preFlightCheck.holdRequest = legalHoldRequest;
+
+          return {
+            success: false,
+            allowed: false,
+            held: true,
+            holdRequest: legalHoldRequest,
+            preFlightCheck,
+            interceptorDecision: {
+              allowed: false,
+              held: true,
+              holdReason: legalHoldCheck.reason,
+              reason: `Execution held for legal review: ${legalHoldCheck.reason}`,
+              frame,
+              proposedAction: tool,
+              coverageConfidence: resolved.parseConfidence || 0,
+              timestamp,
+              auditId,
+              preFlightChecks: {
+                circuitBreakerPassed: preFlightCheck.checks.circuitBreaker.passed,
+                driftPredictionPassed: preFlightCheck.checks.driftPrediction.passed,
+                baselineCheckPassed: preFlightCheck.checks.baseline.passed,
+                predictedDriftScore,
+              },
+            },
+          };
+        }
+      }
     }
 
     // If resuming from hold, use modified frame/args if provided

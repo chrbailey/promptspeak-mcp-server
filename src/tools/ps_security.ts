@@ -11,6 +11,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { SecurityScanResult, SecuritySeverity, SecurityPattern } from '../types/index.js';
 import { SecurityScanner } from '../security/scanner.js';
 import { DEFAULT_PATTERNS, getPatternById } from '../security/patterns.js';
+import { holdManager } from '../gatekeeper/hold-manager.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCANNER INSTANCE (mutable pattern state for config tool)
@@ -138,6 +139,25 @@ export async function handleSecurityGate(args: {
 
   if (scan.enforcement.held.length > 0) {
     const patternIds = scan.enforcement.held.map(f => f.patternId).join(', ');
+
+    // Create a real hold in HoldManager for human review
+    const syntheticRequest = {
+      frame: '⊕◊▶',
+      tool: args.action || 'security_gate',
+      agentId: 'security_scanner',
+      arguments: {},
+    };
+    holdManager.createHold(
+      syntheticRequest,
+      'security_finding',
+      'high',
+      {
+        patternIds,
+        findingCount: scan.enforcement.held.length,
+        findings: scan.enforcement.held,
+      }
+    );
+
     return {
       decision: 'held',
       reason: `Security: ${scan.enforcement.held.length} high-severity finding(s) held for review — ${patternIds}`,

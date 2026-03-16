@@ -8,6 +8,7 @@
 export { OperatorConfigManager, operatorConfig } from './config.js';
 
 import { operatorConfig } from './config.js';
+import { getGovernanceDb } from '../persistence/database.js';
 import type { PolicyOverlay, ConfidenceThresholds } from '../types/index.js';
 
 /**
@@ -345,16 +346,24 @@ export interface AuditLogEntry {
 const auditLog: AuditLogEntry[] = [];
 
 export function recordAudit(action: string, actor: string, details: Record<string, unknown>): void {
-  auditLog.push({
+  const entry = {
     timestamp: Date.now(),
     action,
     actor,
     details
-  });
+  };
 
-  // Keep last 1000 entries
+  auditLog.push(entry);
+
+  // Keep last 1000 entries in memory
   if (auditLog.length > 1000) {
     auditLog.shift();
+  }
+
+  // Persist to disk (unlimited history)
+  const db = getGovernanceDb();
+  if (db) {
+    db.saveAuditEntry(entry);
   }
 }
 
@@ -365,6 +374,27 @@ export interface AuditGetRequest {
 }
 
 export function ps_audit_get(request: AuditGetRequest = {}): AuditLogEntry[] {
+  const limit = request.limit ?? 100;
+
+  // Try persistent store first (has full history beyond in-memory 1000 cap)
+  const db = getGovernanceDb();
+  if (db) {
+    let rows: Array<{ timestamp: number; action: string; actor: string; details: Record<string, unknown> }>;
+    if (request.since && request.action) {
+      rows = db.getAuditEntriesSince(request.since, limit)
+        .filter(e => e.action === request.action);
+    } else if (request.since) {
+      rows = db.getAuditEntriesSince(request.since, limit);
+    } else if (request.action) {
+      rows = db.getAuditEntriesByAction(request.action, limit);
+    } else {
+      rows = db.getAuditEntries(limit);
+    }
+    // DB returns newest-first; reverse for chronological
+    return rows.reverse();
+  }
+
+  // Fall back to in-memory
   let results = auditLog;
 
   if (request.since) {
@@ -375,6 +405,5 @@ export function ps_audit_get(request: AuditGetRequest = {}): AuditLogEntry[] {
     results = results.filter(e => e.action === request.action);
   }
 
-  const limit = request.limit ?? 100;
   return results.slice(-limit);
 }

@@ -64,6 +64,14 @@ export type {
   ThresholdComputeOptions,
 } from './governance/index.js';
 
+// ─── Governance Persistence ──────────────────────────────────────────────────
+export {
+  GovernanceDatabase,
+  initializeGovernanceDb,
+  getGovernanceDb,
+  closeGovernanceDb,
+} from './persistence/database.js';
+
 // ─── Core Types ──────────────────────────────────────────────────────────────
 export type {
   ExecuteRequest,

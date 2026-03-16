@@ -21,6 +21,9 @@ import { fileURLToPath } from 'url';
 import { initializePolicyLoader, getPolicyLoader, type PolicyLoader } from './policies/loader.js';
 import { operatorConfig } from './operator/config.js';
 import { initializeSymbolManager, getSymbolManager, type SymbolManager } from './symbols/index.js';
+import { initializeGovernanceDb, type GovernanceDatabase } from './persistence/database.js';
+import { holdManager } from './gatekeeper/hold-manager.js';
+import { circuitBreaker } from './drift/circuit-breaker.js';
 
 
 const logger = createLogger('ServerInit');
@@ -34,11 +37,14 @@ export interface ServerConfig {
   policiesRoot?: string;
   /** Root directory for symbol registry */
   symbolsRoot?: string;
+  /** Root directory for governance persistence (holds, circuit breakers) */
+  governanceRoot?: string;
   /** Whether to skip subsystem initialization (for testing) */
   skipSubsystems?: boolean;
   /** Skip individual subsystems */
   skipPolicyLoader?: boolean;
   skipSymbolManager?: boolean;
+  skipGovernanceDb?: boolean;
 }
 
 export interface SubsystemStatus {
@@ -52,12 +58,14 @@ export interface InitializationResult {
   subsystems: {
     policyLoader: SubsystemStatus;
     symbolManager: SubsystemStatus;
+    governanceDb: SubsystemStatus;
   };
   errors: string[];
   /** Reference to initialized subsystems for direct access */
   instances: {
     policyLoader?: PolicyLoader;
     symbolManager?: SymbolManager;
+    governanceDb?: GovernanceDatabase;
   };
 }
 
@@ -68,13 +76,14 @@ export interface InitializationResult {
 /**
  * Get default paths relative to the module location.
  */
-function getDefaultPaths(): Required<Pick<ServerConfig, 'policiesRoot' | 'symbolsRoot'>> {
+function getDefaultPaths(): Required<Pick<ServerConfig, 'policiesRoot' | 'symbolsRoot' | 'governanceRoot'>> {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
   return {
     policiesRoot: path.join(__dirname, '..', 'policies'),
     symbolsRoot: path.join(__dirname, '..', 'symbols'),
+    governanceRoot: path.join(__dirname, '..', 'data'),
   };
 }
 
@@ -156,6 +165,49 @@ function initializeSymbols(symbolsRoot: string): SubsystemStatus & { instance?: 
   }
 }
 
+/**
+ * Initialize the governance persistence subsystem.
+ * Sets up SQLite-backed persistence for holds and circuit breakers,
+ * then wires into the singleton instances so state survives restarts.
+ */
+function initializeGovernance(governanceRoot: string): SubsystemStatus & { instance?: GovernanceDatabase } {
+  try {
+    logger.info('Initializing governance persistence', { root: governanceRoot });
+
+    const dbPath = path.join(governanceRoot, 'governance.db');
+    const db = initializeGovernanceDb(dbPath);
+
+    // Wire persistence into singletons
+    holdManager.attachDb(db);
+    circuitBreaker.attachDb(db);
+
+    const pendingHolds = db.getPendingHolds();
+    const breakers = db.getAllCircuitBreakers();
+
+    logger.info('Governance persistence initialized', {
+      pendingHolds: pendingHolds.length,
+      circuitBreakers: breakers.length,
+    });
+
+    return {
+      initialized: true,
+      details: {
+        dbPath,
+        pendingHoldsRestored: pendingHolds.length,
+        circuitBreakersRestored: breakers.length,
+      },
+      instance: db,
+    };
+  } catch (error) {
+    const msg = `Governance persistence failed: ${error instanceof Error ? error.message : String(error)}`;
+    logger.error(msg, error instanceof Error ? error : undefined);
+    return {
+      initialized: false,
+      error: msg,
+    };
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -194,6 +246,7 @@ export async function initializeServer(
     subsystems: {
       policyLoader: { initialized: false },
       symbolManager: { initialized: false },
+      governanceDb: { initialized: false },
     },
     errors: [],
     instances: {},
@@ -209,6 +262,7 @@ export async function initializeServer(
   const paths = {
     policiesRoot: config.policiesRoot ?? defaults.policiesRoot,
     symbolsRoot: config.symbolsRoot ?? defaults.symbolsRoot,
+    governanceRoot: config.governanceRoot ?? defaults.governanceRoot,
   };
 
   logger.info('Beginning server initialization', {
@@ -259,6 +313,27 @@ export async function initializeServer(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Initialize governance persistence
+  // ─────────────────────────────────────────────────────────────────────────
+  if (!config.skipGovernanceDb) {
+    const govResult = initializeGovernance(paths.governanceRoot);
+    result.subsystems.governanceDb = {
+      initialized: govResult.initialized,
+      error: govResult.error,
+      details: govResult.details,
+    };
+    if (govResult.instance) {
+      result.instances.governanceDb = govResult.instance;
+    }
+    if (!govResult.initialized && govResult.error) {
+      result.errors.push(govResult.error);
+    }
+  } else {
+    logger.info('Skipping governance persistence initialization');
+    result.subsystems.governanceDb = { initialized: false, error: 'Skipped by configuration' };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Final status
   // ─────────────────────────────────────────────────────────────────────────
   result.success = result.errors.length === 0;
@@ -270,6 +345,7 @@ export async function initializeServer(
       errors: result.errors,
       policyLoader: result.subsystems.policyLoader.initialized,
       symbolManager: result.subsystems.symbolManager.initialized,
+      governanceDb: result.subsystems.governanceDb.initialized,
     });
   }
 

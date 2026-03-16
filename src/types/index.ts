@@ -396,7 +396,8 @@ export type HoldReason =
   | 'legal_judge_preference_unknown'  // No pattern data for assigned judge
   | 'legal_jurisdiction_mismatch'     // Case law from wrong jurisdiction
   | 'legal_privilege_risk'            // May expose privileged information
-  | 'legal_fabrication_flag';         // Content matches hallucination patterns
+  | 'legal_fabrication_flag'          // Content matches hallucination patterns
+  | 'security_finding';               // High-severity security scan finding
 
 export type HoldState = 'pending' | 'approved' | 'rejected' | 'expired';
 

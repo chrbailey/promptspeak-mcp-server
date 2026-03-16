@@ -100,7 +100,7 @@ When an agent writes code (`write_file`, `edit_file`, `create_file`, `patch_file
 
 ### What works (tested)
 
-All claims below are backed by passing tests (95 tests across 4 test files):
+All claims below are backed by passing tests (104 tests across 5 test files):
 
 - **Pattern detection works.** Each of the 10 patterns is tested for true positives AND false positives. Example: `api_key = "sk-1234567890abcdef"` is caught; `API_KEY = process.env.API_KEY` is not. SQL injection catches `\`SELECT * FROM users WHERE id = ${id}\`` but not parameterized queries (`db.query("SELECT * FROM users WHERE id = ?", [id])`).
 - **Severity enforcement works.** Critical findings block execution. High findings hold for review. Medium findings warn but allow. Tested end-to-end through the interceptor pipeline.
@@ -111,11 +111,11 @@ All claims below are backed by passing tests (95 tests across 4 test files):
 
 ### What does NOT work yet
 
-- **No hold queue integration for HIGH findings.** The interceptor blocks HIGH-severity findings (returns `allowed: false`) but does not create an actual hold in the HoldManager. This means `ps_hold_list` won't show security holds, and there's no approve/reject flow for them. The `ps_security_gate` tool reports `decision: "held"` but this is informational only — there's no pending hold to act on. **Why:** Wiring into HoldManager requires an `ExecuteRequest` object and a `HoldReason` type extension. Both are doable but weren't in scope for the initial implementation.
+- ~~**No hold queue integration for HIGH findings.**~~ **FIXED.** HIGH-severity security findings now create real holds in HoldManager via `security_finding` HoldReason. They appear in `ps_hold_list` and can be approved/rejected through the normal hold flow.
 - **No auto-scan on `ps_execute`.** The security scan only triggers in the interceptor's `intercept()` method for direct tool calls. If an agent uses `ps_execute` (the governed execution path), the scan runs only if the inner tool is a write action AND the content is passed as a top-level arg. Nested argument structures may bypass scanning. **Why:** `ps_execute` wraps tool calls in its own argument schema; the scanner checks `proposedArgs.content`, not deeply nested fields.
 - **No file-path-based scanning.** The scanner only examines content passed as arguments. It cannot scan files already on disk — it doesn't read from the filesystem. **Why:** The scanner is a pure function that takes a string. Adding filesystem access would change the security model.
 - **Patterns are regex-based, not AST-aware.** The patterns use regular expressions, which means they can't understand code structure. A hardcoded secret inside a test fixture or a SQL injection in a comment will still trigger. False positive rates range from 25-70% depending on the pattern (documented per-pattern). **Why:** AST parsing would add dependencies and complexity. Regex is fast and good enough for a governance layer that holds for human review rather than silently blocking.
-- **No persistence.** Pattern configuration changes (enable/disable, severity changes) are in-memory only. They reset when the server restarts. **Why:** The rest of PromptSpeak's config is also in-memory. Persistence would need the SQLite layer or a config file, neither of which was in scope.
+- **Partial persistence.** Holds and circuit breaker state now persist to SQLite (`data/governance.db`) and survive server restarts. However, pattern configuration changes (enable/disable, severity changes via `ps_security_config`) are still in-memory only and reset on restart. **Why:** Pattern config is lightweight and rarely changed; full config persistence would need a separate config store.
 
 
 ## MCP tools (45)
@@ -223,6 +223,8 @@ src/
 ├── security/         # Security vulnerability scanning
 │   ├── patterns.ts   #   10 detection patterns (regex-based)
 │   └── scanner.ts    #   Scanner engine + severity classification
+├── persistence/      # SQLite governance persistence
+│   └── database.ts   #   Holds, decisions, circuit breakers (WAL mode)
 ├── symbols/          # SQLite-backed entity registry (11 CRUD tools)
 ├── policies/         # Policy file loader + overlay system
 ├── operator/         # Operator configuration
@@ -244,14 +246,14 @@ src/
 | Operations/second | 6,977 |
 | Holds/second | 33,333 |
 | Security scan (100 lines) | < 10ms |
-| Test suite | 658 tests, 21 test files |
+| Test suite | 829 tests, 33 test files |
 
 
 ## Requirements
 
 - Node.js >= 20.0.0
 - TypeScript 5.3+ (build from source)
-- No external services required — SQLite for symbols, in-memory for everything else
+- No external services required — SQLite for symbols and governance persistence
 
 
 ## Related Projects

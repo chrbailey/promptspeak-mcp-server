@@ -48,9 +48,6 @@ openapi.yaml
 # Frontend (separate concern)
 frontend/
 
-# Scheduler (local launchd config)
-scheduler/
-
 .mcpregistry_*
 
 # Git worktrees

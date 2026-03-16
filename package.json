@@ -60,15 +60,24 @@
     "test:watch": "vitest",
     "test:stress": "vitest run tests/stress --reporter=verbose",
     "prepublishOnly": "npm run build && npm test",
+    "ops": "node dist/http-server.js",
+    "ops:dev": "tsx watch src/http-server.ts",
     "seed": "tsx scripts/seed-database.ts",
     "seed:dry-run": "tsx scripts/seed-database.ts --dry-run",
-    "seed:force": "tsx scripts/seed-database.ts --force"
+    "seed:force": "tsx scripts/seed-database.ts --force",
+    "seed:gov": "tsx scripts/seed-governance.ts",
+    "seed:gov:dry-run": "tsx scripts/seed-governance.ts --dry-run",
+    "seed:gov:force": "tsx scripts/seed-governance.ts --force",
+    "demo:seed": "tsx scripts/demo-playbook.ts seed",
+    "demo:run": "tsx scripts/demo-playbook.ts"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "better-sqlite3": "^12.5.0",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
+    "hono": "^4.12.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {

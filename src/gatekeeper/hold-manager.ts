@@ -27,6 +27,7 @@ import type {
   CitationUnverifiedEvidence,
 } from '../types/index.js';
 import { generateAuditId } from '../utils/hash.js';
+import type { GovernanceDatabase } from '../persistence/database.js';
 
 const DEFAULT_HOLD_TIMEOUT_MS = 300000; // 5 minutes
 
@@ -128,6 +129,9 @@ export class HoldManager {
   private config: ExecutionControlConfig;
   private legalConfig: LegalHoldConfig;
 
+  // Optional persistence layer (in-memory if not attached)
+  private db: GovernanceDatabase | null = null;
+
   // Callbacks for external notification
   private onHoldCreated?: (hold: HoldRequest) => void;
   private onHoldDecided?: (decision: HoldDecision) => void;
@@ -139,6 +143,35 @@ export class HoldManager {
   ) {
     this.config = { ...DEFAULT_EXECUTION_CONTROL, ...config };
     this.legalConfig = { ...DEFAULT_LEGAL_HOLD_CONFIG, ...legalConfig };
+  }
+
+  /**
+   * Attach a persistence database. Loads pending holds and decision history
+   * from disk into the in-memory cache.
+   */
+  attachDb(db: GovernanceDatabase): void {
+    this.db = db;
+    this.loadFromDb();
+  }
+
+  /**
+   * Load persisted state into memory.
+   * Pending holds are restored to the active map.
+   * Decision history is restored to the history array.
+   */
+  private loadFromDb(): void {
+    if (!this.db) return;
+
+    // Load pending holds
+    const pendingHolds = this.db.getPendingHolds();
+    for (const hold of pendingHolds) {
+      this.pendingHolds.set(hold.holdId, hold);
+    }
+
+    // Load recent decisions into history
+    const decisions = this.db.getDecisions(1000);
+    // Decisions come back newest-first; reverse for chronological order
+    this.holdHistory = decisions.reverse();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -245,6 +278,11 @@ export class HoldManager {
     };
 
     this.pendingHolds.set(holdId, hold);
+
+    // Persist to disk
+    if (this.db) {
+      this.db.saveHold(hold);
+    }
 
     // Notify via callback
     if (this.onHoldCreated) {
@@ -621,6 +659,13 @@ export class HoldManager {
     };
 
     this.holdHistory.push(decision);
+
+    // Persist state change and decision
+    if (this.db) {
+      this.db.updateHoldState(holdId, 'approved');
+      this.db.saveDecision(decision);
+    }
+
     if (this.onHoldDecided) {
       this.onHoldDecided(decision);
     }
@@ -651,6 +696,13 @@ export class HoldManager {
     };
 
     this.holdHistory.push(decision);
+
+    // Persist state change and decision
+    if (this.db) {
+      this.db.updateHoldState(holdId, 'rejected');
+      this.db.saveDecision(decision);
+    }
+
     if (this.onHoldDecided) {
       this.onHoldDecided(decision);
     }
@@ -701,6 +753,10 @@ export class HoldManager {
         const decision = this.rejectHold(holdId, 'timeout', expiryReason);
         if (decision) {
           decision.state = 'expired';
+          // Update persisted state to 'expired' (rejectHold wrote 'rejected')
+          if (this.db) {
+            this.db.updateHoldState(holdId, 'expired');
+          }
           expired.push(decision);
         }
       }
@@ -831,6 +887,8 @@ export class HoldManager {
       legal_jurisdiction_mismatch: 0,
       legal_privilege_risk: 0,
       legal_fabrication_flag: 0,
+      // Security hold reasons
+      security_finding: 0,
     };
 
     for (const hold of this.pendingHolds.values()) {
