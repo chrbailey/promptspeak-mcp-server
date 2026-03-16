@@ -7,6 +7,8 @@
  * as a separate process, sharing the same SQLite DB (WAL mode).
  *
  * Endpoints:
+ *   GET  /                   — Holds approval UI
+ *   ALL  /mcp                — MCP protocol (Streamable HTTP)
  *   GET  /api/holds          — List pending holds
  *   GET  /api/holds/stats    — Hold statistics
  *   GET  /api/holds/:id      — Get single hold
@@ -15,7 +17,9 @@
  *   GET  /api/breakers       — List circuit breaker states
  *   GET  /api/audit          — Recent audit log entries
  *   GET  /api/health         — Health check
- *   GET  /                   — Holds approval UI
+ *
+ * Auth: Set PS_API_KEYS (comma-separated) to require Bearer tokens on /api/* and /mcp.
+ * Webhooks: Set PS_WEBHOOK_URL to receive Slack-format notifications on hold decisions.
  */
 
 import { Hono } from 'hono';
@@ -24,6 +28,8 @@ import { serve } from '@hono/node-server';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GovernanceDatabase } from './persistence/database.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { createMcpServer } from './server-setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +49,56 @@ const db = new GovernanceDatabase(dbPath);
 const app = new Hono();
 
 app.use('*', cors());
+
+// ─── Auth Middleware ─────────────────────────────────────────────────────
+// Skip if PS_API_KEYS not set (local dev mode = open access)
+
+app.use('/api/*', async (c, next) => {
+  const keys = process.env.PS_API_KEYS;
+  if (!keys) return next();
+  const auth = c.req.header('Authorization');
+  if (!auth?.startsWith('Bearer ')) return c.json({ error: 'Missing Authorization header' }, 401);
+  const validKeys = keys.split(',').map(k => k.trim());
+  if (!validKeys.includes(auth.slice(7))) return c.json({ error: 'Invalid API key' }, 401);
+  return next();
+});
+
+app.use('/mcp', async (c, next) => {
+  const keys = process.env.PS_API_KEYS;
+  if (!keys) return next();
+  const auth = c.req.header('Authorization');
+  if (!auth?.startsWith('Bearer ')) return c.json({ error: 'Missing Authorization header' }, 401);
+  const validKeys = keys.split(',').map(k => k.trim());
+  if (!validKeys.includes(auth.slice(7))) return c.json({ error: 'Invalid API key' }, 401);
+  return next();
+});
+
+// ─── Webhook Dispatcher ─────────────────────────────────────────────────
+// Fire on hold creation/decisions. Set PS_WEBHOOK_URL to enable.
+
+async function notifyWebhook(event: string, hold: Record<string, unknown>): Promise<void> {
+  const url = process.env.PS_WEBHOOK_URL;
+  if (!url) return;
+  const payload = {
+    text: `Hold ${event}: ${hold.severity} — ${String(hold.reason || '').replace(/_/g, ' ')}`,
+    blocks: [{
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Hold ${hold.holdId}* (${event})\n*Severity:* ${hold.severity}\n*Agent:* ${hold.agentId}\n*Tool:* ${hold.tool}\n*Reason:* ${String(hold.reason || '').replace(/_/g, ' ')}`,
+      },
+    }],
+  };
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error('Webhook failed:', e);
+  }
+}
 
 // ─── Health ──────────────────────────────────────────────────────────────
 
@@ -116,6 +172,7 @@ app.post('/api/holds/:id/approve', async (c) => {
     details: { holdId, reason },
   });
 
+  notifyWebhook('approved', hold as unknown as Record<string, unknown>).catch(() => {});
   return c.json({ success: true, holdId, state: 'approved' });
 });
 
@@ -143,6 +200,7 @@ app.post('/api/holds/:id/reject', async (c) => {
     details: { holdId, reason },
   });
 
+  notifyWebhook('rejected', hold as unknown as Record<string, unknown>).catch(() => {});
   return c.json({ success: true, holdId, state: 'rejected' });
 });
 
@@ -448,24 +506,47 @@ function holdsPage(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// START
+// MCP HTTP TRANSPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+const mcpTransport = new WebStandardStreamableHTTPServerTransport({
+  sessionIdGenerator: undefined, // stateless
+});
+
+app.all('/mcp', async (c) => {
+  return mcpTransport.handleRequest(c.req.raw);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`\n  PromptSpeak Ops Center`);
-  console.log(`  http://localhost:${info.port}\n`);
-  console.log(`  Endpoints:`);
-  console.log(`    GET  /              \u2014 Hold approval UI`);
-  console.log(`    GET  /api/holds     \u2014 List pending holds`);
-  console.log(`    GET  /api/holds/stats`);
-  console.log(`    POST /api/holds/:id/approve`);
-  console.log(`    POST /api/holds/:id/reject`);
-  console.log(`    GET  /api/breakers  \u2014 Circuit breaker states`);
-  console.log(`    GET  /api/audit     \u2014 Audit log`);
-  console.log(`    GET  /api/health\n`);
-  console.log(`  DB: ${dbPath}\n`);
+async function start() {
+  const mcpServer = await createMcpServer();
+  await mcpServer.connect(mcpTransport);
+
+  serve({ fetch: app.fetch, port: PORT }, (info) => {
+    console.log(`\n  PromptSpeak Ops Center`);
+    console.log(`  http://localhost:${info.port}\n`);
+    console.log(`  Endpoints:`);
+    console.log(`    GET  /              \u2014 Hold approval UI`);
+    console.log(`    ALL  /mcp           \u2014 MCP protocol (Streamable HTTP)`);
+    console.log(`    GET  /api/holds     \u2014 List pending holds`);
+    console.log(`    GET  /api/holds/stats`);
+    console.log(`    POST /api/holds/:id/approve`);
+    console.log(`    POST /api/holds/:id/reject`);
+    console.log(`    GET  /api/breakers  \u2014 Circuit breaker states`);
+    console.log(`    GET  /api/audit     \u2014 Audit log`);
+    console.log(`    GET  /api/health\n`);
+    console.log(`  Auth: ${process.env.PS_API_KEYS ? 'enabled (PS_API_KEYS)' : 'disabled (open access)'}`);
+    console.log(`  Webhook: ${process.env.PS_WEBHOOK_URL ? 'enabled' : 'disabled'}`);
+    console.log(`  DB: ${dbPath}\n`);
+  });
+}
+
+start().catch((err) => {
+  console.error('Failed to start:', err);
+  process.exit(1);
 });
 
 process.on('SIGINT', () => { db.close(); process.exit(0); });
