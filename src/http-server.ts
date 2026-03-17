@@ -27,20 +27,16 @@ import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GovernanceDatabase } from './persistence/database.js';
+import { getGovernanceDb, type GovernanceDatabase } from './persistence/database.js';
+import type { HoldRequest, HoldState } from './types/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createMcpServer } from './server-setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DATABASE
-// ═══════════════════════════════════════════════════════════════════════════
-
-const dataDir = path.join(__dirname, '..', 'data');
-const dbPath = path.join(dataDir, 'governance.db');
-const db = new GovernanceDatabase(dbPath);
+// DB reference — set in start() after createMcpServer() initializes the singleton
+let db: GovernanceDatabase;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // APP
@@ -53,39 +49,35 @@ app.use('*', cors());
 // ─── Auth Middleware ─────────────────────────────────────────────────────
 // Skip if PS_API_KEYS not set (local dev mode = open access)
 
-app.use('/api/*', async (c, next) => {
-  const keys = process.env.PS_API_KEYS;
-  if (!keys) return next();
-  const auth = c.req.header('Authorization');
-  if (!auth?.startsWith('Bearer ')) return c.json({ error: 'Missing Authorization header' }, 401);
-  const validKeys = keys.split(',').map(k => k.trim());
-  if (!validKeys.includes(auth.slice(7))) return c.json({ error: 'Invalid API key' }, 401);
-  return next();
-});
+const validApiKeys = process.env.PS_API_KEYS
+  ? new Set(process.env.PS_API_KEYS.split(',').map(k => k.trim()))
+  : null;
 
-app.use('/mcp', async (c, next) => {
-  const keys = process.env.PS_API_KEYS;
-  if (!keys) return next();
+const bearerAuth = async (c: any, next: any) => {
+  if (!validApiKeys) return next();
   const auth = c.req.header('Authorization');
   if (!auth?.startsWith('Bearer ')) return c.json({ error: 'Missing Authorization header' }, 401);
-  const validKeys = keys.split(',').map(k => k.trim());
-  if (!validKeys.includes(auth.slice(7))) return c.json({ error: 'Invalid API key' }, 401);
+  if (!validApiKeys.has(auth.slice(7))) return c.json({ error: 'Invalid API key' }, 401);
   return next();
-});
+};
+
+app.use('/api/*', bearerAuth);
+app.use('/mcp', bearerAuth);
 
 // ─── Webhook Dispatcher ─────────────────────────────────────────────────
-// Fire on hold creation/decisions. Set PS_WEBHOOK_URL to enable.
+// Fire on hold decisions. Set PS_WEBHOOK_URL to enable.
 
-async function notifyWebhook(event: string, hold: Record<string, unknown>): Promise<void> {
+async function notifyWebhook(event: string, hold: HoldRequest): Promise<void> {
   const url = process.env.PS_WEBHOOK_URL;
   if (!url) return;
+  const reasonDisplay = hold.reason.replace(/_/g, ' ');
   const payload = {
-    text: `Hold ${event}: ${hold.severity} — ${String(hold.reason || '').replace(/_/g, ' ')}`,
+    text: `Hold ${event}: ${hold.severity} — ${reasonDisplay}`,
     blocks: [{
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Hold ${hold.holdId}* (${event})\n*Severity:* ${hold.severity}\n*Agent:* ${hold.agentId}\n*Tool:* ${hold.tool}\n*Reason:* ${String(hold.reason || '').replace(/_/g, ' ')}`,
+        text: `*Hold ${hold.holdId}* (${event})\n*Severity:* ${hold.severity}\n*Agent:* ${hold.agentId}\n*Tool:* ${hold.tool}\n*Reason:* ${reasonDisplay}`,
       },
     }],
   };
@@ -94,6 +86,7 @@ async function notifyWebhook(event: string, hold: Record<string, unknown>): Prom
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000),
     });
   } catch (e) {
     console.error('Webhook failed:', e);
@@ -148,61 +141,24 @@ app.get('/api/holds/:id', (c) => {
   return c.json({ hold, decisions });
 });
 
-app.post('/api/holds/:id/approve', async (c) => {
+async function resolveHold(c: any, state: 'approved' | 'rejected') {
   const holdId = c.req.param('id');
   const hold = db.getHold(holdId);
   if (!hold) return c.json({ error: 'Hold not found' }, 404);
   if (hold.state !== 'pending') return c.json({ error: `Hold is already ${hold.state}` }, 400);
 
   const body = await c.req.json().catch(() => ({}));
-  const reason = (body as Record<string, string>).reason || 'Approved via Ops Center';
+  const reason = (body as Record<string, string>).reason || `${state.charAt(0).toUpperCase() + state.slice(1)} via Ops Center`;
 
-  db.updateHoldState(holdId, 'approved');
-  db.saveDecision({
-    holdId,
-    state: 'approved',
-    decidedBy: 'human',
-    decidedAt: Date.now(),
-    reason,
-  });
-  db.saveAuditEntry({
-    timestamp: Date.now(),
-    action: 'hold_approved',
-    actor: 'ops-center',
-    details: { holdId, reason },
-  });
+  db.updateHoldState(holdId, state);
+  db.saveDecision({ holdId, state, decidedBy: 'human', decidedAt: Date.now(), reason });
+  db.saveAuditEntry({ timestamp: Date.now(), action: `hold_${state}`, actor: 'ops-center', details: { holdId, reason } });
+  notifyWebhook(state, hold).catch(() => {});
+  return c.json({ success: true, holdId, state });
+}
 
-  notifyWebhook('approved', hold as unknown as Record<string, unknown>).catch(() => {});
-  return c.json({ success: true, holdId, state: 'approved' });
-});
-
-app.post('/api/holds/:id/reject', async (c) => {
-  const holdId = c.req.param('id');
-  const hold = db.getHold(holdId);
-  if (!hold) return c.json({ error: 'Hold not found' }, 404);
-  if (hold.state !== 'pending') return c.json({ error: `Hold is already ${hold.state}` }, 400);
-
-  const body = await c.req.json().catch(() => ({}));
-  const reason = (body as Record<string, string>).reason || 'Rejected via Ops Center';
-
-  db.updateHoldState(holdId, 'rejected');
-  db.saveDecision({
-    holdId,
-    state: 'rejected',
-    decidedBy: 'human',
-    decidedAt: Date.now(),
-    reason,
-  });
-  db.saveAuditEntry({
-    timestamp: Date.now(),
-    action: 'hold_rejected',
-    actor: 'ops-center',
-    details: { holdId, reason },
-  });
-
-  notifyWebhook('rejected', hold as unknown as Record<string, unknown>).catch(() => {});
-  return c.json({ success: true, holdId, state: 'rejected' });
-});
+app.post('/api/holds/:id/approve', (c) => resolveHold(c, 'approved'));
+app.post('/api/holds/:id/reject', (c) => resolveHold(c, 'rejected'));
 
 // ─── Circuit Breakers ────────────────────────────────────────────────────
 
@@ -523,6 +479,7 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 async function start() {
   const mcpServer = await createMcpServer();
+  db = getGovernanceDb()!;
   await mcpServer.connect(mcpTransport);
 
   serve({ fetch: app.fetch, port: PORT }, (info) => {
@@ -540,7 +497,7 @@ async function start() {
     console.log(`    GET  /api/health\n`);
     console.log(`  Auth: ${process.env.PS_API_KEYS ? 'enabled (PS_API_KEYS)' : 'disabled (open access)'}`);
     console.log(`  Webhook: ${process.env.PS_WEBHOOK_URL ? 'enabled' : 'disabled'}`);
-    console.log(`  DB: ${dbPath}\n`);
+    console.log(`  DB: ${path.join(__dirname, '..', 'data', 'governance.db')}\n`);
   });
 }
 
