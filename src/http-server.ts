@@ -30,7 +30,7 @@ import { fileURLToPath } from 'url';
 import { getGovernanceDb, type GovernanceDatabase } from './persistence/database.js';
 import type { HoldRequest, HoldState } from './types/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { createMcpServer } from './server-setup.js';
+import { createMcpServer, ensureSubsystems } from './server-setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -462,15 +462,16 @@ function holdsPage(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MCP HTTP TRANSPORT
+// MCP HTTP TRANSPORT (stateless — new transport + server per request)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const mcpTransport = new WebStandardStreamableHTTPServerTransport({
-  sessionIdGenerator: undefined, // stateless
-});
-
 app.all('/mcp', async (c) => {
-  return mcpTransport.handleRequest(c.req.raw);
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+  const server = await createMcpServer();
+  await server.connect(transport);
+  return transport.handleRequest(c.req.raw);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -478,9 +479,8 @@ app.all('/mcp', async (c) => {
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 async function start() {
-  const mcpServer = await createMcpServer();
+  await ensureSubsystems();
   db = getGovernanceDb()!;
-  await mcpServer.connect(mcpTransport);
 
   serve({ fetch: app.fetch, port: PORT }, (info) => {
     console.log(`\n  PromptSpeak Ops Center`);
