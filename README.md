@@ -33,7 +33,7 @@ Add to `~/.claude/settings.json` (or project-level `.claude/settings.json`):
 }
 ```
 
-Restart Claude Code. All 45 governance tools are immediately available.
+Restart Claude Code. All 56 governance tools are immediately available.
 
 ### Claude Desktop
 
@@ -63,6 +63,104 @@ git clone https://github.com/chrbailey/promptspeak-mcp-server.git
 cd promptspeak-mcp-server
 npm install && npm run build
 npm start
+```
+
+
+## Usage examples
+
+### 1. Validate a governance frame before execution
+
+```json
+// Request: validate that a frame is structurally and semantically correct
+{
+  "name": "ps_validate",
+  "arguments": {
+    "frame": "Ξ⊕●▶α",
+    "validationLevel": "full"
+  }
+}
+
+// Response: validation report with confidence score
+{
+  "valid": true,
+  "parseConfidence": 1.0,
+  "summary": { "errors": 0, "warnings": 3, "passed": 14 }
+}
+```
+
+### 2. Execute a tool call under governance
+
+```json
+// Request: execute a file write under PromptSpeak governance
+{
+  "name": "ps_execute",
+  "arguments": {
+    "agentId": "code-assistant",
+    "frame": "Ξ⊕●▶α",
+    "action": {
+      "tool": "write_file",
+      "arguments": { "path": "/tmp/output.txt", "content": "Hello world" }
+    }
+  }
+}
+
+// Response: execution result with governance metadata
+{
+  "allowed": true,
+  "driftScore": 0.02,
+  "executionTime": "0.12ms",
+  "auditId": "exec_a1b2c3"
+}
+```
+
+### 3. Hold a risky operation for human approval
+
+```json
+// When an agent attempts a dangerous action, it's automatically held:
+{
+  "name": "ps_hold_list",
+  "arguments": {}
+}
+
+// Response: pending holds awaiting human review
+{
+  "holds": [{
+    "holdId": "hold_001",
+    "agentId": "devops-agent",
+    "tool": "modify_infrastructure",
+    "severity": "critical",
+    "reason": "human_approval_required",
+    "state": "pending"
+  }],
+  "count": 1
+}
+
+// Approve or reject:
+{ "name": "ps_hold_approve", "arguments": { "holdId": "hold_001", "reason": "Reviewed and safe" } }
+{ "name": "ps_hold_reject",  "arguments": { "holdId": "hold_001", "reason": "Too risky" } }
+```
+
+### 4. Halt a drifting agent immediately
+
+```json
+// Request: emergency halt — trips circuit breaker, blocks all future calls
+{
+  "name": "ps_state_halt",
+  "arguments": {
+    "agentId": "rogue-agent",
+    "reason": "Drift score exceeded threshold (0.85)"
+  }
+}
+
+// Resume after investigation:
+{
+  "name": "ps_state_resume",
+  "arguments": {
+    "agentId": "rogue-agent",
+    "reason": "Root cause identified and fixed",
+    "resetMetrics": true
+  }
+}
 ```
 
 
@@ -118,7 +216,7 @@ All claims below are backed by passing tests (104 tests across 5 test files):
 - **Partial persistence.** Holds and circuit breaker state now persist to SQLite (`data/governance.db`) and survive server restarts. However, pattern configuration changes (enable/disable, severity changes via `ps_security_config`) are still in-memory only and reset on restart. **Why:** Pattern config is lightweight and rarely changed; full config persistence would need a separate config store.
 
 
-## MCP tools (45)
+## MCP tools (56)
 
 ### Core governance
 
@@ -259,6 +357,13 @@ src/
 ## Related Projects
 
 - **[deeptrend](https://github.com/chrbailey/deeptrend)** — Structured AI trend feed for autonomous agents. Curated from 14+ sources, synthesized via LLM Counsel, published every 6h as JSON Feed, RSS, and `llms.txt`. Designed as a data source for agent monitoring pipelines.
+
+
+## Privacy Policy
+
+[https://promptspeak.admin-as-a-service.com/privacy](https://promptspeak.admin-as-a-service.com/privacy)
+
+PromptSpeak does not collect personal data, has no telemetry, and stores all governance data locally in SQLite. See the full policy at the link above.
 
 
 ## License

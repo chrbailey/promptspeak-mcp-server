@@ -461,6 +461,50 @@ function holdsPage(): string {
 </html>`;
 }
 
+// ─── Privacy Policy ──────────────────────────────────────────────────────
+
+app.get('/privacy', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptSpeak Privacy Policy</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#222}
+h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:2rem}p,ul{margin:0.5rem 0}</style></head>
+<body>
+<h1>PromptSpeak MCP Server — Privacy Policy</h1>
+<p><em>Last updated: March 17, 2026</em></p>
+
+<h2>What PromptSpeak Does</h2>
+<p>PromptSpeak is a pre-execution governance layer for AI agents. It intercepts MCP tool calls, validates them against deterministic rules, and blocks or holds risky operations for human approval. It runs as middleware between an AI agent and the tools it calls.</p>
+
+<h2>Data Collected</h2>
+<p>PromptSpeak processes the following data solely for governance validation:</p>
+<ul>
+<li><strong>Tool call metadata:</strong> tool name, arguments, agent identifier, governance frame</li>
+<li><strong>Validation results:</strong> pass/fail status, confidence scores, drift metrics</li>
+<li><strong>Hold queue entries:</strong> operations held for human review (tool name, arguments, severity, reason)</li>
+<li><strong>Audit log:</strong> timestamps, actions taken, actor identifiers</li>
+</ul>
+<p>PromptSpeak does <strong>not</strong> collect personal information, authentication credentials, chat history, or user profile data.</p>
+
+<h2>Data Storage</h2>
+<p>All data is stored locally in a SQLite database on the machine where PromptSpeak runs. No data is transmitted to external servers, cloud services, or third parties. When used via the remote HTTP transport, data remains on the server host.</p>
+
+<h2>Third-Party Sharing</h2>
+<p>PromptSpeak does <strong>not</strong> share, sell, or transmit any data to third parties. It has no analytics, telemetry, or tracking of any kind.</p>
+
+<h2>Data Retention</h2>
+<p>Governance data (holds, decisions, audit log entries) is retained in the local SQLite database indefinitely until manually deleted by the server operator. In-memory state (agent drift metrics, circuit breaker status) resets on server restart unless persistence is enabled.</p>
+
+<h2>Operator Responsibility</h2>
+<p>PromptSpeak is infrastructure software deployed by operators. Operators are responsible for the security of their deployment environment, access controls, and compliance with applicable regulations regarding the tool call data processed through the governance pipeline.</p>
+
+<h2>Contact</h2>
+<p>For privacy questions or concerns:<br>
+Christopher Bailey — <a href="mailto:chris@erpaccess.com">chris@erpaccess.com</a><br>
+GitHub: <a href="https://github.com/chrbailey/promptspeak-mcp-server">chrbailey/promptspeak-mcp-server</a></p>
+</body></html>`);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MCP HTTP TRANSPORT (stateless — new transport + server per request)
 // ═══════════════════════════════════════════════════════════════════════════
