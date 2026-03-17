@@ -461,6 +461,21 @@ function holdsPage(): string {
 </html>`;
 }
 
+// ─── Favicon ─────────────────────────────────────────────────────────────
+
+const faviconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect width="64" height="64" rx="12" fill="#0f172a"/>
+<text x="32" y="46" font-family="system-ui,sans-serif" font-size="36" font-weight="bold" fill="#22c55e" text-anchor="middle">Ξ</text>
+</svg>`;
+
+app.get('/favicon.ico', (c) => {
+  return c.body(faviconSvg, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
+});
+
+app.get('/favicon.svg', (c) => {
+  return c.body(faviconSvg, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
+});
+
 // ─── Privacy Policy ──────────────────────────────────────────────────────
 
 app.get('/privacy', (c) => {
