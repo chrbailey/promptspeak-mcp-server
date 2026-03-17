@@ -35,6 +35,13 @@ export const holdToolDefinitions: Tool[] = [
       },
       required: [],
     },
+    annotations: {
+      title: 'List Pending Holds',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_hold_approve',
@@ -65,6 +72,13 @@ export const holdToolDefinitions: Tool[] = [
       },
       required: ['holdId'],
     },
+    annotations: {
+      title: 'Approve Held Operation',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_hold_reject',
@@ -86,6 +100,13 @@ export const holdToolDefinitions: Tool[] = [
         },
       },
       required: ['holdId'],
+    },
+    annotations: {
+      title: 'Reject Held Operation',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   {
@@ -118,6 +139,13 @@ export const holdToolDefinitions: Tool[] = [
       },
       required: ['action'],
     },
+    annotations: {
+      title: 'Configure Hold Behavior',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_hold_stats',
@@ -131,6 +159,13 @@ export const holdToolDefinitions: Tool[] = [
         },
       },
       required: [],
+    },
+    annotations: {
+      title: 'Get Hold Statistics',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];

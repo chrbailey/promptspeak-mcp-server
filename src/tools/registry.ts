@@ -42,6 +42,13 @@ export const GRAMMAR_TOOLS: Tool[] = [
       },
       required: ['expression'],
     },
+    annotations: {
+      title: 'Parse PromptSpeak Expression',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_expand',
@@ -52,6 +59,13 @@ export const GRAMMAR_TOOLS: Tool[] = [
         expression: { type: 'string', description: 'PromptSpeak expression to expand' },
       },
       required: ['expression'],
+    },
+    annotations: {
+      title: 'Expand Expression to English',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];
@@ -71,6 +85,13 @@ export const REGISTRY_TOOLS: Tool[] = [
       },
       required: ['symbol'],
     },
+    annotations: {
+      title: 'Lookup Verb Definition',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_registry_propose',
@@ -86,6 +107,13 @@ export const REGISTRY_TOOLS: Tool[] = [
       },
       required: ['symbol', 'namespace', 'definition'],
     },
+    annotations: {
+      title: 'Propose New Verb',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_registry_status',
@@ -96,6 +124,13 @@ export const REGISTRY_TOOLS: Tool[] = [
         symbol: { type: 'string', description: 'Verb symbol to check' },
       },
       required: ['symbol'],
+    },
+    annotations: {
+      title: 'Check Verb Status',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
   {
@@ -108,6 +143,13 @@ export const REGISTRY_TOOLS: Tool[] = [
       },
       required: ['namespace'],
     },
+    annotations: {
+      title: 'List Namespace Verbs',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_registry_audit',
@@ -119,6 +161,13 @@ export const REGISTRY_TOOLS: Tool[] = [
       },
       required: ['symbol'],
     },
+    annotations: {
+      title: 'Audit Verb History',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_registry_version',
@@ -126,6 +175,13 @@ export const REGISTRY_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {},
+    },
+    annotations: {
+      title: 'Get Registry Version',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];
@@ -151,7 +207,14 @@ export const VALIDATION_TOOLS: Tool[] = [
         strict: { type: 'boolean', description: 'If true, warnings also cause validation failure' }
       },
       required: ['frame']
-    }
+    },
+    annotations: {
+      title: 'Validate Frame',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_validate_batch',
@@ -175,7 +238,14 @@ export const VALIDATION_TOOLS: Tool[] = [
         stopOnFirstError: { type: 'boolean' }
       },
       required: ['frames']
-    }
+    },
+    annotations: {
+      title: 'Validate Frames (Batch)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -204,7 +274,14 @@ export const EXECUTION_TOOLS: Tool[] = [
         parentFrame: { type: 'string', description: 'Parent frame if part of delegation chain' }
       },
       required: ['agentId', 'frame', 'action']
-    }
+    },
+    annotations: {
+      title: 'Execute Governed Action',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_execute_dry_run',
@@ -225,7 +302,14 @@ export const EXECUTION_TOOLS: Tool[] = [
         parentFrame: { type: 'string' }
       },
       required: ['agentId', 'frame', 'action']
-    }
+    },
+    annotations: {
+      title: 'Dry Run Execution Check',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_execute_batch',
@@ -253,7 +337,14 @@ export const EXECUTION_TOOLS: Tool[] = [
         parallel: { type: 'boolean', description: 'Execute all actions in parallel instead of sequentially' }
       },
       required: ['agentId', 'frame', 'actions']
-    }
+    },
+    annotations: {
+      title: 'Execute Governed Actions (Batch)',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -283,7 +374,14 @@ export const DELEGATION_TOOLS: Tool[] = [
         inheritanceMode: { type: 'string', enum: ['strict', 'relaxed', 'custom'] }
       },
       required: ['parentAgentId', 'childAgentId', 'parentFrame', 'childFrame']
-    }
+    },
+    annotations: {
+      title: 'Delegate Task to Agent',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_delegate_revoke',
@@ -296,7 +394,14 @@ export const DELEGATION_TOOLS: Tool[] = [
         reason: { type: 'string' }
       },
       required: ['delegationId', 'parentAgentId']
-    }
+    },
+    annotations: {
+      title: 'Revoke Delegation',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_delegate_list',
@@ -309,7 +414,14 @@ export const DELEGATION_TOOLS: Tool[] = [
         status: { type: 'string', enum: ['active', 'completed', 'revoked', 'all'] }
       },
       required: ['agentId']
-    }
+    },
+    annotations: {
+      title: 'List Delegations',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -327,7 +439,14 @@ export const STATE_TOOLS: Tool[] = [
         agentId: { type: 'string' }
       },
       required: ['agentId']
-    }
+    },
+    annotations: {
+      title: 'Get Agent State',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_system',
@@ -335,7 +454,14 @@ export const STATE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {}
-    }
+    },
+    annotations: {
+      title: 'Get System State',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_reset',
@@ -350,7 +476,14 @@ export const STATE_TOOLS: Tool[] = [
         reason: { type: 'string' }
       },
       required: ['agentId', 'reason']
-    }
+    },
+    annotations: {
+      title: 'Reset Agent State',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_recalibrate',
@@ -374,7 +507,14 @@ export const STATE_TOOLS: Tool[] = [
         }
       },
       required: ['agentId']
-    }
+    },
+    annotations: {
+      title: 'Recalibrate Agent Baseline',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_halt',
@@ -386,7 +526,14 @@ export const STATE_TOOLS: Tool[] = [
         reason: { type: 'string' }
       },
       required: ['agentId', 'reason']
-    }
+    },
+    annotations: {
+      title: 'Halt Agent',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_resume',
@@ -399,7 +546,14 @@ export const STATE_TOOLS: Tool[] = [
         resetMetrics: { type: 'boolean' }
       },
       required: ['agentId', 'reason']
-    }
+    },
+    annotations: {
+      title: 'Resume Halted Agent',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_state_drift_history',
@@ -412,7 +566,14 @@ export const STATE_TOOLS: Tool[] = [
         limit: { type: 'number' }
       },
       required: ['agentId']
-    }
+    },
+    annotations: {
+      title: 'Get Drift History',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -431,7 +592,14 @@ export const CONFIG_TOOLS: Tool[] = [
         overlay: { type: 'object' }
       },
       required: ['overlayId', 'overlay']
-    }
+    },
+    annotations: {
+      title: 'Register Policy Overlay',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_config_activate',
@@ -442,7 +610,14 @@ export const CONFIG_TOOLS: Tool[] = [
         overlayId: { type: 'string' }
       },
       required: ['overlayId']
-    }
+    },
+    annotations: {
+      title: 'Activate Policy Overlay',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_config_get',
@@ -450,7 +625,14 @@ export const CONFIG_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {}
-    }
+    },
+    annotations: {
+      title: 'Get Configuration',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_config_export',
@@ -458,7 +640,14 @@ export const CONFIG_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {}
-    }
+    },
+    annotations: {
+      title: 'Export Configuration',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_config_import',
@@ -470,7 +659,14 @@ export const CONFIG_TOOLS: Tool[] = [
         expectedChecksum: { type: 'string' }
       },
       required: ['data']
-    }
+    },
+    annotations: {
+      title: 'Import Configuration',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -492,7 +688,14 @@ export const CONFIDENCE_TOOLS: Tool[] = [
         value: { type: 'number', minimum: 0, maximum: 1 }
       },
       required: ['threshold', 'value']
-    }
+    },
+    annotations: {
+      title: 'Set Confidence Threshold',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_confidence_get',
@@ -500,7 +703,14 @@ export const CONFIDENCE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {}
-    }
+    },
+    annotations: {
+      title: 'Get Confidence Thresholds',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_confidence_bulk_set',
@@ -511,7 +721,14 @@ export const CONFIDENCE_TOOLS: Tool[] = [
         thresholds: { type: 'object' }
       },
       required: ['thresholds']
-    }
+    },
+    annotations: {
+      title: 'Set Confidence Thresholds (Bulk)',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -530,7 +747,14 @@ export const FEATURE_TOOLS: Tool[] = [
         enabled: { type: 'boolean' }
       },
       required: ['flag', 'enabled']
-    }
+    },
+    annotations: {
+      title: 'Set Feature Flag',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_feature_get',
@@ -538,7 +762,14 @@ export const FEATURE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {}
-    }
+    },
+    annotations: {
+      title: 'Get Feature Flags',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -557,7 +788,14 @@ export const AUDIT_TOOLS: Tool[] = [
         action: { type: 'string' },
         limit: { type: 'number' }
       }
-    }
+    },
+    annotations: {
+      title: 'Get Audit Log',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   }
 ];
 
@@ -573,6 +811,13 @@ export const HANDSHAKE_TOOLS: Tool[] = [
       type: 'object' as const,
       properties: {},
     },
+    annotations: {
+      title: 'Initiate Handshake',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_handshake_respond',
@@ -584,6 +829,13 @@ export const HANDSHAKE_TOOLS: Tool[] = [
       },
       required: ['input'],
     },
+    annotations: {
+      title: 'Respond to Handshake',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_capability_get',
@@ -591,6 +843,13 @@ export const HANDSHAKE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object' as const,
       properties: {},
+    },
+    annotations: {
+      title: 'Get Server Capabilities',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];

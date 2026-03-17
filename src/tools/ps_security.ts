@@ -52,6 +52,13 @@ export const securityToolDefinitions: Tool[] = [
       },
       required: ['content'],
     },
+    annotations: {
+      title: 'Scan for Security Vulnerabilities',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'ps_security_gate',
@@ -69,6 +76,13 @@ export const securityToolDefinitions: Tool[] = [
         },
       },
       required: ['content', 'action'],
+    },
+    annotations: {
+      title: 'Security Gate Check',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
     },
   },
   {
@@ -93,6 +107,13 @@ export const securityToolDefinitions: Tool[] = [
         },
       },
       required: ['action'],
+    },
+    annotations: {
+      title: 'Configure Security Patterns',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];

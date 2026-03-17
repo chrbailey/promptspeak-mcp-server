@@ -140,6 +140,13 @@ Symbol IDs follow the pattern:
       },
       required: ['symbolId', 'who', 'what', 'why', 'where', 'when', 'how', 'commanders_intent', 'requirements'],
     },
+    annotations: {
+      title: 'Create Directive Symbol',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +172,13 @@ Symbol IDs follow the pattern:
         },
       },
       required: ['symbolId'],
+    },
+    annotations: {
+      title: 'Get Directive Symbol',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 
@@ -195,6 +209,13 @@ Symbol IDs follow the pattern:
         },
       },
       required: ['symbolId', 'changes', 'change_description'],
+    },
+    annotations: {
+      title: 'Update Directive Symbol',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
     },
   },
 
@@ -239,6 +260,13 @@ Symbol IDs follow the pattern:
         },
       },
     },
+    annotations: {
+      title: 'List Directive Symbols',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -260,6 +288,13 @@ Symbol IDs follow the pattern:
         },
       },
       required: ['symbolId', 'reason'],
+    },
+    annotations: {
+      title: 'Delete Directive Symbol',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 
@@ -300,6 +335,13 @@ Symbol IDs follow the pattern:
       },
       required: ['source', 'data', 'category', 'id_prefix'],
     },
+    annotations: {
+      title: 'Import Symbols (Bulk)',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -311,6 +353,13 @@ Symbol IDs follow the pattern:
     inputSchema: {
       type: 'object' as const,
       properties: {},
+    },
+    annotations: {
+      title: 'Get Symbol Statistics',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 
@@ -334,6 +383,13 @@ Symbol IDs follow the pattern:
         },
       },
       required: ['symbolId'],
+    },
+    annotations: {
+      title: 'Format Symbol for Prompt',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 
@@ -389,6 +445,13 @@ evidence or have plausible alternative explanations.`,
       },
       required: ['symbolId', 'new_status', 'reviewer'],
     },
+    annotations: {
+      title: 'Verify Symbol Claim',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -435,6 +498,13 @@ Use this to find claims that need human validation before action.`,
         },
       },
     },
+    annotations: {
+      title: 'List Unverified Symbols',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -479,6 +549,13 @@ Examples:
         },
       },
       required: ['symbolId', 'alternative', 'likelihood', 'added_by'],
+    },
+    annotations: {
+      title: 'Add Alternative Explanation',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
     },
   },
 ];
