@@ -39,7 +39,7 @@ export async function createMcpServer(): Promise<Server> {
   await ensureSubsystems();
 
   const server = new Server(
-    { name: 'promptspeak-mcp-server', version: '0.4.0' },
+    { name: 'promptspeak-mcp-server', version: '0.4.1' },
     { capabilities: { tools: {} } }
   );
 
