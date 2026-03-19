@@ -366,6 +366,13 @@ src/
 PromptSpeak does not collect personal data, has no telemetry, and stores all governance data locally in SQLite. See the full policy at the link above.
 
 
+## Data Processing Terms
+
+[https://promptspeak.admin-as-a-service.com/dpa](https://promptspeak.admin-as-a-service.com/dpa)
+
+Standard data processing terms for platform integrations (e.g., Anthropic Connectors). PromptSpeak acts as a data processor; no sub-processors, no external data transmission.
+
+
 ## License
 
 MIT

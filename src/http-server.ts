@@ -520,6 +520,62 @@ GitHub: <a href="https://github.com/chrbailey/promptspeak-mcp-server">chrbailey/
 </body></html>`);
 });
 
+// ─── Data Processing Terms ───────────────────────────────────────────────
+
+app.get('/dpa', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptSpeak Data Processing Terms</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#222}
+h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:2rem}p,ul{margin:0.5rem 0}ol{margin:0.5rem 0;padding-left:1.5rem}</style></head>
+<body>
+<h1>PromptSpeak MCP Server — Data Processing Terms</h1>
+<p><em>Last updated: March 19, 2026</em></p>
+
+<h2>1. Scope</h2>
+<p>These terms apply when PromptSpeak processes data on behalf of a platform operator (e.g., Anthropic) via the MCP Connectors integration. PromptSpeak acts as a <strong>data processor</strong>; the platform operator is the <strong>data controller</strong>.</p>
+
+<h2>2. Data Processed</h2>
+<p>PromptSpeak processes only the data necessary for governance validation:</p>
+<ul>
+<li>MCP tool call metadata (tool name, arguments, agent identifier)</li>
+<li>Governance frames and validation results</li>
+<li>Hold queue entries for operations requiring human review</li>
+<li>Audit log entries (timestamps, actions, outcomes)</li>
+</ul>
+<p>PromptSpeak does <strong>not</strong> process personal data, user credentials, conversation content, or any data beyond tool call metadata.</p>
+
+<h2>3. Processing Purpose</h2>
+<p>Data is processed solely to:</p>
+<ol>
+<li>Validate tool calls against governance rules before execution</li>
+<li>Detect behavioral drift in AI agent sessions</li>
+<li>Hold risky operations for human approval</li>
+<li>Maintain an audit trail of governance decisions</li>
+</ol>
+
+<h2>4. Data Storage and Security</h2>
+<p>All data is stored in a local SQLite database on the server host. Data is encrypted at rest via filesystem encryption on the host. No data is transmitted to external services, cloud storage, or third parties. The server communicates only with the requesting MCP client over HTTPS.</p>
+
+<h2>5. Data Retention</h2>
+<p>Governance data is retained until manually deleted by the server operator. In-memory session state (drift metrics, circuit breaker status) resets on server restart unless persistence is enabled. Server operators may purge all data at any time by deleting the SQLite database file.</p>
+
+<h2>6. Sub-processors</h2>
+<p>PromptSpeak uses <strong>no sub-processors</strong>. All processing occurs locally on the server host. The only external dependency is Cloudflare (for TLS termination and DNS proxying of the HTTPS endpoint).</p>
+
+<h2>7. Data Subject Rights</h2>
+<p>Since PromptSpeak does not process personal data, data subject requests (access, deletion, portability) are not applicable. If personal data is inadvertently included in tool call arguments, the server operator may delete it by purging the relevant audit log or hold queue entries.</p>
+
+<h2>8. Breach Notification</h2>
+<p>In the event of a data breach affecting processed data, the server operator will notify the data controller within 72 hours of becoming aware of the breach, including the nature of the breach, categories of data affected, and remediation measures taken.</p>
+
+<h2>9. Contact</h2>
+<p>For data processing inquiries:<br>
+Christopher Bailey — <a href="mailto:chris@erpaccess.com">chris@erpaccess.com</a><br>
+GitHub: <a href="https://github.com/chrbailey/promptspeak-mcp-server">chrbailey/promptspeak-mcp-server</a></p>
+</body></html>`);
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MCP HTTP TRANSPORT (stateless — new transport + server per request)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -553,6 +609,8 @@ async function start() {
     console.log(`    POST /api/holds/:id/reject`);
     console.log(`    GET  /api/breakers  \u2014 Circuit breaker states`);
     console.log(`    GET  /api/audit     \u2014 Audit log`);
+    console.log(`    GET  /privacy        — Privacy policy`);
+    console.log(`    GET  /dpa            — Data processing terms`);
     console.log(`    GET  /api/health\n`);
     console.log(`  Auth: ${process.env.PS_API_KEYS ? 'enabled (PS_API_KEYS)' : 'disabled (open access)'}`);
     console.log(`  Webhook: ${process.env.PS_WEBHOOK_URL ? 'enabled' : 'disabled'}`);
