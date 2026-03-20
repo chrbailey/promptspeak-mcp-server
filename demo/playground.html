@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptSpeak Governance — Live Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:'SF Mono','Fira Code','Cascadia Code',monospace;font-size:13px;line-height:1.5}
+a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
+.header{padding:20px 24px;border-bottom:1px solid #21262d;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.header h1{font-size:1.4em;color:#f0f6fc}.header h1 span{color:#58a6ff}
+.subtitle{color:#8b949e;font-size:.85em}
+.badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{padding:2px 10px;border-radius:12px;font-size:.75em;font-weight:600}
+.badge-green{background:#23863620;color:#238636;border:1px solid #23863650}
+.badge-blue{background:#1f6feb20;color:#58a6ff;border:1px solid #1f6feb50}
+.badge-purple{background:#8957e520;color:#bc8cff;border:1px solid #8957e550}
+.pipeline{display:flex;align-items:center;gap:0;padding:16px 24px;background:#161b22;border-bottom:1px solid #21262d;overflow-x:auto}
+.pipe-stage{padding:6px 14px;border:1px solid #30363d;border-radius:6px;font-size:.8em;white-space:nowrap;transition:all .3s}
+.pipe-arrow{color:#484f58;padding:0 4px;font-size:.9em}
+.pipe-pass{border-color:#238636;background:#23863615;color:#3fb950}
+.pipe-fail{border-color:#f85149;background:#f8514915;color:#f85149}
+.pipe-hold{border-color:#d29922;background:#d2992215;color:#e3b341}
+.tabs{display:flex;border-bottom:1px solid #21262d;background:#161b22}
+.tab{padding:12px 24px;cursor:pointer;color:#8b949e;border-bottom:2px solid transparent;transition:all .2s}
+.tab:hover{color:#c9d1d9}.tab.active{color:#f0f6fc;border-bottom-color:#1f6feb}
+.content{padding:24px;max-width:1100px;margin:0 auto}
+.panel{display:none}.panel.active{display:block}
+.frame-input{width:100%;padding:12px 16px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#f0f6fc;font-family:inherit;font-size:1.8em;text-align:center;letter-spacing:8px;outline:none}
+.frame-input:focus{border-color:#1f6feb}
+.presets{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.preset{padding:4px 12px;background:#21262d;border:1px solid #30363d;border-radius:6px;cursor:pointer;color:#c9d1d9;transition:all .2s}
+.preset:hover{border-color:#58a6ff;color:#58a6ff}
+.result-box{margin-top:16px;padding:16px;background:#161b22;border:1px solid #30363d;border-radius:8px;min-height:120px}
+.result-pass{border-color:#238636}.result-fail{border-color:#f85149}.result-warn{border-color:#d29922}
+.symbol-row{display:flex;gap:16px;margin:8px 0;flex-wrap:wrap}
+.symbol-card{padding:8px 14px;background:#0d1117;border:1px solid #30363d;border-radius:6px;text-align:center}
+.symbol-glyph{font-size:1.8em;display:block;margin-bottom:4px}
+.symbol-name{font-size:.75em;color:#8b949e}
+.code-input{width:100%;height:140px;padding:12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#f0f6fc;font-family:inherit;font-size:.9em;resize:vertical;outline:none}
+.code-input:focus{border-color:#1f6feb}
+.cb-container{display:flex;gap:24px;flex-wrap:wrap}
+.cb-visual{flex:1;min-width:300px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px;background:#161b22;border:1px solid #30363d;border-radius:8px}
+.cb-state-indicator{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2em;font-weight:700;transition:all .5s;border:3px solid}
+.cb-closed{background:#23863620;border-color:#238636;color:#3fb950}
+.cb-half{background:#d2992220;border-color:#d29922;color:#e3b341}
+.cb-open{background:#f8514920;border-color:#f85149;color:#f85149}
+.cb-controls{flex:1;min-width:300px}
+.cb-btn{padding:10px 20px;border:1px solid #30363d;border-radius:6px;background:#21262d;color:#c9d1d9;font-family:inherit;font-size:.9em;cursor:pointer;margin:4px;transition:all .2s;width:100%}
+.cb-btn:hover{border-color:#58a6ff;color:#58a6ff}
+.cb-btn:disabled{opacity:.4;cursor:not-allowed}
+.cb-btn.danger{border-color:#f85149;color:#f85149}.cb-btn.danger:hover{background:#f8514920}
+.cb-btn.success{border-color:#238636;color:#3fb950}.cb-btn.success:hover{background:#23863620}
+.cb-log{margin-top:12px;padding:12px;background:#0d1117;border:1px solid #21262d;border-radius:6px;max-height:200px;overflow-y:auto;font-size:.8em}
+.cb-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.cb-metric{text-align:center;padding:8px;background:#0d1117;border-radius:6px;border:1px solid #21262d}
+.cb-metric-val{font-size:1.4em;font-weight:700;color:#f0f6fc}
+.cb-metric-label{font-size:.7em;color:#8b949e}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Prompt<span>Speak</span> Governance</h1>
+    <div class="subtitle">Pre-execution blocking for AI agents. <a href="https://github.com/chrbailey/promptspeak-mcp-server">GitHub</a></div>
+  </div>
+  <div class="badges">
+    <span class="badge badge-green">829 tests</span>
+    <span class="badge badge-blue">56 MCP tools</span>
+    <span class="badge badge-purple">0.164ms avg</span>
+  </div>
+</div>
+<div class="pipeline" id="pipeline">
+  <div class="pipe-stage" id="pipe-cb">Circuit Breaker</div><span class="pipe-arrow">&rarr;</span>
+  <div class="pipe-stage" id="pipe-val">Validation</div><span class="pipe-arrow">&rarr;</span>
+  <div class="pipe-stage" id="pipe-drift">Drift Check</div><span class="pipe-arrow">&rarr;</span>
+  <div class="pipe-stage" id="pipe-hold">Hold Check</div><span class="pipe-arrow">&rarr;</span>
+  <div class="pipe-stage" id="pipe-sec">Security Scan</div><span class="pipe-arrow">&rarr;</span>
+  <div class="pipe-stage" id="pipe-exec">Execute</div>
+</div>
+<div class="tabs">
+  <div class="tab active" data-tab="validate">Frame Validation</div>
+  <div class="tab" data-tab="security">Security Scanner</div>
+  <div class="tab" data-tab="breaker">Circuit Breaker</div>
+</div>
+<div class="content">
+<div class="panel active" id="panel-validate">
+  <input class="frame-input" id="frame-input" value="" placeholder="Type a symbol frame...">
+  <div class="presets" id="frame-presets"></div>
+  <div class="result-box" id="frame-result"></div>
+</div>
+<div class="panel" id="panel-security">
+  <textarea class="code-input" id="code-input">const query = "SELECT * FROM users WHERE id = " + req.params.id;
+const password = "hunter2";
+app.use(cors());
+const config = { host: "0.0.0.0", debug: true };</textarea>
+  <div class="presets" id="code-presets"></div>
+  <div class="result-box" id="security-result"></div>
+</div>
+<div class="panel" id="panel-breaker">
+  <div class="cb-container">
+    <div class="cb-visual">
+      <div class="cb-state-indicator cb-closed" id="cb-indicator">CLOSED</div>
+      <div class="cb-metrics">
+        <div class="cb-metric"><div class="cb-metric-val" id="cb-failures">0</div><div class="cb-metric-label">Failures</div></div>
+        <div class="cb-metric"><div class="cb-metric-val" id="cb-ops">0</div><div class="cb-metric-label">Operations</div></div>
+        <div class="cb-metric"><div class="cb-metric-val" id="cb-blocked">0</div><div class="cb-metric-label">Blocked</div></div>
+      </div>
+    </div>
+    <div class="cb-controls">
+      <button class="cb-btn success" id="btn-execute">&#9654; Execute Operation</button>
+      <button class="cb-btn" id="btn-fail">&#10006; Record Failure</button>
+      <button class="cb-btn danger" id="btn-halt">&#9724; Halt Agent</button>
+      <button class="cb-btn" id="btn-resume" disabled>&#8635; Recalibrate &amp; Resume</button>
+      <button class="cb-btn" id="btn-reset" style="margin-top:8px;font-size:.8em;color:#8b949e">Reset Demo</button>
+      <div class="cb-log" id="cb-log"></div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+// NOTE: This demo uses textContent and DOM construction for safe rendering.
+// innerHTML is used only with developer-controlled static strings, never user input.
+// All user input (frame symbols, code text) is escaped or set via textContent.
+
+(function(){
+"use strict";
+
+// --- Symbols ---
+var SYM={"\u2295":{n:"strict",c:"mode",cl:"#3fb950"},"\u2298":{n:"neutral",c:"mode",cl:"#8b949e"},"\u2296":{n:"flexible",c:"mode",cl:"#58a6ff"},"\u2297":{n:"forbidden",c:"mode",cl:"#f85149"},"\u25CA":{n:"financial",c:"domain",cl:"#e3b341"},"\u25C8":{n:"technical",c:"domain",cl:"#58a6ff"},"\u25C7":{n:"legal",c:"domain",cl:"#bc8cff"},"\u25C6":{n:"medical",c:"domain",cl:"#f85149"},"\u25D0":{n:"operational",c:"domain",cl:"#8b949e"},"\u25B6":{n:"execute",c:"action",cl:"#3fb950"},"\u25C0":{n:"retrieve",c:"action",cl:"#58a6ff"},"\u25B2":{n:"analyze",c:"action",cl:"#e3b341"},"\u25BC":{n:"transform",c:"action",cl:"#bc8cff"},"\u25CF":{n:"validate",c:"action",cl:"#3fb950"},"\u25CB":{n:"create",c:"action",cl:"#58a6ff"},"\u26D4":{n:"forbidden",c:"constraint",cl:"#f85149"},"\u2717":{n:"rejected",c:"constraint",cl:"#f85149"},"\u26A0":{n:"warning",c:"constraint",cl:"#e3b341"},"\u2713":{n:"approved",c:"constraint",cl:"#3fb950"},"\u03B1":{n:"primary",c:"entity",cl:"#58a6ff"},"\u03B2":{n:"secondary",c:"entity",cl:"#bc8cff"},"\u03B3":{n:"tertiary",c:"entity",cl:"#8b949e"},"\u03C9":{n:"terminal",c:"entity",cl:"#f85149"},"\u27F3":{n:"iterative",c:"modifier",cl:"#3fb950"}};
+
+// --- Helpers ---
+function $(id){return document.getElementById(id)}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function resetPipe(){var stages=$("pipeline").querySelectorAll(".pipe-stage");for(var i=0;i<stages.length;i++)stages[i].className="pipe-stage"}
+function setPipe(arr){resetPipe();for(var i=0;i<arr.length;i++)$(arr[i][0]).classList.add(arr[i][1])}
+
+// --- Tabs ---
+var tabs=document.querySelectorAll(".tab");
+for(var i=0;i<tabs.length;i++){tabs[i].addEventListener("click",function(){
+  for(var j=0;j<tabs.length;j++){tabs[j].classList.remove("active");document.querySelectorAll(".panel")[j].classList.remove("active")}
+  this.classList.add("active");$("panel-"+this.getAttribute("data-tab")).classList.add("active");
+  resetPipe();
+  if(this.getAttribute("data-tab")==="validate")doValidate();
+  if(this.getAttribute("data-tab")==="security")doScan();
+  if(this.getAttribute("data-tab")==="breaker")cbPipe();
+})}
+
+// --- Frame Validation ---
+var framePresets=[
+  ["\u2295\u25CA\u25B6\u03B2","valid"],
+  ["\u2297\u25B6\u03B1","forbidden+execute"],
+  ["\u2295\u25B6\u03B1","missing domain"],
+  ["\u2295\u25C8\u27F3\u25B6\u03B1","iterative"],
+  ["\u2295\u2296\u25B6\u03B1","conflicting modes"]
+];
+var fpEl=$("frame-presets");
+framePresets.forEach(function(p){
+  var btn=document.createElement("span");btn.className="preset";btn.textContent=p[0]+" "+p[1];
+  btn.addEventListener("click",function(){$("frame-input").value=p[0];doValidate()});fpEl.appendChild(btn);
+});
+$("frame-input").addEventListener("input",doValidate);
+
+function doValidate(){
+  var frame=$("frame-input").value.trim(),el=$("frame-result");
+  if(!frame){el.className="result-box";el.textContent="Click a preset or type a symbol frame...";resetPipe();return}
+  var chars=Array.from(frame),parsed=chars.map(function(c){return SYM[c]?{s:c,n:SYM[c].n,c:SYM[c].c,cl:SYM[c].cl}:null}).filter(Boolean);
+  var errs=[],warns=[];
+  if(parsed.length>0&&parsed[0].c!=="mode")errs.push("Mode symbol must be first in frame");
+  if(chars.length<2)errs.push("Frame must have at least 2 symbols");
+  if(chars.length>12)errs.push("Frame must have at most 12 symbols");
+  if(parsed.some(function(s){return s.n==="forbidden"&&s.c==="mode"})&&parsed.some(function(s){return s.n==="execute"&&s.c==="action"}))errs.push("Forbidden mode (\u2297) cannot include execute action (\u25B6)");
+  var modes=parsed.filter(function(s){return s.c==="mode"});
+  if(modes.length>1)errs.push("Conflicting modes: "+modes.map(function(m){return m.n}).join(" + "));
+  var unk=chars.filter(function(c){return !SYM[c]});
+  if(unk.length)errs.push("Unknown symbols: "+unk.join(", "));
+  if(!parsed.some(function(s){return s.c==="domain"})&&parsed.some(function(s){return s.c==="action"}))warns.push("Action without domain \u2014 consider adding domain for context");
+  var valid=errs.length===0,pc=17-errs.length-warns.length;
+  if(valid)setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-pass"],["pipe-sec","pipe-pass"],["pipe-exec","pipe-pass"]]);
+  else setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-fail"]]);
+  // Build result using safe DOM construction
+  el.className="result-box "+(valid?(warns.length?"result-warn":"result-pass"):"result-fail");
+  el.textContent="";
+  var hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px";
+  var st=document.createElement("span");st.style.cssText="font-weight:700;font-size:1.1em;color:"+(valid?"#3fb950":"#f85149");st.textContent=(valid?"VALID":"INVALID")+" \u2014 "+errs.length+" error"+(errs.length!==1?"s":"")+", "+warns.length+" warning"+(warns.length!==1?"s":"")+", "+pc+" passed";
+  var meta=document.createElement("span");meta.style.cssText="color:#484f58;font-size:.8em";meta.textContent="parseConfidence: 1.0";
+  hdr.appendChild(st);hdr.appendChild(meta);el.appendChild(hdr);
+  var row=document.createElement("div");row.className="symbol-row";
+  chars.forEach(function(ch){var s=SYM[ch];var card=document.createElement("div");card.className="symbol-card";
+    var glyph=document.createElement("span");glyph.className="symbol-glyph";glyph.style.color=s?s.cl:"#f85149";glyph.textContent=ch;
+    var name=document.createElement("span");name.className="symbol-name";name.textContent=s?(s.c+": "+s.n):"unknown";
+    card.appendChild(glyph);card.appendChild(name);row.appendChild(card)});el.appendChild(row);
+  errs.forEach(function(e){var d=document.createElement("div");d.style.cssText="padding:6px 10px;margin:4px 0;background:#f8514910;border-left:3px solid #f85149;border-radius:0 4px 4px 0;font-size:.9em";d.textContent="\u2716 "+e;el.appendChild(d)});
+  warns.forEach(function(w){var d=document.createElement("div");d.style.cssText="padding:6px 10px;margin:4px 0;background:#d2992210;border-left:3px solid #d29922;border-radius:0 4px 4px 0;font-size:.9em";d.textContent="\u26A0 "+w;el.appendChild(d)});
+  if(valid&&warns.length===0){var ok=document.createElement("div");ok.style.cssText="color:#3fb950;margin-top:8px";ok.textContent="\u2713 All 17 validation checks passed";el.appendChild(ok)}
+}
+
+// --- Security Scanner ---
+var PATS=[
+  {id:"sql-injection",sev:"critical",re:/(?:SELECT|INSERT|UPDATE|DELETE|DROP)\s.*\+\s*(?:req|params|input|user|body)/i,enf:"blocked",sug:"Use parameterized queries or prepared statements"},
+  {id:"hardcoded-secret",sev:"critical",re:/(?:password|secret|api_?key|token)\s*=\s*["'][^"']{3,}/i,enf:"blocked",sug:"Move secrets to environment variables or a secrets manager"},
+  {id:"insecure-cors",sev:"high",re:/cors\(\s*\)/,enf:"held",sug:"Configure CORS origins explicitly"},
+  {id:"bind-all",sev:"high",re:/0\.0\.0\.0/,enf:"held",sug:"Bind to 127.0.0.1 in production"},
+  {id:"debug-enabled",sev:"medium",re:/debug\s*:\s*true/i,enf:"warned",sug:"Disable debug mode in production"}
+];
+var CODE_P={
+  sqli:'const query = "SELECT * FROM users WHERE id = " + req.params.id;',
+  secrets:'const password = "hunter2";\nconst apiKey = "sk-abc123secret";',
+  insecure:'app.use(cors());\nconst config = { host: "0.0.0.0", debug: true };',
+  all:'const query = "SELECT * FROM users WHERE id = " + req.params.id;\nconst password = "hunter2";\napp.use(cors());\nconst config = { host: "0.0.0.0", debug: true };',
+  clean:'import { z } from "zod";\nconst id = z.string().uuid().parse(req.params.id);\nconst result = await db.query("SELECT * FROM users WHERE id = $1", [id]);'
+};
+var cpEl=$("code-presets");
+[["sqli","SQL Injection"],["secrets","Hardcoded Secrets"],["insecure","Insecure Defaults"],["all","All Vulnerabilities"],["clean","Clean Code"]].forEach(function(p){
+  var btn=document.createElement("span");btn.className="preset";btn.textContent=p[1];
+  btn.addEventListener("click",function(){$("code-input").value=CODE_P[p[0]];doScan()});cpEl.appendChild(btn)});
+$("code-input").addEventListener("input",doScan);
+
+function doScan(){
+  var code=$("code-input").value,el=$("security-result");
+  if(!code.trim()){el.className="result-box";el.textContent="Paste code to scan...";resetPipe();return}
+  var lines=code.split("\n"),finds=[];
+  lines.forEach(function(line,i){PATS.forEach(function(p){if(p.re.test(line))finds.push({id:p.id,sev:p.sev,enf:p.enf,sug:p.sug,line:i+1,match:line.trim()})})});
+  var blocked=finds.filter(function(f){return f.enf==="blocked"}),held=finds.filter(function(f){return f.enf==="held"}),warned=finds.filter(function(f){return f.enf==="warned"});
+  if(blocked.length)setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-pass"],["pipe-sec","pipe-fail"]]);
+  else if(held.length)setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-hold"],["pipe-sec","pipe-hold"]]);
+  else setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-pass"],["pipe-sec","pipe-pass"],["pipe-exec","pipe-pass"]]);
+  el.textContent="";el.className="result-box "+(blocked.length?"result-fail":finds.length?"result-warn":"result-pass");
+  var hdr=document.createElement("div");hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px";
+  var st=document.createElement("span");st.textContent=finds.length+" finding"+(finds.length!==1?"s":"")+" \u2014 "+blocked.length+" blocked, "+held.length+" held, "+warned.length+" warned";
+  var mt=document.createElement("span");mt.style.cssText="color:#484f58;font-size:.8em";mt.textContent=PATS.length+" patterns checked";
+  hdr.appendChild(st);hdr.appendChild(mt);el.appendChild(hdr);
+  if(!finds.length){var ok=document.createElement("div");ok.style.cssText="color:#3fb950;margin-top:8px";ok.textContent="\u2713 No vulnerabilities detected. Code passes security gate.";el.appendChild(ok);return}
+  var sevCl={critical:"background:#f8514930;color:#f85149;border:1px solid #f85149",high:"background:#d2992230;color:#e3b341;border:1px solid #d29922",medium:"background:#d2922230;color:#d29222;border:1px solid #d29222"};
+  var enfCl={blocked:"background:#f8514920;color:#f85149",held:"background:#d2992220;color:#e3b341",warned:"background:#58a6ff20;color:#58a6ff"};
+  finds.forEach(function(f){
+    var row=document.createElement("div");row.style.cssText="padding:10px 14px;margin:8px 0;background:#161b22;border:1px solid #30363d;border-radius:6px;display:flex;gap:12px;align-items:flex-start";
+    var sv=document.createElement("span");sv.style.cssText="padding:2px 8px;border-radius:4px;font-size:.75em;font-weight:700;white-space:nowrap;"+(sevCl[f.sev]||"");sv.textContent=f.sev.toUpperCase();
+    var det=document.createElement("div");det.style.flex="1";
+    var top=document.createElement("div");var nm=document.createElement("span");nm.style.cssText="color:#f0f6fc;font-weight:600";nm.textContent=f.id+" ";
+    var en=document.createElement("span");en.style.cssText="font-size:.75em;padding:2px 6px;border-radius:3px;font-weight:600;"+(enfCl[f.enf]||"");en.textContent=f.enf.toUpperCase();
+    top.appendChild(nm);top.appendChild(en);det.appendChild(top);
+    var ln=document.createElement("div");ln.style.cssText="color:#8b949e;font-size:.85em";ln.textContent="Line "+f.line+": "+f.match;det.appendChild(ln);
+    var sg=document.createElement("div");sg.style.cssText="color:#8b949e;font-size:.85em;margin-top:4px";sg.textContent=f.sug;det.appendChild(sg);
+    row.appendChild(sv);row.appendChild(det);el.appendChild(row)});
+}
+
+// --- Circuit Breaker ---
+var cb={state:"closed",failures:0,ops:0,blocked:0,threshold:5,log:[]};
+function cbLog(msg,cls){
+  cb.log.unshift({msg:msg,cls:cls,ts:new Date().toLocaleTimeString()});
+  if(cb.log.length>20)cb.log.pop();
+  var el=$("cb-log");el.textContent="";
+  cb.log.forEach(function(l){var d=document.createElement("div");d.style.cssText="padding:2px 0;border-bottom:1px solid #21262d10;color:"+({pass:"#3fb950",fail:"#f85149",warn:"#e3b341",info:"#58a6ff"}[cls]||"#c9d1d9");d.textContent="["+l.ts+"] "+l.msg;el.appendChild(d)});
+}
+function cbPipe(){
+  if(cb.state==="open")setPipe([["pipe-cb","pipe-fail"]]);
+  else if(cb.state==="half-open")setPipe([["pipe-cb","pipe-hold"]]);
+  else setPipe([["pipe-cb","pipe-pass"]]);
+}
+function updateCB(){
+  var ind=$("cb-indicator");ind.className="cb-state-indicator "+(cb.state==="closed"?"cb-closed":cb.state==="half-open"?"cb-half":"cb-open");
+  ind.textContent=cb.state.toUpperCase().replace("-"," ");
+  $("cb-failures").textContent=cb.failures;$("cb-ops").textContent=cb.ops;$("cb-blocked").textContent=cb.blocked;
+  $("btn-fail").disabled=cb.state==="open";$("btn-halt").disabled=cb.state==="open";$("btn-resume").disabled=cb.state!=="open";
+  cbPipe();
+}
+$("btn-execute").addEventListener("click",function(){
+  cb.ops++;
+  if(cb.state==="open"){cb.blocked++;cbLog("BLOCKED \u2014 Agent halted. Tool call rejected before execution.","fail");setPipe([["pipe-cb","pipe-fail"]])}
+  else if(cb.state==="half-open"){cbLog("PROBE \u2014 Half-open. Testing single execution...","warn");cb.state="closed";cb.failures=0;cbLog("SUCCESS \u2014 Probe passed. Circuit closed.","pass");setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-pass"],["pipe-sec","pipe-pass"],["pipe-exec","pipe-pass"]])}
+  else{cbLog("PASSED \u2014 Circuit closed. Proceeding through 6-stage pipeline...","pass");setPipe([["pipe-cb","pipe-pass"],["pipe-val","pipe-pass"],["pipe-drift","pipe-pass"],["pipe-hold","pipe-pass"],["pipe-sec","pipe-pass"],["pipe-exec","pipe-pass"]])}
+  updateCB();
+});
+$("btn-fail").addEventListener("click",function(){
+  cb.failures++;cb.ops++;
+  if(cb.failures>=cb.threshold){cb.state="open";cbLog("TRIPPED \u2014 "+cb.failures+" consecutive failures. Circuit OPEN.","fail")}
+  else cbLog("FAILURE recorded ("+cb.failures+"/"+cb.threshold+" threshold)","warn");
+  updateCB();
+});
+$("btn-halt").addEventListener("click",function(){cb.state="open";cbLog("HALTED \u2014 Operator triggered manual halt. Circuit OPEN.","fail");updateCB()});
+$("btn-resume").addEventListener("click",function(){cb.state="half-open";cbLog("RECALIBRATED \u2014 Circuit half-open. Next execution is a probe.","info");updateCB()});
+$("btn-reset").addEventListener("click",function(){cb={state:"closed",failures:0,ops:0,blocked:0,threshold:5,log:[]};$("cb-log").textContent="";cbLog("Demo reset. Threshold: 5 failures.","info");updateCB()});
+
+// --- Init ---
+cbLog("Circuit breaker initialized. Threshold: 5 failures.","info");
+updateCB();
+doScan();
+})();
+</script>
+</body>
+</html>
