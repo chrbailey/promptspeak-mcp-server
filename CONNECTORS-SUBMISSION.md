@@ -58,14 +58,27 @@ chris@erpaccess.com
 - [x] 829 tests passing
 - [x] HTTPS via Cloudflare Tunnel
 
-## IP Allowlisting Note
+## IP Allowlisting
 
-PromptSpeak runs behind a Cloudflare Tunnel (tunnel ID 401f738a):
-- Claude → Cloudflare edge → Cloudflare Tunnel → Mac Mini :3000
-- Traffic flows through Cloudflare's network, not directly from Claude's IPs
-- The tunnel is already authenticated and secure
-- IP allowlisting at the origin server level is **not required** because Cloudflare Tunnel doesn't expose the origin — Cloudflare's edge handles all inbound connections
-- If Anthropic requires explicit IP allowlisting, it would be at the Cloudflare WAF level (Access rules), not at the origin. Check the submission form for specific instructions.
+**Anthropic's outbound IP range**: `160.79.104.0/21` (used when Claude calls your MCP server)
+- Reference: https://platform.claude.com/docs/en/api/ip-addresses
+- Note: IP allowlisting only works for claude.ai and Claude Desktop, NOT Claude Code
+
+**Your architecture** (Cloudflare Tunnel):
+```
+Claude (160.79.104.0/21) → Cloudflare edge → Cloudflare Tunnel (401f738a) → Mac Mini :3000
+```
+
+**No changes needed on Mac Mini** — the tunnel handles connectivity, no inbound ports exposed.
+
+**Optional: Cloudflare WAF restriction** (recommended for production):
+1. Cloudflare dashboard → Security → WAF → Custom Rules
+2. Create IP List `anthropic_ips` with `160.79.104.0/21`
+3. Rule: `(not ip.src in $anthropic_ips and http.request.uri.path eq "/mcp")` → Block
+4. This restricts `/mcp` to Anthropic while leaving `/privacy`, `/dpa`, `/` open
+
+**Phased-out IPs** (remove if previously allowlisted):
+- 34.162.46.92/32, 34.162.102.82/32, 34.162.136.91/32, 34.162.142.92/32, 34.162.183.95/32
 
 ## Post-Submission
 
