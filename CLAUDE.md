@@ -4,7 +4,9 @@
 
 Pre-execution governance layer for AI agents. Intercepts MCP tool calls, validates against deterministic rules, blocks or holds risky operations for human approval. Validation latency: 0.103ms avg.
 
-**v0.3.0** — 658 tests, 45 MCP tools, 16K lines, MIT licensed, published as `promptspeak-mcp-server`.
+**v0.4.1** — 829 tests, 56 MCP tools, MIT licensed, published as `@chrbailey/promptspeak-mcp-server`.
+HTTPS live at `https://promptspeak.admin-as-a-service.com/mcp` (Cloudflare Tunnel → Mac Mini).
+Safety annotations on all 56 tools. Streamable HTTP transport. Connectors submission pending (3 blockers: examples, CORS audit, token cap audit).
 
 ## Architecture
 

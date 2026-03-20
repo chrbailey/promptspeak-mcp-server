@@ -68,98 +68,204 @@ npm start
 
 ## Usage examples
 
-### 1. Validate a governance frame before execution
+### 1. Validate a governance frame
 
-```json
-// Request: validate that a frame is structurally and semantically correct
+Validate that a PromptSpeak frame is structurally and semantically correct before using it. Frames encode governance constraints as symbol sequences — mode first, then domain, action, and entity.
+
+```jsonc
+// Tool call: ps_validate
 {
   "name": "ps_validate",
   "arguments": {
-    "frame": "Ξ⊕●▶α",
+    "frame": "⊕◊▶α",
     "validationLevel": "full"
   }
 }
+```
 
-// Response: validation report with confidence score
+```jsonc
+// Response
 {
   "valid": true,
+  "frame": "⊕◊▶α",
+  "parsedFrame": {
+    "mode": { "symbol": "⊕", "meaning": "strict" },
+    "domain": { "symbol": "◊", "meaning": "financial" },
+    "action": { "symbol": "▶", "meaning": "execute" },
+    "entity": { "symbol": "α", "meaning": "primary" }
+  },
   "parseConfidence": 1.0,
-  "summary": { "errors": 0, "warnings": 3, "passed": 14 }
+  "report": {
+    "valid": true,
+    "errors": [],
+    "warnings": [
+      { "code": "ACTION_MISSING_DOMAIN", "message": "Consider adding domain context", "severity": "warning" }
+    ]
+  },
+  "summary": { "errors": 0, "warnings": 1, "passed": 16 }
 }
 ```
 
-### 2. Execute a tool call under governance
+Invalid frames return actionable suggestions:
 
-```json
-// Request: execute a file write under PromptSpeak governance
+```jsonc
+// Tool call: validate a frame with conflicting modes
 {
-  "name": "ps_execute",
-  "arguments": {
-    "agentId": "code-assistant",
-    "frame": "Ξ⊕●▶α",
-    "action": {
-      "tool": "write_file",
-      "arguments": { "path": "/tmp/output.txt", "content": "Hello world" }
-    }
-  }
+  "name": "ps_validate",
+  "arguments": { "frame": "⊕⊖▶", "validationLevel": "semantic" }
 }
 
-// Response: execution result with governance metadata
+// Response: blocked — strict + flexible modes conflict
 {
-  "allowed": true,
-  "driftScore": 0.02,
-  "executionTime": "0.12ms",
-  "auditId": "exec_a1b2c3"
+  "valid": false,
+  "summary": { "errors": 1, "warnings": 0, "passed": 10 },
+  "suggestions": ["Remove either ⊕ (strict) or ⊖ (flexible) - cannot have both"]
 }
 ```
 
-### 3. Hold a risky operation for human approval
+### 2. Hold queue workflow — human-in-the-loop approval
 
-```json
-// When an agent attempts a dangerous action, it's automatically held:
+When an agent attempts a risky operation (high drift score, low confidence, security finding), the action is held for human review instead of executing. This is the full hold lifecycle: list, inspect, approve or reject.
+
+**Step 1: List pending holds**
+
+```jsonc
+// Tool call: ps_hold_list
 {
   "name": "ps_hold_list",
   "arguments": {}
 }
-
-// Response: pending holds awaiting human review
-{
-  "holds": [{
-    "holdId": "hold_001",
-    "agentId": "devops-agent",
-    "tool": "modify_infrastructure",
-    "severity": "critical",
-    "reason": "human_approval_required",
-    "state": "pending"
-  }],
-  "count": 1
-}
-
-// Approve or reject:
-{ "name": "ps_hold_approve", "arguments": { "holdId": "hold_001", "reason": "Reviewed and safe" } }
-{ "name": "ps_hold_reject",  "arguments": { "holdId": "hold_001", "reason": "Too risky" } }
 ```
 
-### 4. Halt a drifting agent immediately
-
-```json
-// Request: emergency halt — trips circuit breaker, blocks all future calls
+```jsonc
+// Response: one hold awaiting human review
 {
-  "name": "ps_state_halt",
+  "holds": [
+    {
+      "holdId": "hold_7k2m9x",
+      "agentId": "devops-agent",
+      "frame": "⊕◈▶α",
+      "tool": "deploy_to_production",
+      "severity": "high",
+      "reason": "drift_prediction",
+      "state": "pending",
+      "evidence": { "driftScore": 0.72, "predictedDrift": 0.85 }
+    }
+  ],
+  "count": 1,
+  "expiredCount": 0
+}
+```
+
+**Step 2: Approve with modifications (or reject)**
+
+```jsonc
+// Tool call: ps_hold_approve — approve but downgrade to staging
+{
+  "name": "ps_hold_approve",
   "arguments": {
-    "agentId": "rogue-agent",
-    "reason": "Drift score exceeded threshold (0.85)"
+    "holdId": "hold_7k2m9x",
+    "reason": "Reviewed — safe for staging, not production",
+    "modifiedArgs": { "environment": "staging" }
+  }
+}
+```
+
+```jsonc
+// Response
+{
+  "success": true,
+  "decision": {
+    "holdId": "hold_7k2m9x",
+    "state": "approved",
+    "decidedBy": "human",
+    "reason": "Reviewed — safe for staging, not production"
+  },
+  "executionResult": { "success": true }
+}
+```
+
+To reject instead:
+
+```jsonc
+{
+  "name": "ps_hold_reject",
+  "arguments": {
+    "holdId": "hold_7k2m9x",
+    "reason": "Drift too high — recalibrate agent first",
+    "haltAgent": true
+  }
+}
+// Agent is halted (circuit breaker tripped) and the operation is denied.
+```
+
+### 3. Security scanning — catch vulnerabilities before execution
+
+Scan code content for security issues before an agent writes it to disk. Critical findings block execution; high-severity findings are held for human review.
+
+```jsonc
+// Tool call: ps_security_scan
+{
+  "name": "ps_security_scan",
+  "arguments": {
+    "content": "const query = `SELECT * FROM users WHERE id = ${userId}`;\nconst API_KEY = 'sk-1234567890abcdef1234567890abcdef';"
+  }
+}
+```
+
+```jsonc
+// Response: two findings — one critical (blocked), one critical (blocked)
+{
+  "findings": [
+    {
+      "patternId": "sql-injection",
+      "severity": "critical",
+      "match": "SELECT * FROM users WHERE id = ${userId}",
+      "line": 1,
+      "context": "const query = `SELECT * FROM users WHERE id = ${userId}`;",
+      "suggestion": "Use parameterized queries or prepared statements instead of template literals"
+    },
+    {
+      "patternId": "hardcoded-secret",
+      "severity": "critical",
+      "match": "API_KEY = 'sk-1234567890abcdef1234567890abcdef'",
+      "line": 2,
+      "context": "const API_KEY = 'sk-1234567890abcdef1234567890abcdef';",
+      "suggestion": "Move secrets to environment variables or a secrets manager"
+    }
+  ],
+  "scannedAt": "2026-03-19T12:00:00.000Z",
+  "contentLength": 98,
+  "patternsChecked": 10,
+  "enforcement": {
+    "blocked": [
+      { "patternId": "sql-injection", "severity": "critical" },
+      { "patternId": "hardcoded-secret", "severity": "critical" }
+    ],
+    "held": [],
+    "warned": [],
+    "logged": []
+  }
+}
+```
+
+Use `ps_security_gate` instead of `ps_security_scan` to enforce the policy — it blocks on critical, holds high-severity for human review, and warns on medium:
+
+```jsonc
+// Tool call: ps_security_gate — scan AND enforce
+{
+  "name": "ps_security_gate",
+  "arguments": {
+    "content": "app.use(cors());\napp.listen(0.0.0.0, 3000);",
+    "action": "write_file"
   }
 }
 
-// Resume after investigation:
+// Response: held for review (insecure defaults = high severity)
 {
-  "name": "ps_state_resume",
-  "arguments": {
-    "agentId": "rogue-agent",
-    "reason": "Root cause identified and fixed",
-    "resetMetrics": true
-  }
+  "decision": "held",
+  "reason": "Security: 1 high-severity finding(s) held for review — insecure-defaults",
+  "scan": { "findings": [{ "patternId": "insecure-defaults", "severity": "high", "line": 1 }] }
 }
 ```
 
