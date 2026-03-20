@@ -1,132 +1,51 @@
-# Contributing to PromptSpeak MCP Server
-
-Thank you for contributing to PromptSpeak! This document outlines our development practices and requirements.
+# Contributing
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+git clone https://github.com/chrbailey/promptspeak-mcp-server.git
+cd promptspeak-mcp-server
 npm install
-
-# Run tests
-npm test
-
-# Type check
+npm test        # 829 tests, ~1s
 npx tsc --noEmit
-
-# Build
 npm run build
 ```
 
-## Code Quality Requirements
+## Rules
 
-All PRs must:
-- [ ] Pass TypeScript type checking (`npx tsc --noEmit`)
-- [ ] Pass all tests (`npm test`)
-- [ ] Pass linting (`npm run lint`)
-- [ ] Pass security checks (see below)
+- **Every tool needs tests.** No exceptions.
+- **Don't weaken validation to make tests pass.** Fix the test or the code.
+- **Don't reorder the pipeline.** Circuit breaker -> validation -> drift -> hold -> security scan -> execute.
+- **Don't add modules without discussion.** Codebase was cut from 82K to 16K lines for a reason.
+- **Conventional commits.** `feat:`, `fix:`, `docs:`, `test:`, `chore:`.
 
----
+## Security
 
-## 🔒 SECURITY REQUIREMENTS
+All PRs are scanned for sensitive logging patterns. Violations block merge. Use `createSecureLogger` for any module handling sensitive data. See [docs/SECURITY_LOGGING.md](docs/SECURITY_LOGGING.md).
 
-### Secure Logging (MANDATORY)
+**Report vulnerabilities:** See [SECURITY.md](SECURITY.md). Do not open public issues.
 
-**Read the full guide:** [docs/SECURITY_LOGGING.md](docs/SECURITY_LOGGING.md)
+## Pull Requests
 
-#### Quick Rules
+1. Branch from `main`
+2. Add tests for new functionality
+3. Pass: `npm test`, `npx tsc --noEmit`, `npm run lint`
+4. Open PR with clear description of what and why
 
-1. **NEVER log raw sensitive values:**
-   ```typescript
-   // ❌ WRONG - Will be rejected by CI
-   logger.debug(`Customer: ${customer.email}`);
-   logger.info('Response:', apiResponse);
-
-   // ✅ CORRECT - Use secure logging
-   import { createSecureLogger } from '../core/security/index.js';
-   const logger = createSecureLogger('MyModule');
-   logger.safeDebug('Customer lookup', { email: customer.email });
-   ```
-
-2. **Use SecureLogger in sensitive modules:**
-   - `government/adapters/*`
-   - `swarm/ebay/*`
-   - `auth/*`
-   - `http/routes/*`
-   - Any code handling PII, financial data, or credentials
-
-3. **For existing loggers, use the wrapper:**
-   ```typescript
-   import { safeDebug } from '../core/security/index.js';
-   safeDebug(logger, 'Processing', sensitiveData);
-   ```
-
-### CI Security Checks
-
-PRs are automatically scanned for:
-- Direct logging of sensitive field names
-- Template string injection in logs
-- Unredacted API response logging
-
-**Violations will block merge.**
-
----
-
-## Testing
-
-### Running Tests
-
-```bash
-# All tests
-npm test
-
-# Specific test file
-npm test -- --grep "security"
-
-# Watch mode
-npm test -- --watch
-```
-
-### Writing Tests
-
-- Place tests in `__tests__/` directories or `*.test.ts` files
-- Use descriptive test names
-- Mock external APIs
-- Test error cases
-
----
-
-## Architecture Overview
+## Architecture
 
 ```
 src/
-├── core/           # Shared utilities
-│   ├── logging/    # Structured logging
-│   ├── security/   # Redaction & secure logging ← NEW
-│   ├── errors/     # Error types
-│   └── result/     # Result pattern utilities
-├── handlers/       # MCP tool handlers
-├── symbols/        # Symbol registry
-├── government/     # SAM.gov, USASpending adapters
-├── swarm/          # eBay swarm agents
-└── http/           # Express HTTP server
+├── core/           # Logging, errors, result pattern
+├── gatekeeper/     # 6-stage interceptor pipeline (load-bearing)
+├── grammar/        # Frame parser, lexer, AST, expander
+├── handlers/       # MCP tool dispatcher
+├── tools/          # 56 tool implementations (11 categories)
+├── persistence/    # SQLite governance storage
+├── http-server.ts  # Hono + Streamable HTTP MCP
+└── types/          # Zod schemas
 ```
 
----
+## License
 
-## Pull Request Process
-
-1. Create a feature branch from `main`
-2. Make your changes
-3. Ensure all checks pass locally
-4. Submit PR with clear description
-5. Address review feedback
-6. Squash and merge when approved
-
----
-
-## Questions?
-
-- Check existing issues
-- Open a discussion for design questions
-- Tag `@maintainers` for urgent security issues
+Contributions are licensed under MIT.

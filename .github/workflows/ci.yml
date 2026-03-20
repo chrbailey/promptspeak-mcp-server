@@ -29,8 +29,8 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        run: npx vitest run --coverage --coverage.reporter=text --coverage.reporter=json-summary
 
       - name: Run linter
         run: npm run lint --if-present

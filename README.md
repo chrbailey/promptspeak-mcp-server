@@ -1,5 +1,10 @@
 # promptspeak-mcp-server
 
+[![CI](https://github.com/chrbailey/promptspeak-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/chrbailey/promptspeak-mcp-server/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@chrbailey/promptspeak-mcp-server)](https://www.npmjs.com/package/@chrbailey/promptspeak-mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-829%20passing-brightgreen)](https://github.com/chrbailey/promptspeak-mcp-server/actions)
+
 **Pre-execution governance for AI agents. Blocks dangerous tool calls before they execute.**
 
 AI agents call tools (file writes, API requests, shell commands) with no validation layer between intent and execution. A prompt injection, hallucinated argument, or drifting goal can trigger irreversible actions. PromptSpeak intercepts every MCP tool call, validates it against deterministic rules, and blocks or holds risky operations for human approval — in 0.1ms, before anything executes.
