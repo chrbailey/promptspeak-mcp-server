@@ -128,8 +128,14 @@ export interface SecurityScanRequest {
 }
 
 export async function handleSecurityScan(args: SecurityScanRequest): Promise<SecurityScanResult> {
+  const content = args.content;
+  if (typeof content !== 'string') {
+    throw new Error(
+      `ps_security_scan requires "content" (string). Received: ${JSON.stringify(Object.keys(args))}`,
+    );
+  }
   const scanner = getScanner();
-  return scanner.scan(args.content, {
+  return scanner.scan(content, {
     onlyPatterns: args.patterns,
   });
 }
@@ -146,8 +152,19 @@ export async function handleSecurityGate(args: {
   content: string;
   action: string;
 }): Promise<SecurityGateResult> {
+  const content = args.content;
+  if (typeof content !== 'string') {
+    throw new Error(
+      `ps_security_gate requires "content" (string). Received: ${JSON.stringify(Object.keys(args))}`,
+    );
+  }
+  if (typeof args.action !== 'string') {
+    throw new Error(
+      `ps_security_gate requires "action" (string).`,
+    );
+  }
   const scanner = getScanner();
-  const scan = scanner.scan(args.content);
+  const scan = scanner.scan(content);
 
   if (scan.enforcement.blocked.length > 0) {
     const patternIds = scan.enforcement.blocked.map(f => f.patternId).join(', ');

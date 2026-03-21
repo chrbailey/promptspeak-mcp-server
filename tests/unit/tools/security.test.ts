@@ -39,6 +39,24 @@ describe('ps_security_scan', () => {
     expect(result.contentLength).toBe(code.length);
     expect(result.patternsChecked).toBeGreaterThan(0);
   });
+
+  it('should throw a clear error when content is missing', async () => {
+    await expect(
+      handleSecurityScan({} as any),
+    ).rejects.toThrow('ps_security_scan requires "content" (string)');
+  });
+
+  it('should throw a clear error when content is non-string', async () => {
+    await expect(
+      handleSecurityScan({ content: 123 } as any),
+    ).rejects.toThrow('ps_security_scan requires "content" (string)');
+  });
+
+  it('should throw when called with wrong field names (HTTP mismatch)', async () => {
+    await expect(
+      handleSecurityScan({ code: 'const x = 1;', language: 'javascript' } as any),
+    ).rejects.toThrow('ps_security_scan requires "content" (string)');
+  });
 });
 
 describe('ps_security_gate', () => {
@@ -87,6 +105,18 @@ describe('ps_security_gate', () => {
       action: 'write_file',
     });
     expect(result.decision).toBe('blocked');
+  });
+
+  it('should throw a clear error when content is missing', async () => {
+    await expect(
+      handleSecurityGate({ action: 'write_file' } as any),
+    ).rejects.toThrow('ps_security_gate requires "content" (string)');
+  });
+
+  it('should throw a clear error when action is missing', async () => {
+    await expect(
+      handleSecurityGate({ content: 'const x = 1;' } as any),
+    ).rejects.toThrow('ps_security_gate requires "action" (string)');
   });
 });
 
