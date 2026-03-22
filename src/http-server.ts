@@ -31,6 +31,7 @@ import { getGovernanceDb, type GovernanceDatabase } from './persistence/database
 import type { HoldRequest, HoldState } from './types/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createMcpServer, ensureSubsystems } from './server-setup.js';
+import { broadcastSSE, sseClients } from './demo/sse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -150,11 +151,13 @@ async function resolveHold(c: any, state: 'approved' | 'rejected') {
   const body = await c.req.json().catch(() => ({}));
   const reason = (body as Record<string, string>).reason || `${state.charAt(0).toUpperCase() + state.slice(1)} via Ops Center`;
 
+  const now = Date.now();
   db.updateHoldState(holdId, state);
-  db.saveDecision({ holdId, state, decidedBy: 'human', decidedAt: Date.now(), reason });
-  db.saveAuditEntry({ timestamp: Date.now(), action: `hold_${state}`, actor: 'ops-center', details: { holdId, reason } });
+  const decision = { holdId, state, decidedBy: 'human' as const, decidedAt: now, reason };
+  db.saveDecision(decision);
+  db.saveAuditEntry({ timestamp: now, action: `hold_${state}`, actor: 'ops-center', details: { holdId, reason } });
   notifyWebhook(state, hold).catch(() => {});
-  return c.json({ success: true, holdId, state });
+  return c.json(decision);
 }
 
 app.post('/api/holds/:id/approve', (c) => resolveHold(c, 'approved'));
@@ -173,6 +176,77 @@ app.get('/api/audit', (c) => {
   const limit = parseInt(c.req.query('limit') || '50', 10);
   const entries = db.getAuditEntries(Math.min(limit, 500));
   return c.json({ entries, count: entries.length });
+});
+
+// ─── SSE Stream ─────────────────────────────────────────────────────────
+
+app.get('/api/holds/stream', (c) => {
+  let controllerRef: ReadableStreamDefaultController;
+  const stream = new ReadableStream({
+    start(controller) {
+      controllerRef = controller;
+      sseClients.add(controller);
+      controller.enqueue(new TextEncoder().encode(': connected\n\n'));
+    },
+    cancel() {
+      sseClients.delete(controllerRef);
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
+
+// ─── Hold History ───────────────────────────────────────────────────────
+
+app.get('/api/holds/history', (c) => {
+  const limit = parseInt(c.req.query('limit') || '50', 10);
+  const decisions = db.getDecisions(Math.min(limit, 500));
+  return c.json(decisions);
+});
+
+// ─── Analytics ──────────────────────────────────────────────────────────
+
+app.get('/api/analytics', (c) => {
+  const pending = db.getPendingHolds();
+  const decisions = db.getDecisions(1000);
+
+  const approvedCount = decisions.filter(d => d.state === 'approved').length;
+  const totalDecisions = decisions.length;
+  const avgTime = totalDecisions > 0 ? decisions.reduce((sum, d) => sum + ((d as any).responseTimeMs || 0), 0) / totalDecisions : 0;
+
+  const reasonCounts = new Map<string, { total: number; approved: number }>();
+  for (const d of decisions) {
+    const r = (d as any).originalReason || 'unknown';
+    const entry = reasonCounts.get(r) || { total: 0, approved: 0 };
+    entry.total++;
+    if (d.state === 'approved') entry.approved++;
+    reasonCounts.set(r, entry);
+  }
+
+  const topReasons = Array.from(reasonCounts.entries())
+    .map(([reason, { total, approved }]) => ({ reason, count: total, approvalRate: total > 0 ? approved / total : 0 }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  return c.json({
+    stats: {
+      pending: pending.length,
+      critical: pending.filter(h => h.severity === 'critical').length,
+      avgResponseTimeMs: avgTime,
+      falsePositiveRate: totalDecisions > 0 ? approvedCount / totalDecisions : 0,
+      holdsPerHour: totalDecisions / 24,
+    },
+    topReasons,
+    ruleTuneSuggestions: [],
+    recentDecisions: decisions.slice(0, 10),
+  });
 });
 
 // ─── Root: Serve holds UI ────────────────────────────────────────────────
@@ -597,6 +671,17 @@ async function start() {
   await ensureSubsystems();
   db = getGovernanceDb()!;
 
+  // SSE keepalive every 30s
+  setInterval(() => {
+    for (const controller of sseClients) {
+      try {
+        controller.enqueue(new TextEncoder().encode(': keepalive\n\n'));
+      } catch {
+        sseClients.delete(controller);
+      }
+    }
+  }, 30000);
+
   serve({ fetch: app.fetch, port: PORT }, (info) => {
     console.log(`\n  PromptSpeak Ops Center`);
     console.log(`  http://localhost:${info.port}\n`);
@@ -607,6 +692,9 @@ async function start() {
     console.log(`    GET  /api/holds/stats`);
     console.log(`    POST /api/holds/:id/approve`);
     console.log(`    POST /api/holds/:id/reject`);
+    console.log(`    GET  /api/holds/stream \u2014 SSE`);
+    console.log(`    GET  /api/holds/history`);
+    console.log(`    GET  /api/analytics`);
     console.log(`    GET  /api/breakers  \u2014 Circuit breaker states`);
     console.log(`    GET  /api/audit     \u2014 Audit log`);
     console.log(`    GET  /privacy        — Privacy policy`);
