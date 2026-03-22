@@ -32,6 +32,7 @@ import type { HoldRequest, HoldState } from './types/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createMcpServer, ensureSubsystems } from './server-setup.js';
 import { broadcastSSE, sseClients } from './demo/sse.js';
+import { seedDemoHolds, runDemoScenario } from './demo/runner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -247,6 +248,13 @@ app.get('/api/analytics', (c) => {
     ruleTuneSuggestions: [],
     recentDecisions: decisions.slice(0, 10),
   });
+});
+
+// ─── Demo Scenario ──────────────────────────────────────────────────────
+
+app.post('/api/demo/run-scenario', (c) => {
+  const result = runDemoScenario();
+  return c.json(result);
 });
 
 // ─── Root: Serve holds UI ────────────────────────────────────────────────
@@ -670,6 +678,7 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 async function start() {
   await ensureSubsystems();
   db = getGovernanceDb()!;
+  seedDemoHolds();
 
   // SSE keepalive every 30s
   setInterval(() => {
@@ -699,6 +708,7 @@ async function start() {
     console.log(`    GET  /api/audit     \u2014 Audit log`);
     console.log(`    GET  /privacy        — Privacy policy`);
     console.log(`    GET  /dpa            — Data processing terms`);
+    console.log(`    POST /api/demo/run-scenario`);
     console.log(`    GET  /api/health\n`);
     console.log(`  Auth: ${process.env.PS_API_KEYS ? 'enabled (PS_API_KEYS)' : 'disabled (open access)'}`);
     console.log(`  Webhook: ${process.env.PS_WEBHOOK_URL ? 'enabled' : 'disabled'}`);
