@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ahgen OS — System Architecture</title>
+<style>
+  :root {
+    --bg: #0a0a1a;
+    --bg-card: #111127;
+    --bg-card-hover: #1a1a3a;
+    --border: #1e1e3e;
+    --text: #e0e0f0;
+    --text-dim: #8888aa;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0d0d24 0%, var(--bg) 100%);
+    position: relative;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--cyan), var(--purple), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header .subtitle {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 4px;
+    letter-spacing: 2px;
+  }
+
+  .metrics-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    padding: 12px 20px;
+    background: rgba(17, 17, 39, 0.8);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .metric .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  .metric .label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .metric .value { font-weight: 700; font-size: 14px; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+    50% { opacity: 0.5; box-shadow: 0 0 8px currentColor; }
+  }
+
+  /* Flow selector tabs */
+  .flow-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    flex-wrap: wrap;
+  }
+
+  .flow-tab {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+
+  .flow-tab:hover { border-color: var(--purple); color: var(--text); }
+  .flow-tab.active { border-color: var(--purple); background: rgba(139,92,246,0.15); color: var(--purple); }
+
+  /* Main grid */
+  .architecture {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .layer {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    position: relative;
+    transition: border-color 0.3s;
+  }
+
+  .layer:hover { border-color: var(--purple); }
+
+  .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .layer-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .layer-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .layer-badge {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .components {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .component {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 10px 12px;
+    cursor: default;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .component:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-1px);
+  }
+
+  .component .name {
+    font-weight: 600;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .component .detail {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .status-active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-loaded { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .status-staged { background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+  .status-unloaded { background: var(--red); box-shadow: 0 0 4px var(--red); }
+  .status-governance { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+
+  /* Tooltip */
+  .tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a3a;
+    border: 1px solid var(--purple);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: pre-line;
+    z-index: 100;
+    max-width: 320px;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+
+  .component:hover .tooltip { display: block; }
+
+  /* Data flow visualization */
+  .flow-section {
+    margin: 20px auto;
+    max-width: 1400px;
+    padding: 0 20px;
+  }
+
+  .flow-container {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flow-container.active { display: block; }
+
+  .flow-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 12px 0;
+  }
+
+  .flow-step {
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 12px 16px;
+    text-align: center;
+    min-width: 120px;
+    position: relative;
+  }
+
+  .flow-step .step-name {
+    font-weight: 600;
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .flow-step .step-detail {
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+
+  .flow-arrow {
+    flex-shrink: 0;
+    width: 40px;
+    height: 2px;
+    position: relative;
+    margin: 0 4px;
+  }
+
+  .flow-arrow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 1px;
+  }
+
+  .flow-arrow::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+
+  .flow-arrow .pulse {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 8px;
+    height: 6px;
+    border-radius: 3px;
+    animation: flow-pulse 2s linear infinite;
+  }
+
+  @keyframes flow-pulse {
+    0% { left: 0; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { left: calc(100% - 8px); opacity: 0; }
+  }
+
+  /* Flow color themes */
+  .flow-green .flow-arrow::before { background: rgba(34,197,94,0.3); }
+  .flow-green .flow-arrow::after { border-left-color: var(--green); }
+  .flow-green .flow-arrow .pulse { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .flow-green .flow-step { border-color: rgba(34,197,94,0.2); }
+
+  .flow-blue .flow-arrow::before { background: rgba(59,130,246,0.3); }
+  .flow-blue .flow-arrow::after { border-left-color: var(--blue); }
+  .flow-blue .flow-arrow .pulse { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+  .flow-blue .flow-step { border-color: rgba(59,130,246,0.2); }
+
+  .flow-purple .flow-arrow::before { background: rgba(139,92,246,0.3); }
+  .flow-purple .flow-arrow::after { border-left-color: var(--purple); }
+  .flow-purple .flow-arrow .pulse { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+  .flow-purple .flow-step { border-color: rgba(139,92,246,0.2); }
+
+  .flow-cyan .flow-arrow::before { background: rgba(6,182,212,0.3); }
+  .flow-cyan .flow-arrow::after { border-left-color: var(--cyan); }
+  .flow-cyan .flow-arrow .pulse { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .flow-cyan .flow-step { border-color: rgba(6,182,212,0.2); }
+
+  /* Pipeline visualization */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pipeline-stage {
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    position: relative;
+    text-align: center;
+  }
+
+  .pipeline-connector {
+    width: 24px;
+    height: 2px;
+    background: var(--purple);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .pipeline-connector .pulse {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 6px var(--purple);
+    animation: flow-pulse 3s linear infinite;
+  }
+
+  /* Grid layout for layers */
+  .layers-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .layer-row {
+    display: grid;
+    gap: 12px;
+  }
+
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .row-1 { grid-template-columns: 1fr; }
+
+  @media (max-width: 900px) {
+    .row-2, .row-3 { grid-template-columns: 1fr; }
+    .flow-steps { flex-wrap: wrap; justify-content: center; }
+    .flow-arrow { width: 24px; }
+    .pipeline { flex-direction: column; align-items: stretch; }
+    .pipeline-connector { width: 2px; height: 16px; margin: 0 auto; }
+  }
+
+  /* Highlight classes for data flow */
+  .highlight-session-start .hl-session-start { border-color: var(--green) !important; box-shadow: 0 0 12px rgba(34,197,94,0.2); }
+  .highlight-session-end .hl-session-end { border-color: var(--blue) !important; box-shadow: 0 0 12px rgba(59,130,246,0.2); }
+  .highlight-governance .hl-governance { border-color: var(--purple) !important; box-shadow: 0 0 12px rgba(139,92,246,0.2); }
+  .highlight-intelligence .hl-intelligence { border-color: var(--cyan) !important; box-shadow: 0 0 12px rgba(6,182,212,0.2); }
+
+  /* Skills grid */
+  .skills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .skill-tag {
+    padding: 3px 10px;
+    background: rgba(139,92,246,0.1);
+    border: 1px solid rgba(139,92,246,0.2);
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--purple);
+  }
+
+  /* Hooks list */
+  .hooks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px;
+  }
+
+  .hook-item {
+    font-size: 10px;
+    padding: 6px 10px;
+    background: rgba(6,182,212,0.06);
+    border: 1px solid rgba(6,182,212,0.15);
+    border-radius: 3px;
+  }
+
+  .hook-item .hook-name { font-weight: 600; color: var(--cyan); }
+  .hook-item .hook-detail { color: var(--text-dim); }
+
+  footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-dim);
+    font-size: 11px;
+    border-top: 1px solid var(--border);
+    margin-top: 20px;
+  }
+
+  /* Ambient glow */
+  .glow-purple { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.3); }
+  .glow-green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
+  .glow-blue { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.25); }
+  .glow-cyan { background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.25); }
+  .glow-amber { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); }
+  .glow-pink { background: rgba(236,72,153,0.08); border-color: rgba(236,72,153,0.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ahgen OS</h1>
+  <div class="subtitle">System Architecture &mdash; Christopher Bailey's AI Operating System</div>
+</header>
+
+<div class="metrics-bar">
+  <div class="metric">
+    <span class="dot status-active"></span>
+    <span class="label">Knowledge</span>
+    <span class="value" style="color:var(--green)">1,201</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-governance"></span>
+    <span class="label">Gov Tools</span>
+    <span class="value" style="color:var(--purple)">56</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-active"></span>
+    <span class="label">Tests</span>
+    <span class="value" style="color:var(--green)">834</span>
+  </div>
+  <div class="metric">
+    <span class="dot" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan);animation:pulse-dot 2s ease-in-out infinite"></span>
+    <span class="label">Evidence</span>
+    <span class="value" style="color:var(--cyan)">158</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-loaded"></span>
+    <span class="label">MCP Plugins</span>
+    <span class="value" style="color:var(--amber)">4</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-active"></span>
+    <span class="label">Skills</span>
+    <span class="value" style="color:var(--green)">24</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-active"></span>
+    <span class="label">Hooks</span>
+    <span class="value" style="color:var(--green)">11</span>
+  </div>
+  <div class="metric">
+    <span class="dot status-loaded"></span>
+    <span class="label">Latency</span>
+    <span class="value" style="color:var(--amber)">0.164ms</span>
+  </div>
+</div>
+
+<!-- Data Flow Tabs -->
+<div class="flow-tabs">
+  <button class="flow-tab active" data-flow="session-start" data-highlight="session-start">1. Session Start</button>
+  <button class="flow-tab" data-flow="session-end" data-highlight="session-end">2. Session End</button>
+  <button class="flow-tab" data-flow="governance" data-highlight="governance">3. Governance Pipeline</button>
+  <button class="flow-tab" data-flow="intelligence" data-highlight="intelligence">4. Intelligence Loop</button>
+</div>
+
+<!-- Data Flow Visualizations -->
+<div class="flow-section">
+  <div class="flow-container flow-green active" id="flow-session-start">
+    <div class="flow-title"><span style="color:var(--green)">&#9654;</span> Session Start &mdash; Context Assembly</div>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="step-name">CLAUDE.md</div><div class="step-detail">global + project<br>198 lines rules</div></div>
+      <div class="flow-arrow"><span class="pulse"></span></div>
+      <div class="flow-step"><div class="step-name">MEMORY.md</div><div class="step-detail">home + project<br>189 lines state</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.3s"></span></div>
+      <div class="flow-step"><div class="step-name">knowledge-read.py</div><div class="step-detail">SessionStart hook<br>8 domain insights</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.6s"></span></div>
+      <div class="flow-step"><div class="step-name">Signal Pack</div><div class="step-detail">Dossier context<br>injected into session</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.9s"></span></div>
+      <div class="flow-step" style="border-color:var(--green)"><div class="step-name" style="color:var(--green)">Claude Code</div><div class="step-detail">Full context<br>assembled</div></div>
+    </div>
+  </div>
+
+  <div class="flow-container flow-blue" id="flow-session-end">
+    <div class="flow-title"><span style="color:var(--blue)">&#9654;</span> Session End &mdash; Knowledge Extraction</div>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="step-name">Conversation</div><div class="step-detail">session transcript</div></div>
+      <div class="flow-arrow"><span class="pulse"></span></div>
+      <div class="flow-step"><div class="step-name">knowledge-write.py</div><div class="step-detail">Stop hook<br>3-pass extractor</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.3s"></span></div>
+      <div class="flow-step"><div class="step-name">Haiku Extract</div><div class="step-detail">domain auto-tag<br>15/session cap</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.6s"></span></div>
+      <div class="flow-step"><div class="step-name">MEMORY.md</div><div class="step-detail">updated state<br>&lt;200 lines</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.9s"></span></div>
+      <div class="flow-step" style="border-color:var(--blue)"><div class="step-name" style="color:var(--blue)">knowledge.db</div><div class="step-detail">SQLite FTS5<br>1,201 insights</div></div>
+    </div>
+  </div>
+
+  <div class="flow-container flow-purple" id="flow-governance">
+    <div class="flow-title"><span style="color:var(--purple)">&#9654;</span> Governance &mdash; 6-Stage Pipeline (0.164ms avg)</div>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="step-name">Tool Call</div><div class="step-detail">MCP request<br>inbound</div></div>
+      <div class="flow-arrow"><span class="pulse"></span></div>
+      <div class="flow-step" style="border-color:var(--red)"><div class="step-name">Circuit Breaker</div><div class="step-detail">halted agents<br>blocked first</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.2s"></span></div>
+      <div class="flow-step"><div class="step-name">Validation</div><div class="step-detail">symbol frame<br>structural + semantic</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.4s"></span></div>
+      <div class="flow-step"><div class="step-name">Drift Check</div><div class="step-detail">state deviation<br>detection</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.6s"></span></div>
+      <div class="flow-step" style="border-color:var(--amber)"><div class="step-name">Hold Check</div><div class="step-detail">human approval<br>gate</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.8s"></span></div>
+      <div class="flow-step" style="border-color:var(--red)"><div class="step-name">Security Scan</div><div class="step-detail">vuln detection<br>CRIT/HIGH/MED/LOW</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:1s"></span></div>
+      <div class="flow-step" style="border-color:var(--green)"><div class="step-name" style="color:var(--green)">Execute</div><div class="step-detail">allow / block / hold</div></div>
+    </div>
+  </div>
+
+  <div class="flow-container flow-cyan" id="flow-intelligence">
+    <div class="flow-title"><span style="color:var(--cyan)">&#9654;</span> Intelligence &mdash; Dossier Research Loop</div>
+    <div class="flow-steps">
+      <div class="flow-step"><div class="step-name">Contract</div><div class="step-detail">RLC.DOSSIER<br>10 sources, 6 dims</div></div>
+      <div class="flow-arrow"><span class="pulse"></span></div>
+      <div class="flow-step"><div class="step-name">8-Phase Loop</div><div class="step-detail">multi-cycle<br>convergence</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.3s"></span></div>
+      <div class="flow-step"><div class="step-name">evidence.db</div><div class="step-detail">158 items<br>6-tier promotion</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.6s"></span></div>
+      <div class="flow-step"><div class="step-name">Context Pack</div><div class="step-detail">pack.md<br>entropy 3.91</div></div>
+      <div class="flow-arrow"><span class="pulse" style="animation-delay:0.9s"></span></div>
+      <div class="flow-step" style="border-color:var(--cyan)"><div class="step-name" style="color:var(--cyan)">Session Inject</div><div class="step-detail">/brief + /os<br>skills wired</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Architecture Layers -->
+<div class="layers-grid" id="arch-layers">
+
+  <!-- Row 1: Runtime -->
+  <div class="layer-row row-2">
+    <div class="layer hl-session-start hl-session-end hl-governance hl-intelligence">
+      <div class="layer-header">
+        <div class="layer-icon glow-green">&#9881;</div>
+        <div class="layer-title">Runtime</div>
+        <span class="layer-badge" style="background:rgba(34,197,94,0.15);color:var(--green)">Core</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Claude Code</div>
+          <div class="detail">Execution runtime. Anthropic CLI. Opus 4.6 (1M context).</div>
+          <div class="tooltip">The primary AI execution engine.<br>Model: claude-opus-4-6 (1M context)<br>Manages all tool calls, file I/O, and agent orchestration.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Mac Mini</div>
+          <div class="detail">Always-on. Apple M2 Pro. Host for all services.</div>
+          <div class="tooltip">Physical hardware layer.<br>Apple M2 Pro, always-on.<br>Runs: PromptSpeak server, launchd jobs,<br>Cloudflare Tunnel, all MCP plugins.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Memory Layer -->
+    <div class="layer hl-session-start hl-session-end">
+      <div class="layer-header">
+        <div class="layer-icon glow-amber">&#128203;</div>
+        <div class="layer-title">Memory</div>
+        <span class="layer-badge" style="background:rgba(245,158,11,0.15);color:var(--amber)">Persistent</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> CLAUDE.md (Global)</div>
+          <div class="detail">121 lines. Behavior rules, security, code style.</div>
+          <div class="tooltip">~/.claude/CLAUDE.md<br>121 lines of behavioral rules.<br>Loaded into every session, agent, sub-agent.<br>Security, code style, MCP config, decision authority.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> CLAUDE.md (Project)</div>
+          <div class="detail">77 lines. PromptSpeak pipeline rules, architecture.</div>
+          <div class="tooltip">Project-level instructions.<br>77 lines. Pipeline execution rules,<br>symbol frame syntax, validation rules,<br>security enforcement, "don't" list.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> MEMORY.md (Home)</div>
+          <div class="detail">120 lines. Cross-project state, gotchas, automation.</div>
+          <div class="tooltip">~/.claude/projects/.../MEMORY.md<br>120 lines. Project versions, automation state,<br>plugin reference, gotchas, archived items.<br>Updated at session end, &lt;200 line cap.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> MEMORY.md (Project)</div>
+          <div class="detail">69 lines. PromptSpeak-specific project state.</div>
+          <div class="tooltip">Project-scoped memory.<br>69 lines. Version, npm, HTTPS endpoints,<br>connectors status, test counts.<br>Auto-updated each session.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Knowledge + Governance -->
+  <div class="layer-row row-2">
+    <div class="layer hl-session-start hl-session-end">
+      <div class="layer-header">
+        <div class="layer-icon glow-blue">&#128218;</div>
+        <div class="layer-title">Knowledge</div>
+        <span class="layer-badge" style="background:rgba(59,130,246,0.15);color:var(--blue)">1,201 insights</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> knowledge.db</div>
+          <div class="detail">SQLite FTS5. 18 domains. 51 pinned. WAL mode.</div>
+          <div class="tooltip">/Volumes/OWC drive/Knowledge/knowledge.db<br>SQLite with FTS5 full-text search.<br>1,201 insights across 18 domains.<br>51 pinned, WAL mode for concurrent reads.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> SessionStart Hook</div>
+          <div class="detail">knowledge-read.py. Injects 8 domain-tagged insights.</div>
+          <div class="tooltip">~/.claude/hooks/knowledge-read.py<br>Fires on SessionStart event.<br>Queries knowledge.db for top 8 domain-relevant insights.<br>Injects signal pack from dossier context.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Stop Hook</div>
+          <div class="detail">knowledge-write.py. 3-pass extractor, 15/session cap.</div>
+          <div class="tooltip">~/.claude/hooks/knowledge-write.py<br>Fires on session Stop event.<br>3-pass extraction via Haiku model.<br>Auto-tags domains, 15 insights/session cap.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> knowledge-store MCP</div>
+          <div class="detail">5 tools: search, get, vote, pin, stats.</div>
+          <div class="tooltip">~/.claude/plugins/knowledge-store/<br>MCP plugin with 5 tools.<br>search_knowledge, get_insight, vote_insight,<br>pin_knowledge, knowledge_stats.<br>Domain filter support.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer hl-governance">
+      <div class="layer-header">
+        <div class="layer-icon glow-purple">&#128737;</div>
+        <div class="layer-title">Governance</div>
+        <span class="layer-badge" style="background:rgba(139,92,246,0.15);color:var(--purple)">56 tools</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-governance"></span> PromptSpeak</div>
+          <div class="detail">v0.4.1. 834 tests. 0.164ms latency. MIT.</div>
+          <div class="tooltip">@chrbailey/promptspeak-mcp-server<br>v0.4.1 — 56 MCP tools, 834 tests<br>Pre-execution governance layer.<br>Symbol frame validation, security scanning.<br>Avg latency: 0.164ms (P95: 0.368ms)</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> HTTPS Endpoint</div>
+          <div class="detail">promptspeak.admin-as-a-service.com/mcp</div>
+          <div class="tooltip">Cloudflare Tunnel 401f738a<br>Routes to Mac Mini :3000<br>Streamable HTTP transport at /mcp<br>Stateless per-request. CORS enabled.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-governance"></span> 6-Stage Pipeline</div>
+          <div class="detail">CB &#8594; Validate &#8594; Drift &#8594; Hold &#8594; Security &#8594; Exec</div>
+          <div class="tooltip">Circuit Breaker (block halted agents)<br>&#8594; Validation (structural + semantic)<br>&#8594; Drift Check (state deviation)<br>&#8594; Hold Check (human approval gate)<br>&#8594; Security Scan (vuln detection)<br>&#8594; Execute (allow/block/hold)<br><br>Order is load-bearing. Do not reorder.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> SQLite + Hono</div>
+          <div class="detail">Persistence: holds, decisions, audit, circuit breakers.</div>
+          <div class="tooltip">Hono HTTP server on port 3000.<br>SQLite persistence for:<br>- Hold queue (approve/reject)<br>- Decision log<br>- Audit trail<br>- Circuit breaker state</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Intelligence + Collection -->
+  <div class="layer-row row-2">
+    <div class="layer hl-intelligence">
+      <div class="layer-header">
+        <div class="layer-icon glow-cyan">&#128301;</div>
+        <div class="layer-title">Intelligence</div>
+        <span class="layer-badge" style="background:rgba(6,182,212,0.15);color:var(--cyan)">158 evidence</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan)"></span> Dossier System</div>
+          <div class="detail">4 cycles. Entropy 3.91. CONVERGED-EARLY.</div>
+          <div class="tooltip">Contract: RLC.DOSSIER.SIGNAL.001<br>AI Signal Curation research loop.<br>10 sources, 6 dimensions, 8 phases per cycle.<br>4 cycles completed, converged early.<br>Entropy 3.91 (high information diversity).</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> evidence.db</div>
+          <div class="detail">158 items. 84 verified, 70 working, 4 raw.</div>
+          <div class="tooltip">data/evidence.db<br>158 evidence items across 3 tiers:<br>- 84 verified (promoted)<br>- 70 working (corroborated)<br>- 4 raw (unverified)<br>13 methods, 6-tier promotion system.<br>Hash-based dedup, topic-tag corroboration.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Context Pack</div>
+          <div class="detail">pack.md. Wired into /brief and /os skills.</div>
+          <div class="tooltip">output/signal-curation/context/pack.md<br>Compiled intelligence briefing.<br>Injected into sessions via /brief and /os skills.<br>Key findings: Pentagon-AI governance,<br>V-JEPA benchmarks, consciousness liability.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-staged"></span> Weekly Monitor</div>
+          <div class="detail">6 event-dependent questions. Sundays 8pm.</div>
+          <div class="tooltip">contracts/weekly-monitor.json<br>scripts/weekly-monitor.sh<br>Tracks 6 open questions:<br>- Court ruling, NDAA deadline<br>- Kalinowski testimony, V-JEPA NLP<br>- Consciousness replication, Pentagon AI<br>Status: STAGED (not yet loaded)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-icon glow-green">&#128225;</div>
+        <div class="layer-title">Collection</div>
+        <span class="layer-badge" style="background:rgba(34,197,94,0.15);color:var(--green)">3 sources</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Lex Scraper</div>
+          <div class="detail">7 Chinese AI sources. 4x daily. Python 3.11.</div>
+          <div class="tooltip">com.ahgen.lex-scrape<br>7 Chinese AI regulatory sources.<br>Runs 4x daily (0/6/12/18h).<br>Must use Lex venv Python 3.11<br>(not system Python 3.14).</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Gmail / Calendar MCP</div>
+          <div class="detail">Connected. Email + calendar context.</div>
+          <div class="tooltip">Gmail MCP + Google Calendar MCP.<br>Authenticated and healthy.<br>Gmail: search, read, draft.<br>Calendar: events, free time, scheduling.<br>Note: Needs --allowedTools in launchd plists.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> Firecrawl</div>
+          <div class="detail">Web research. URL scraping and extraction.</div>
+          <div class="tooltip">Web research tool.<br>URL scraping, content extraction.<br>Used by dossier research loop<br>for source verification.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: Automation -->
+  <div class="layer-row row-1">
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-icon glow-amber">&#9201;</div>
+        <div class="layer-title">Automation (launchd)</div>
+        <span class="layer-badge" style="background:rgba(245,158,11,0.15);color:var(--amber)">7 jobs</span>
+      </div>
+      <div class="components">
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> lex-scrape</div>
+          <div class="detail">4x daily (0/6/12/18h). ACTIVE.</div>
+          <div class="tooltip">com.ahgen.lex-scrape<br>Schedule: 4x daily at 00:00, 06:00, 12:00, 18:00<br>Status: ACTIVE<br>7 Chinese AI sources via Lex venv Python 3.11</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> ops-center</div>
+          <div class="detail">Always-on (pid 51432). PromptSpeak HTTP.</div>
+          <div class="tooltip">com.promptspeak.ops-center<br>Schedule: KeepAlive (always running)<br>Status: ACTIVE (pid 51432)<br>Hono HTTP server on :3000<br>PromptSpeak MCP + Cloudflare Tunnel</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> dashboard-refresh</div>
+          <div class="detail">Every 10min. ACTIVE.</div>
+          <div class="tooltip">com.dossier.dashboard-refresh<br>Schedule: Every 10 minutes<br>Status: ACTIVE<br>Refreshes dossier dashboard data</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-loaded"></span> ahgen-brief</div>
+          <div class="detail">8am daily. LOADED.</div>
+          <div class="tooltip">com.erp-access.ahgen-brief<br>Schedule: 8:00 AM daily<br>Status: LOADED<br>Morning intelligence briefing generation</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-loaded"></span> ahgen-summary</div>
+          <div class="detail">6pm daily. LOADED.</div>
+          <div class="tooltip">com.erp-access.ahgen-summary<br>Schedule: 6:00 PM daily<br>Status: LOADED<br>End-of-day summary generation</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-unloaded"></span> ahgen-pipeline</div>
+          <div class="detail">Every 15min. UNLOADED (fixed, ready).</div>
+          <div class="tooltip">com.erp-access.ahgen-pipeline<br>Schedule: Every 15 minutes<br>Status: UNLOADED (plist FIXED)<br>--allowedTools updated with MCP tools.<br>Ready to reload.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-staged"></span> weekly-monitor</div>
+          <div class="detail">Sundays 8pm. STAGED.</div>
+          <div class="tooltip">com.dossier.weekly-monitor<br>Schedule: Sundays at 8:00 PM<br>Status: STAGED (in ~/.claude/staging/)<br>Not yet loaded into launchd.<br>Tracks 6 event-dependent open questions.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 5: MCP Plugins + Skills + Hooks -->
+  <div class="layer-row row-3">
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-icon glow-purple">&#128268;</div>
+        <div class="layer-title">MCP Plugins</div>
+        <span class="layer-badge" style="background:rgba(139,92,246,0.15);color:var(--purple)">4 active</span>
+      </div>
+      <div class="components" style="grid-template-columns:1fr">
+        <div class="component">
+          <div class="name"><span class="status-dot status-governance"></span> promptspeak</div>
+          <div class="detail">56 tools. Local plugin. Governance layer.</div>
+          <div class="tooltip">Local MCP plugin.<br>56 tools: validate, execute, parse, expand,<br>hold queue, security scan, symbols,<br>config, delegation, registry, state, audit.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-governance"></span> promptspeak-remote</div>
+          <div class="detail">56 tools. HTTPS via Cloudflare Tunnel.</div>
+          <div class="tooltip">Remote MCP endpoint.<br>Same 56 tools as local, accessed via<br>https://promptspeak.admin-as-a-service.com/mcp<br>Streamable HTTP, stateless per-request.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> touchgrass</div>
+          <div class="detail">22 tools. Emotional memory, beliefs, voice.</div>
+          <div class="tooltip">~/.claude/plugins/touchgrass/<br>22 tools: mood detection, emotional memory,<br>beliefs, briefings, voice state, calendar,<br>email summary, influence analysis,<br>pushback, authority management.</div>
+        </div>
+        <div class="component">
+          <div class="name"><span class="status-dot status-active"></span> knowledge-store</div>
+          <div class="detail">5 tools. SQLite FTS5 knowledge access.</div>
+          <div class="tooltip">~/.claude/plugins/knowledge-store/<br>5 tools: search, get, vote, pin, stats.<br>Backed by knowledge.db (1,201 insights).<br>Domain filter support, FTS5 ranking.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-icon glow-pink">&#9889;</div>
+        <div class="layer-title">Skills</div>
+        <span class="layer-badge" style="background:rgba(236,72,153,0.15);color:var(--pink)">24 registered</span>
+      </div>
+      <div style="padding:4px 0">
+        <div class="skills-row">
+          <span class="skill-tag">/os</span>
+          <span class="skill-tag">/brief</span>
+          <span class="skill-tag">/approve</span>
+          <span class="skill-tag">/prospect</span>
+          <span class="skill-tag">/pipeline</span>
+          <span class="skill-tag">/dossier-loop</span>
+          <span class="skill-tag">/red-team</span>
+          <span class="skill-tag">/sauna-service</span>
+          <span class="skill-tag" style="opacity:0.5">+16 more</span>
+        </div>
+        <div class="detail" style="color:var(--text-dim);margin-top:8px;font-size:10px;padding:0 4px">
+          Slash-command shortcuts. Context packs + instruction sets loaded on demand.
+          /os and /brief inject dossier signal pack.
+        </div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-icon glow-cyan">&#128279;</div>
+        <div class="layer-title">Hooks</div>
+        <span class="layer-badge" style="background:rgba(6,182,212,0.15);color:var(--cyan)">11 active</span>
+      </div>
+      <div class="hooks-grid">
+        <div class="hook-item">
+          <div class="hook-name">SessionStart</div>
+          <div class="hook-detail">knowledge-read.py</div>
+        </div>
+        <div class="hook-item">
+          <div class="hook-name">Stop</div>
+          <div class="hook-detail">knowledge-write.py</div>
+        </div>
+        <div class="hook-item">
+          <div class="hook-name">PreToolUse</div>
+          <div class="hook-detail">secrets-guard</div>
+        </div>
+        <div class="hook-item">
+          <div class="hook-name">PreToolUse</div>
+          <div class="hook-detail">preflight-check</div>
+        </div>
+        <div class="hook-item">
+          <div class="hook-name">PostToolUse</div>
+          <div class="hook-detail">bash-verified</div>
+        </div>
+        <div class="hook-item" style="opacity:0.6">
+          <div class="hook-name">+6 more</div>
+          <div class="hook-detail">various lifecycle hooks</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 6: Security Enforcement -->
+  <div class="layer-row row-1">
+    <div class="layer hl-governance" style="border-left:3px solid var(--purple)">
+      <div class="layer-header">
+        <div class="layer-icon glow-purple">&#128274;</div>
+        <div class="layer-title">Security Enforcement Matrix</div>
+        <span class="layer-badge" style="background:rgba(239,68,68,0.15);color:var(--red)">Write Actions</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+        <div class="component" style="border-left:3px solid var(--red)">
+          <div class="name" style="color:var(--red)">CRITICAL &mdash; Block</div>
+          <div class="detail">SQL injection, hardcoded secrets. Immediate rejection.</div>
+        </div>
+        <div class="component" style="border-left:3px solid var(--amber)">
+          <div class="name" style="color:var(--amber)">HIGH &mdash; Hold</div>
+          <div class="detail">Security TODOs, logging secrets, insecure defaults.</div>
+        </div>
+        <div class="component" style="border-left:3px solid var(--blue)">
+          <div class="name" style="color:var(--blue)">MEDIUM &mdash; Warn</div>
+          <div class="detail">Empty catch blocks, hedging comments, disabled tests.</div>
+        </div>
+        <div class="component" style="border-left:3px solid var(--text-dim)">
+          <div class="name" style="color:var(--text-dim)">LOW/INFO &mdash; Log</div>
+          <div class="detail">Destructive DB/filesystem operations. Audit trail only.</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--text-dim)">
+        Scanned actions: write_file, edit_file, create_file, patch_file &mdash; Tools: ps_security_scan, ps_security_gate, ps_security_config
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Ahgen OS &mdash; Built by Christopher Bailey &mdash; Powered by Claude Code (Opus 4.6, 1M context) &mdash; PromptSpeak v0.4.1
+  <br>Mac Mini (M2 Pro) &bull; 56 MCP Tools &bull; 834 Tests &bull; 1,201 Knowledge Insights &bull; 158 Evidence Items
+</footer>
+
+<script>
+  // Flow tab switching + component highlighting
+  const tabs = document.querySelectorAll('.flow-tab');
+  const flows = document.querySelectorAll('.flow-container');
+  const archLayers = document.getElementById('arch-layers');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      flows.forEach(f => f.classList.remove('active'));
+      const targetFlow = document.getElementById('flow-' + tab.dataset.flow);
+      if (targetFlow) targetFlow.classList.add('active');
+
+      // Highlight related components
+      archLayers.className = 'layers-grid';
+      const hl = tab.dataset.highlight;
+      if (hl) archLayers.classList.add('highlight-' + hl);
+    });
+  });
+
+  // Stagger animation delays on flow pulses for visual variety
+  document.querySelectorAll('.flow-container').forEach(container => {
+    const pulses = container.querySelectorAll('.pulse');
+    pulses.forEach((p, i) => {
+      p.style.animationDelay = (i * 0.4) + 's';
+    });
+  });
+
+  // Activate first highlight
+  archLayers.classList.add('highlight-session-start');
+</script>
+
+</body>
+</html>
