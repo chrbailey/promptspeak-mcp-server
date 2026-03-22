@@ -2,11 +2,22 @@
 
 ## Overview
 
-Pre-execution governance layer for AI agents. Intercepts MCP tool calls, validates against deterministic rules, blocks or holds risky operations for human approval. Validation latency: 0.103ms avg.
+Pre-execution governance layer for AI agents. Intercepts MCP tool calls, validates against deterministic rules, blocks or holds risky operations for human approval. Validation latency: 0.164ms avg (P95: 0.368ms).
 
-**v0.4.1** — 829 tests, 56 MCP tools, MIT licensed, published as `@chrbailey/promptspeak-mcp-server`.
+**v0.4.1** — 834 tests, 56 MCP tools, MIT licensed, published as `@chrbailey/promptspeak-mcp-server`.
 HTTPS live at `https://promptspeak.admin-as-a-service.com/mcp` (Cloudflare Tunnel → Mac Mini).
-Safety annotations on all 56 tools. Streamable HTTP transport. Connectors submission pending (3 blockers: examples, CORS audit, token cap audit).
+Safety annotations on all 56 tools. Streamable HTTP transport. Connectors submission: all requirements met, form submitted 2026-03-21.
+
+## General Principles
+
+- **Prefer simplicity over cleverness.** Before building new infrastructure or multi-layer abstractions, ask whether updating existing files (CLAUDE.md, MEMORY.md) or a simpler approach would suffice. The codebase was cut from 82K to 16K lines by following this principle.
+- **Always produce complete output.** Never return "No response requested" or truncated results. If output will be long, break it into clearly labeled parts and continue without being asked.
+
+## Pipeline Execution Rules
+
+- **Validate phase output before proceeding.** Each phase must produce non-empty output before passing to the next phase. If upstream data is None/empty, halt and report the failure clearly rather than silently continuing with training knowledge.
+- **Confirm the target before each phase.** When generating dossiers or research reports, always confirm the target company/entity name before each phase and never mix up targets mid-pipeline.
+- **Verify tool access before starting.** Before web research tasks, verify that WebSearch and WebFetch tool permissions are granted. If denied, immediately inform the user rather than repeatedly attempting and failing silently.
 
 ## Architecture
 
