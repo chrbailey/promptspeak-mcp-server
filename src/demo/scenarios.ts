@@ -13,7 +13,7 @@ function makeHold(template: ScenarioHold): HoldRequest {
     ...template,
     holdId: makeHoldId(),
     createdAt: now,
-    expiresAt: now + 600000,
+    expiresAt: now + 86400000, // 24 hours
     state: 'pending',
   };
 }
