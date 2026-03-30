@@ -275,6 +275,10 @@ Use `ps_security_gate` instead of `ps_security_scan` to enforce the policy — i
 ```
 
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/chrbailey-promptspeak-mcp-server).
+
 ## How it works: 9-stage validation pipeline
 
 Every tool call passes through this pipeline. If any stage fails, execution is blocked.
