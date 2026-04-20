@@ -24,6 +24,10 @@ import { initializeSymbolManager, getSymbolManager, type SymbolManager } from '.
 import { initializeGovernanceDb, type GovernanceDatabase } from './persistence/database.js';
 import { holdManager } from './gatekeeper/hold-manager.js';
 import { circuitBreaker } from './drift/circuit-breaker.js';
+import { VerbRegistryDB, seedCoreVerbs, seedProcurementVerbs, seedProcurementModifiers } from './registry/index.js';
+import { setRegistryDB } from './tools/ps_registry.js';
+import { HandshakeProtocol } from './handshake/index.js';
+import { setHandshakeProtocol } from './tools/ps_handshake.js';
 
 
 const logger = createLogger('ServerInit');
@@ -39,12 +43,16 @@ export interface ServerConfig {
   symbolsRoot?: string;
   /** Root directory for governance persistence (holds, circuit breakers) */
   governanceRoot?: string;
+  /** Root directory for the verb registry DB (defaults to governanceRoot) */
+  verbRegistryRoot?: string;
   /** Whether to skip subsystem initialization (for testing) */
   skipSubsystems?: boolean;
   /** Skip individual subsystems */
   skipPolicyLoader?: boolean;
   skipSymbolManager?: boolean;
   skipGovernanceDb?: boolean;
+  skipVerbRegistry?: boolean;
+  skipHandshake?: boolean;
 }
 
 export interface SubsystemStatus {
@@ -59,6 +67,8 @@ export interface InitializationResult {
     policyLoader: SubsystemStatus;
     symbolManager: SubsystemStatus;
     governanceDb: SubsystemStatus;
+    verbRegistry: SubsystemStatus;
+    handshake: SubsystemStatus;
   };
   errors: string[];
   /** Reference to initialized subsystems for direct access */
@@ -66,6 +76,8 @@ export interface InitializationResult {
     policyLoader?: PolicyLoader;
     symbolManager?: SymbolManager;
     governanceDb?: GovernanceDatabase;
+    verbRegistry?: VerbRegistryDB;
+    handshake?: HandshakeProtocol;
   };
 }
 
@@ -208,6 +220,100 @@ function initializeGovernance(governanceRoot: string): SubsystemStatus & { insta
   }
 }
 
+/**
+ * Initialize the verb registry subsystem (spec §4.2–4.4).
+ * Creates the SQLite-backed VerbRegistryDB, seeds the 30 core verbs,
+ * 6 procurement verbs, and 6 procurement modifiers on first run, and
+ * wires the DB into the ps_registry_* tool handlers.
+ *
+ * Idempotent: if the DB already contains verbs, the seed step is skipped.
+ */
+function initializeVerbRegistry(verbRoot: string): SubsystemStatus & { instance?: VerbRegistryDB } {
+  try {
+    logger.info('Initializing verb registry', { root: verbRoot });
+
+    const dbPath = path.join(verbRoot, 'verb-registry.db');
+    const db = new VerbRegistryDB(dbPath);
+
+    const existingTotal = db.getStats().total;
+    let seededOnThisRun = 0;
+    if (existingTotal === 0) {
+      seedCoreVerbs(db);
+      seedProcurementVerbs(db);
+      seedProcurementModifiers(db);
+      seededOnThisRun = db.getStats().total;
+    }
+
+    setRegistryDB(db);
+
+    const stats = db.getStats();
+    logger.info('Verb registry initialized', {
+      dbPath,
+      total: stats.total,
+      byNamespace: stats.byNamespace,
+      byStatus: stats.byStatus,
+      seededOnThisRun,
+    });
+
+    return {
+      initialized: true,
+      details: {
+        dbPath,
+        totalVerbs: stats.total,
+        byNamespace: stats.byNamespace,
+        byStatus: stats.byStatus,
+        seededOnThisRun,
+      },
+      instance: db,
+    };
+  } catch (error) {
+    const msg = `Verb registry failed: ${error instanceof Error ? error.message : String(error)}`;
+    logger.error(msg, error instanceof Error ? error : undefined);
+    return {
+      initialized: false,
+      error: msg,
+    };
+  }
+}
+
+/**
+ * Initialize the handshake protocol subsystem (spec §5.2).
+ * Instantiates a HandshakeProtocol with capabilities derived from the
+ * live verb registry (count, namespaces) and wires it into the
+ * ps_handshake_* tool handlers.
+ */
+function initializeHandshake(verbRegistry?: VerbRegistryDB): SubsystemStatus & { instance?: HandshakeProtocol } {
+  try {
+    const stats = verbRegistry?.getStats();
+    const namespaces = stats ? Object.keys(stats.byNamespace).sort() : ['ps:core'];
+    const verbCount = stats?.total ?? 0;
+
+    const protocol = new HandshakeProtocol({
+      version: '0.2',
+      verbCount,
+      status: 'active',
+      namespaces,
+    });
+
+    setHandshakeProtocol(protocol);
+
+    logger.info('Handshake protocol initialized', { verbCount, namespaces });
+
+    return {
+      initialized: true,
+      details: { verbCount, namespaces },
+      instance: protocol,
+    };
+  } catch (error) {
+    const msg = `Handshake protocol failed: ${error instanceof Error ? error.message : String(error)}`;
+    logger.error(msg, error instanceof Error ? error : undefined);
+    return {
+      initialized: false,
+      error: msg,
+    };
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN INITIALIZATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -247,6 +353,8 @@ export async function initializeServer(
       policyLoader: { initialized: false },
       symbolManager: { initialized: false },
       governanceDb: { initialized: false },
+      verbRegistry: { initialized: false },
+      handshake: { initialized: false },
     },
     errors: [],
     instances: {},
@@ -263,6 +371,7 @@ export async function initializeServer(
     policiesRoot: config.policiesRoot ?? defaults.policiesRoot,
     symbolsRoot: config.symbolsRoot ?? defaults.symbolsRoot,
     governanceRoot: config.governanceRoot ?? defaults.governanceRoot,
+    verbRegistryRoot: config.verbRegistryRoot ?? config.governanceRoot ?? defaults.governanceRoot,
   };
 
   logger.info('Beginning server initialization', {
@@ -334,6 +443,49 @@ export async function initializeServer(
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Initialize verb registry (spec §4.2–4.4)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (!config.skipVerbRegistry) {
+    const verbResult = initializeVerbRegistry(paths.verbRegistryRoot);
+    result.subsystems.verbRegistry = {
+      initialized: verbResult.initialized,
+      error: verbResult.error,
+      details: verbResult.details,
+    };
+    if (verbResult.instance) {
+      result.instances.verbRegistry = verbResult.instance;
+    }
+    if (!verbResult.initialized && verbResult.error) {
+      result.errors.push(verbResult.error);
+    }
+  } else {
+    logger.info('Skipping verb registry initialization');
+    result.subsystems.verbRegistry = { initialized: false, error: 'Skipped by configuration' };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Initialize handshake protocol (spec §5.2)
+  // Depends on verb registry to report accurate capabilities.
+  // ─────────────────────────────────────────────────────────────────────────
+  if (!config.skipHandshake) {
+    const handshakeResult = initializeHandshake(result.instances.verbRegistry);
+    result.subsystems.handshake = {
+      initialized: handshakeResult.initialized,
+      error: handshakeResult.error,
+      details: handshakeResult.details,
+    };
+    if (handshakeResult.instance) {
+      result.instances.handshake = handshakeResult.instance;
+    }
+    if (!handshakeResult.initialized && handshakeResult.error) {
+      result.errors.push(handshakeResult.error);
+    }
+  } else {
+    logger.info('Skipping handshake protocol initialization');
+    result.subsystems.handshake = { initialized: false, error: 'Skipped by configuration' };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Final status
   // ─────────────────────────────────────────────────────────────────────────
   result.success = result.errors.length === 0;
@@ -346,6 +498,8 @@ export async function initializeServer(
       policyLoader: result.subsystems.policyLoader.initialized,
       symbolManager: result.subsystems.symbolManager.initialized,
       governanceDb: result.subsystems.governanceDb.initialized,
+      verbRegistry: result.subsystems.verbRegistry.initialized,
+      handshake: result.subsystems.handshake.initialized,
     });
   }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { VerbRegistryDB } from '../../../src/registry/registry-db.js';
-import { seedCoreVerbs, seedProcurementVerbs, CORE_VERB_SYMBOLS, PROCUREMENT_VERB_SYMBOLS } from '../../../src/registry/seed-verbs.js';
+import { seedCoreVerbs, seedProcurementVerbs, seedProcurementModifiers, CORE_VERB_SYMBOLS, PROCUREMENT_VERB_SYMBOLS, PROCUREMENT_MODIFIER_SYMBOLS } from '../../../src/registry/seed-verbs.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -103,6 +103,37 @@ describe('Seed Verbs', () => {
       expect(stats.total).toBe(36);
       expect(stats.byNamespace['ps:core']).toBe(30);
       expect(stats.byNamespace['ps:gov']).toBe(6);
+    });
+  });
+
+  describe('seedProcurementModifiers', () => {
+    it('should seed exactly 6 procurement modifiers', () => {
+      seedProcurementModifiers(db);
+      const stats = db.getStats();
+      expect(stats.total).toBe(6);
+    });
+
+    it('should register modifiers with the six spec-§3.4 symbols', () => {
+      seedProcurementModifiers(db);
+      expect(PROCUREMENT_MODIFIER_SYMBOLS).toEqual(['|vehicle', '|naics', '|cage', '|clearance', '|set-aside', '|past-perf']);
+      for (const symbol of PROCUREMENT_MODIFIER_SYMBOLS) {
+        const entry = db.lookup(symbol);
+        expect(entry, `${symbol} should exist`).toBeDefined();
+        expect(entry!.category, `${symbol} should be category=modifier`).toBe('modifier');
+        expect(entry!.namespace, `${symbol} should be in ps:gov`).toBe('ps:gov');
+        expect(entry!.status, `${symbol} should be active`).toBe('active');
+        expect(entry!.safety_class, `${symbol} should be monitored`).toBe('monitored');
+      }
+    });
+
+    it('should give all 42 symbols total when seeded with the core + gov verbs', () => {
+      seedCoreVerbs(db);
+      seedProcurementVerbs(db);
+      seedProcurementModifiers(db);
+      const stats = db.getStats();
+      expect(stats.total).toBe(42);
+      expect(stats.byNamespace['ps:core']).toBe(30);
+      expect(stats.byNamespace['ps:gov']).toBe(12);
     });
   });
 });

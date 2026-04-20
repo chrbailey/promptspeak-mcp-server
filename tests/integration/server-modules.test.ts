@@ -116,6 +116,8 @@ describe('Server Module Integration', () => {
         skipPolicyLoader: true,
         skipSymbolManager: true,
         skipGovernanceDb: true,
+        skipVerbRegistry: true,
+        skipHandshake: true,
       });
 
       // All subsystems skipped - success but nothing initialized
@@ -123,6 +125,8 @@ describe('Server Module Integration', () => {
       expect(result.subsystems.policyLoader.initialized).toBe(false);
       expect(result.subsystems.symbolManager.initialized).toBe(false);
       expect(result.subsystems.governanceDb.initialized).toBe(false);
+      expect(result.subsystems.verbRegistry.initialized).toBe(false);
+      expect(result.subsystems.handshake.initialized).toBe(false);
     });
 
     it('should return structured initialization result', async () => {
@@ -140,6 +144,8 @@ describe('Server Module Integration', () => {
       expect(result.subsystems).toHaveProperty('policyLoader');
       expect(result.subsystems).toHaveProperty('symbolManager');
       expect(result.subsystems).toHaveProperty('governanceDb');
+      expect(result.subsystems).toHaveProperty('verbRegistry');
+      expect(result.subsystems).toHaveProperty('handshake');
     });
   });
 

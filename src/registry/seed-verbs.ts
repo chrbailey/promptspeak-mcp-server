@@ -66,15 +66,24 @@ const PROCUREMENT_VERBS: VerbSeed[] = [
   { symbol: '::seek', definition: 'Discovery and evaluation of potential partners or opportunities.' },
 ];
 
+const PROCUREMENT_MODIFIERS: VerbSeed[] = [
+  { symbol: '|vehicle', definition: 'Contract vehicle type (SDVOSB, 8a, GWAC, BPA, IDIQ, GSA).' },
+  { symbol: '|naics', definition: 'NAICS code for industry classification.' },
+  { symbol: '|cage', definition: 'CAGE code for entity identification.' },
+  { symbol: '|clearance', definition: 'Security clearance level required or held.' },
+  { symbol: '|set-aside', definition: 'Set-aside type designation for restricted solicitations.' },
+  { symbol: '|past-perf', definition: 'Past performance reference by contract number or description.' },
+];
+
 /** Verbs that require elevated safety classification. */
 const MONITORED_VERBS = new Set(['::delegate']);
 
-function seedVerbs(db: VerbRegistryDB, verbs: VerbSeed[], namespace: string, defaultSafetyClass: 'unrestricted' | 'monitored'): void {
+function seedVerbs(db: VerbRegistryDB, verbs: VerbSeed[], namespace: string, defaultSafetyClass: 'unrestricted' | 'monitored', category: 'verb' | 'modifier' = 'verb'): void {
   for (const verb of verbs) {
     const input: RegisterInput = {
       symbol: verb.symbol,
       namespace,
-      category: 'verb',
+      category,
       definition: verb.definition,
       safety_class: MONITORED_VERBS.has(verb.symbol) ? 'monitored' : defaultSafetyClass,
       registered_by: 'PSR',
@@ -105,6 +114,15 @@ export function seedProcurementVerbs(db: VerbRegistryDB): void {
   seedVerbs(db, PROCUREMENT_VERBS, 'ps:gov', 'monitored');
 }
 
+/**
+ * Seed the 6 procurement-domain modifiers from spec Section 3.4.
+ * Modifiers carry dynamic values at use-time; the registry stores the key form
+ * (e.g. `|vehicle`) and semantics so agents can resolve them at parse.
+ */
+export function seedProcurementModifiers(db: VerbRegistryDB): void {
+  seedVerbs(db, PROCUREMENT_MODIFIERS, 'ps:gov', 'monitored', 'modifier');
+}
+
 /** All core verb symbols for testing convenience. */
 export const CORE_VERB_SYMBOLS = [
   ...CORE_ANALYSIS,
@@ -116,3 +134,6 @@ export const CORE_VERB_SYMBOLS = [
 
 /** All procurement verb symbols for testing convenience. */
 export const PROCUREMENT_VERB_SYMBOLS = PROCUREMENT_VERBS.map(v => v.symbol);
+
+/** All procurement modifier symbols for testing convenience. */
+export const PROCUREMENT_MODIFIER_SYMBOLS = PROCUREMENT_MODIFIERS.map(v => v.symbol);
