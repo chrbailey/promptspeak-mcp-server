@@ -69,7 +69,9 @@
     "seed:gov:dry-run": "tsx scripts/seed-governance.ts --dry-run",
     "seed:gov:force": "tsx scripts/seed-governance.ts --force",
     "demo:seed": "tsx scripts/demo-playbook.ts seed",
-    "demo:run": "tsx scripts/demo-playbook.ts"
+    "demo:run": "tsx scripts/demo-playbook.ts",
+    "convergence": "tsx scripts/convergence/run.ts",
+    "convergence:dry-run": "tsx scripts/convergence/run.ts --dry-run"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
