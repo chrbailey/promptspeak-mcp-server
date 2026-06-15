@@ -17,6 +17,15 @@ import { BaselineStore } from './baseline.js';
 import { TripwireInjector } from './tripwire.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import { ContinuousMonitor } from './monitor.js';
+import type { OperationContext } from '../utils/embedding-provider.js';
+
+export type { OperationContext } from '../utils/embedding-provider.js';
+export {
+  getEmbeddingProvider,
+  setEmbeddingProvider,
+  resetEmbeddingProvider,
+  type EmbeddingProvider,
+} from '../utils/embedding-provider.js';
 
 // Create integrated drift detection engine
 export class DriftDetectionEngine {
@@ -100,10 +109,11 @@ export class DriftDetectionEngine {
     agentId: string,
     frame: string,
     action: string,
-    success: boolean
+    success: boolean,
+    context?: OperationContext
   ): { type: string; message: string } | null {
-    // Record with monitor
-    this.monitor.recordOperation(agentId, frame, action, success);
+    // Record with monitor (context carries behavioral signal for drift)
+    this.monitor.recordOperation(agentId, frame, action, success, undefined, context);
 
     // Check drift status
     const status = this.monitor.getDriftStatus(agentId);

@@ -13,7 +13,8 @@ import { BaselineStore } from './baseline.js';
 import { TripwireInjector } from './tripwire.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import { generateAlertId } from '../utils/hash.js';
-import { calculateDriftScore, generateFrameEmbedding } from '../utils/embeddings.js';
+import { calculateDriftScore } from '../utils/embeddings.js';
+import { getEmbeddingProvider, type OperationContext } from '../utils/embedding-provider.js';
 import { FrameValidator } from '../gatekeeper/validator.js';
 import { DynamicResolver } from '../gatekeeper/resolver.js';
 
@@ -90,7 +91,8 @@ export class ContinuousMonitor {
     frame: string | ParsedFrame,
     action: string | string[],
     success: boolean,
-    senderId?: string
+    senderId?: string,
+    context?: OperationContext
   ): DriftMetrics {
     // Handle string frame
     const parsedFrame: ParsedFrame = typeof frame === 'string'
@@ -115,7 +117,7 @@ export class ContinuousMonitor {
     // Handle string action
     const behavior = typeof action === 'string' ? [action] : action;
 
-    return this._recordOperation(agentId, parsedFrame, behavior, success, senderId);
+    return this._recordOperation(agentId, parsedFrame, behavior, success, senderId, context);
   }
 
   /**
@@ -127,7 +129,8 @@ export class ContinuousMonitor {
     frame: ParsedFrame,
     behavior: string[],
     success: boolean,
-    senderId?: string
+    senderId?: string,
+    context?: OperationContext
   ): DriftMetrics {
     if (!this.enabled) {
       return this.getMetrics(agentId);
@@ -136,8 +139,9 @@ export class ContinuousMonitor {
     const metrics = this.getMetrics(agentId);
     const now = Date.now();
 
-    // 1. Record embedding
-    const embedding = generateFrameEmbedding(frame);
+    // 1. Record embedding — includes behavioral content (args/results) when
+    //    available, so drift reflects what the agent did, not just the frame glyphs.
+    const embedding = getEmbeddingProvider().embed({ frame, behavior, context });
     this.recordEmbedding(agentId, embedding);
 
     // 2. Compare to baseline if available

@@ -129,3 +129,59 @@ export function calculateDriftScore(baseline: number[], current: number[]): numb
   // Normalize to 0-1 range (assuming max distance is sqrt(2) for normalized vectors)
   return Math.min(1, distance / Math.sqrt(2));
 }
+
+/**
+ * Generate a deterministic embedding from arbitrary behavioral content
+ * (serialized tool arguments, results, etc).
+ *
+ * Unlike generateFrameEmbedding — which only captures the symbol glyphs of a
+ * frame — this captures the actual content of an operation, so drift detection
+ * can react to behavioral change, not just frame composition. It is deterministic
+ * and local (no network, no model dependency), which keeps validation latency flat.
+ * For semantic drift, inject a real model via the EmbeddingProvider seam.
+ */
+export function generateContentEmbedding(content: string): number[] {
+  const embedding: number[] = new Array(EMBEDDING_DIM).fill(0);
+  if (!content) return embedding;
+
+  // Distribute each character's influence across the vector deterministically.
+  // Two independent projections reduce collisions between similar strings.
+  for (let i = 0; i < content.length; i++) {
+    const code = content.charCodeAt(i);
+    const d1 = (code + i) % EMBEDDING_DIM;
+    embedding[d1] += Math.sin(code * 0.131 + i * 0.077);
+    const d2 = (code * 7 + i * 13) % EMBEDDING_DIM;
+    embedding[d2] += Math.cos(code * 0.217 + i * 0.043);
+  }
+
+  // Normalize to unit length so distances stay in the same scale as frame vectors.
+  const magnitude = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0));
+  if (magnitude > 0) {
+    for (let i = 0; i < EMBEDDING_DIM; i++) {
+      embedding[i] /= magnitude;
+    }
+  }
+
+  return embedding;
+}
+
+/**
+ * Blend two embeddings by a weight on the first, returning a re-normalized vector.
+ * weightA = 1 yields purely `a`; weightA = 0 yields purely `b`.
+ */
+export function blendEmbeddings(a: number[], b: number[], weightA = 0.5): number[] {
+  if (a.length !== b.length) {
+    throw new Error('Embedding dimensions must match');
+  }
+  const out: number[] = new Array(a.length).fill(0);
+  for (let i = 0; i < a.length; i++) {
+    out[i] = weightA * a[i] + (1 - weightA) * b[i];
+  }
+  const magnitude = Math.sqrt(out.reduce((sum, v) => sum + v * v, 0));
+  if (magnitude > 0) {
+    for (let i = 0; i < out.length; i++) {
+      out[i] /= magnitude;
+    }
+  }
+  return out;
+}
