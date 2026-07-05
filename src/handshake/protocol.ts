@@ -8,6 +8,7 @@
  * Enables agents to verify PromptSpeak capability before issuing commands.
  */
 
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { parse, ParseError } from '../grammar/parser.js';
 import { expand } from '../grammar/expander.js';
 
@@ -26,11 +27,124 @@ export interface HandshakeResponse {
   error?: string;
 }
 
+export interface HandshakeChallenge {
+  nonce: string;
+  expiresAt: number;
+  ttlMs: number;
+}
+
+export interface ChallengeVerification {
+  verified: boolean;
+  reason?: string;
+}
+
+export interface HandshakeOptions {
+  /** Shared secret for HMAC auth. Falls back to env, then an ephemeral per-process key. */
+  secret?: string;
+  /** Challenge time-to-live in milliseconds (default 60s). */
+  challengeTtlMs?: number;
+}
+
+const DEFAULT_CHALLENGE_TTL_MS = 60_000;
+
 export class HandshakeProtocol {
   private capabilities: HandshakeCapabilities;
+  private readonly secret: string;
+  private readonly secretIsEphemeral: boolean;
+  private readonly challengeTtlMs: number;
+  // nonce -> expiry timestamp (single-use, expiring)
+  private readonly pendingChallenges = new Map<string, number>();
 
-  constructor(capabilities: HandshakeCapabilities) {
+  constructor(capabilities: HandshakeCapabilities, options?: HandshakeOptions) {
     this.capabilities = capabilities;
+    this.challengeTtlMs = options?.challengeTtlMs ?? DEFAULT_CHALLENGE_TTL_MS;
+
+    const configured = options?.secret ?? process.env.PROMPTSPEAK_HANDSHAKE_SECRET;
+    if (configured && configured.length > 0) {
+      this.secret = configured;
+      this.secretIsEphemeral = false;
+    } else {
+      // No shared secret configured: generate an ephemeral per-process key so
+      // prove/verify still round-trips within this instance. Cross-process
+      // verification requires a configured PROMPTSPEAK_HANDSHAKE_SECRET.
+      this.secret = randomBytes(32).toString('hex');
+      this.secretIsEphemeral = true;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AUTHENTICATED CHALLENGE–RESPONSE (HMAC-SHA256)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** True when a durable (non-ephemeral) shared secret is in use. */
+  hasSharedSecret(): boolean {
+    return !this.secretIsEphemeral;
+  }
+
+  /**
+   * Verifier side: issue a single-use, expiring challenge nonce.
+   * The peer must return HMAC-SHA256(secret, nonce) via proveChallenge().
+   */
+  issueChallenge(): HandshakeChallenge {
+    this.pruneExpiredChallenges();
+    const nonce = randomBytes(16).toString('hex');
+    const expiresAt = Date.now() + this.challengeTtlMs;
+    this.pendingChallenges.set(nonce, expiresAt);
+    return { nonce, expiresAt, ttlMs: this.challengeTtlMs };
+  }
+
+  /**
+   * Prover side: compute the HMAC proof for a challenge nonce using the secret.
+   */
+  proveChallenge(nonce: string): string {
+    return this.computeMac(nonce);
+  }
+
+  /**
+   * Verifier side: verify a peer's HMAC proof against an issued nonce.
+   * Constant-time comparison; nonce is consumed (single-use) on any attempt.
+   */
+  verifyChallenge(nonce: string, mac: string): ChallengeVerification {
+    // Read before pruning so a genuinely-expired (but still tracked) nonce is
+    // reported as "expired" rather than "unknown".
+    const expiresAt = this.pendingChallenges.get(nonce);
+    if (expiresAt === undefined) {
+      return { verified: false, reason: 'Unknown or already-used challenge nonce' };
+    }
+    // Consume the nonce regardless of outcome to prevent replay/brute-force.
+    this.pendingChallenges.delete(nonce);
+
+    if (Date.now() > expiresAt) {
+      return { verified: false, reason: 'Challenge expired' };
+    }
+
+    const expected = Buffer.from(this.computeMac(nonce), 'hex');
+    let provided: Buffer;
+    try {
+      provided = Buffer.from(mac, 'hex');
+    } catch {
+      return { verified: false, reason: 'Malformed MAC' };
+    }
+
+    if (provided.length !== expected.length) {
+      return { verified: false, reason: 'MAC length mismatch' };
+    }
+
+    const ok = timingSafeEqual(provided, expected);
+    return ok ? { verified: true } : { verified: false, reason: 'MAC mismatch' };
+  }
+
+  private computeMac(nonce: string): string {
+    return createHmac('sha256', this.secret).update(nonce).digest('hex');
+  }
+
+  private pruneExpiredChallenges(): void {
+    const now = Date.now();
+    for (const [nonce, expiresAt] of this.pendingChallenges) {
+      if (now > expiresAt) {
+        this.pendingChallenges.delete(nonce);
+      }
+    }
   }
 
   /**

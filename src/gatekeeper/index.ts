@@ -64,12 +64,31 @@ const DEFAULT_EVICTION_CONFIG: AgentEvictionConfig = {
   logEvictions: true,
 };
 
+/**
+ * A real tool executor. When set, the gatekeeper runs this AFTER all
+ * pre-execution checks pass, instead of the built-in simulation. Synchronous
+ * by design — the gatekeeper's execute() is synchronous and the codebase uses
+ * synchronous I/O (better-sqlite3). Executors that must perform async work
+ * should dispatch it and return a handle/acknowledgement synchronously.
+ *
+ * Throwing from an executor is treated as a failed execution (not a crash):
+ * the failure is recorded for drift and surfaced in the ExecuteResult.
+ */
+export type ToolExecutor = (
+  tool: string,
+  args: Record<string, unknown>,
+  ctx: { agentId: string; frame: string }
+) => unknown;
+
 export class Gatekeeper {
   private resolver: DynamicResolver;
   private validator: FrameValidator;
   private interceptor: ActionInterceptor;
   private coverageCalculator: CoverageCalculator;
   private holdManager: HoldManager;
+
+  // Optional real executor. Defaults to simulation when unset (safe default).
+  private executor?: ToolExecutor;
 
   // Frame cache for chain validation (with eviction)
   private activeFrames: Map<string, ResolvedFrame> = new Map();
@@ -99,12 +118,16 @@ export class Gatekeeper {
     evictedByInactivity: 0,
   };
 
-  constructor(evictionConfig?: Partial<AgentEvictionConfig>) {
+  constructor(
+    evictionConfig?: Partial<AgentEvictionConfig>,
+    options?: { executor?: ToolExecutor }
+  ) {
     this.resolver = new DynamicResolver();
     this.validator = new FrameValidator();
     this.interceptor = new ActionInterceptor();
     this.coverageCalculator = new CoverageCalculator();
     this.holdManager = holdManager;  // Use singleton
+    this.executor = options?.executor;
     this.evictionConfig = { ...DEFAULT_EVICTION_CONFIG, ...evictionConfig };
 
     // Start periodic cleanup if enabled
@@ -138,6 +161,19 @@ export class Gatekeeper {
    */
   getEvictionConfig(): AgentEvictionConfig {
     return { ...this.evictionConfig };
+  }
+
+  /**
+   * Register (or clear) a real tool executor. When set, it replaces the
+   * built-in simulation in STEP 6 of the execution pipeline.
+   */
+  setExecutor(executor: ToolExecutor | undefined): void {
+    this.executor = executor;
+  }
+
+  /** Whether a real executor is currently registered. */
+  hasExecutor(): boolean {
+    return this.executor !== undefined;
   }
 
   /**
@@ -693,13 +729,51 @@ export class Gatekeeper {
 
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 6: TOOL EXECUTION
-    // All pre-execution checks passed - now execute
+    // All pre-execution checks passed - now execute via the registered executor,
+    // falling back to simulation when none is configured (safe default).
     // ═══════════════════════════════════════════════════════════════════════
     preFlightCheck.passed = true;
-    const result = this.simulateToolExecution(tool, effectiveArgs);
+    let result: unknown;
+    let executionSucceeded = true;
+    let executionError: string | undefined;
+    try {
+      result = this.executor
+        ? this.executor(tool, effectiveArgs, { agentId, frame: effectiveFrame })
+        : this.simulateToolExecution(tool, effectiveArgs);
+    } catch (err) {
+      executionSucceeded = false;
+      executionError = err instanceof Error ? err.message : String(err);
+      result = { tool, executed: false, error: executionError };
+    }
 
-    // Record successful operation in drift engine
-    driftEngine.recordOperation(agentId, frame, tool, true);
+    // Record operation in drift engine with behavioral context (args + result),
+    // so drift detection reacts to actual behavior, not just frame composition.
+    driftEngine.recordOperation(agentId, frame, tool, executionSucceeded, {
+      args: effectiveArgs,
+      result,
+    });
+
+    // A real executor that threw is a failed execution, not a pipeline crash.
+    if (!executionSucceeded) {
+      this.recordExecution(agentId, request, decision, result);
+      this.activeFrames.set(agentId, resolved);
+      return {
+        success: false,
+        allowed: true,
+        error: executionError,
+        result,
+        preFlightCheck,
+        interceptorDecision: {
+          ...decision,
+          preFlightChecks: {
+            circuitBreakerPassed: true,
+            driftPredictionPassed: preFlightCheck.checks.driftPrediction.passed,
+            baselineCheckPassed: preFlightCheck.checks.baseline.passed,
+            predictedDriftScore,
+          },
+        },
+      };
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // STEP 7: POST-AUDIT

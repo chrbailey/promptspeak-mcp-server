@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Pluggable tool executor** (`ToolExecutor`). The gatekeeper's STEP 6 now runs a registered executor instead of the built-in simulation when one is provided via `new Gatekeeper(eviction, { executor })` or `gatekeeper.setExecutor(...)`. Defaults to simulation (safe, unchanged behavior). Executor exceptions are recorded as failed executions rather than crashing the pipeline.
+- **Pluggable, content-aware embeddings** (`EmbeddingProvider` seam in `src/utils/embedding-provider.ts`). Drift embeddings now incorporate behavioral content (tool arguments + results), so drift reflects what an agent actually did — not just the frame's symbol glyphs. The default provider is deterministic and local (no network, no model dependency), preserving validation latency; a real semantic model can be injected via `setEmbeddingProvider()`. Frame-only operations remain byte-identical to prior behavior (backward compatible).
+- **Authenticated handshake** (HMAC-SHA256 challenge–response): `issueChallenge()` / `proveChallenge()` / `verifyChallenge()` with single-use, expiring nonces and constant-time comparison. Secret sourced from `PROMPTSPEAK_HANDSHAKE_SECRET` (falls back to an ephemeral per-process key). Existing version-check/echo behavior is unchanged.
+
+### Changed
+
+- `DriftDetectionEngine.recordOperation()` and `ContinuousMonitor.recordOperation()` accept an optional `OperationContext` (args/result) carrying behavioral signal. `ps_execute` and the gatekeeper thread this through automatically.
+
+### Security
+
+- Tripwire injection and selection now use crypto-backed randomness (`crypto.randomInt`) instead of `Math.random`, removing predictability for an adversary who knows the injection rate.
+
 ## [0.4.0] - 2026-03-14
 
 ### Security

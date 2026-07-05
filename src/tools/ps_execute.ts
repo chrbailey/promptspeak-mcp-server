@@ -112,12 +112,13 @@ export async function ps_execute(request: PSExecuteRequest): Promise<PSExecuteRe
     // Step 3: Execute through gatekeeper
     const executeResult = await gatekeeper.execute(executeRequest);
 
-    // Step 4: Record drift metrics
+    // Step 4: Record drift metrics with behavioral context (args + result)
     const driftAlert = driftEngine.recordOperation(
       request.agentId,
       request.frame,
       actionTool,
-      executeResult.success
+      executeResult.success,
+      { args: normalizedAction.arguments, result: executeResult.result }
     );
 
     // Step 5: Get updated drift status
@@ -158,7 +159,8 @@ export async function ps_execute(request: PSExecuteRequest): Promise<PSExecuteRe
       request.agentId,
       request.frame,
       actionTool,
-      false
+      false,
+      { args: normalizedAction.arguments }
     );
 
     return {

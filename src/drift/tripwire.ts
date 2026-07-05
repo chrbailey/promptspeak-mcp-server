@@ -5,8 +5,12 @@
 // The agent doesn't know which operations are tripwires.
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { randomInt } from 'crypto';
 import type { TripwireResult, ParsedFrame } from '../types/index.js';
 import { generateTripwireId } from '../utils/hash.js';
+
+// Resolution for crypto-backed probability draws.
+const RNG_RESOLUTION = 1_000_000;
 
 // Predefined tripwire test cases
 interface TripwireTestCase {
@@ -94,16 +98,20 @@ export class TripwireInjector {
    */
   shouldInject(): boolean {
     if (!this.enabled) return false;
-    return Math.random() < this.injectionRate;
+    if (this.injectionRate <= 0) return false;
+    if (this.injectionRate >= 1) return true;
+    // Crypto-backed draw: an adversary who knows the rate cannot predict
+    // which operations are tripwires (Math.random is predictable).
+    return randomInt(0, RNG_RESOLUTION) < this.injectionRate * RNG_RESOLUTION;
   }
 
   /**
    * Get a random tripwire test case.
    */
   getRandomTripwire(): TripwireTestCase {
-    // 50% chance of valid, 50% chance of invalid
-    const pool = Math.random() < 0.5 ? VALID_TRIPWIRES : INVALID_TRIPWIRES;
-    return pool[Math.floor(Math.random() * pool.length)];
+    // 50% chance of valid, 50% chance of invalid (crypto-backed)
+    const pool = randomInt(0, 2) === 0 ? VALID_TRIPWIRES : INVALID_TRIPWIRES;
+    return pool[randomInt(0, pool.length)];
   }
 
   /**
@@ -111,7 +119,7 @@ export class TripwireInjector {
    */
   getTripwire(type: 'valid' | 'invalid'): TripwireTestCase {
     const pool = type === 'valid' ? VALID_TRIPWIRES : INVALID_TRIPWIRES;
-    return pool[Math.floor(Math.random() * pool.length)];
+    return pool[randomInt(0, pool.length)];
   }
 
   /**
