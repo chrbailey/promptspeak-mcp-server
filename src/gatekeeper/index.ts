@@ -80,6 +80,38 @@ export type ToolExecutor = (
   ctx: { agentId: string; frame: string }
 ) => unknown;
 
+/**
+ * An async real tool executor, for tools that perform genuine asynchronous work
+ * (network calls, file I/O). Used only by executeAsync(); the synchronous
+ * execute() ignores it. All governance checks (STEP 1–5) run before it, and
+ * post-audit (STEP 7–9) runs after it, identically to the sync path.
+ *
+ * Throwing (or rejecting) is treated as a failed execution, not a crash.
+ */
+export type AsyncToolExecutor = (
+  tool: string,
+  args: Record<string, unknown>,
+  ctx: { agentId: string; frame: string }
+) => Promise<unknown>;
+
+/**
+ * Context carried between the pre-execution checks (STEP 1–5) and the
+ * post-execution audit (STEP 7–9), so the sync and async execution paths can
+ * share the identical governance pipeline and differ only in STEP 6.
+ */
+interface PreparedExecution {
+  agentId: string;
+  frame: string;
+  tool: string;
+  config: ReturnType<HoldManager['getConfig']>;
+  resolved: ResolvedFrame;
+  decision: InterceptorDecision;
+  effectiveFrame: string;
+  effectiveArgs: Record<string, unknown>;
+  predictedDriftScore: number;
+  preFlightCheck: PreFlightCheck;
+}
+
 export class Gatekeeper {
   private resolver: DynamicResolver;
   private validator: FrameValidator;
@@ -89,6 +121,9 @@ export class Gatekeeper {
 
   // Optional real executor. Defaults to simulation when unset (safe default).
   private executor?: ToolExecutor;
+
+  // Optional async real executor, used only by executeAsync().
+  private asyncExecutor?: AsyncToolExecutor;
 
   // Frame cache for chain validation (with eviction)
   private activeFrames: Map<string, ResolvedFrame> = new Map();
@@ -120,7 +155,7 @@ export class Gatekeeper {
 
   constructor(
     evictionConfig?: Partial<AgentEvictionConfig>,
-    options?: { executor?: ToolExecutor }
+    options?: { executor?: ToolExecutor; asyncExecutor?: AsyncToolExecutor }
   ) {
     this.resolver = new DynamicResolver();
     this.validator = new FrameValidator();
@@ -128,6 +163,7 @@ export class Gatekeeper {
     this.coverageCalculator = new CoverageCalculator();
     this.holdManager = holdManager;  // Use singleton
     this.executor = options?.executor;
+    this.asyncExecutor = options?.asyncExecutor;
     this.evictionConfig = { ...DEFAULT_EVICTION_CONFIG, ...evictionConfig };
 
     // Start periodic cleanup if enabled
@@ -174,6 +210,18 @@ export class Gatekeeper {
   /** Whether a real executor is currently registered. */
   hasExecutor(): boolean {
     return this.executor !== undefined;
+  }
+
+  /**
+   * Register (or clear) an async real tool executor, used by executeAsync().
+   */
+  setAsyncExecutor(executor: AsyncToolExecutor | undefined): void {
+    this.asyncExecutor = executor;
+  }
+
+  /** Whether an async real executor is currently registered. */
+  hasAsyncExecutor(): boolean {
+    return this.asyncExecutor !== undefined;
   }
 
   /**
@@ -453,7 +501,9 @@ export class Gatekeeper {
    * 7. POST-AUDIT - Confirm behavior matches prediction
    * 8. IMMEDIATE ACTION - Halt agent if critical drift detected
    */
-  execute(request: ExecuteRequest): ExecuteResult {
+  private prepareExecution(
+    request: ExecuteRequest
+  ): { done: ExecuteResult } | { proceed: PreparedExecution } {
     const { agentId, frame, tool, arguments: args, bypassHold, holdDecision } = request;
     const config = this.holdManager.getConfig();
     const timestamp = Date.now();
@@ -492,7 +542,7 @@ export class Gatekeeper {
         // Log to audit trail
         this.logCircuitBreakerBlock(agentId, frame, tool, cbState.reason);
 
-        return {
+        return { done: {
           success: false,
           allowed: false,
           held: false,
@@ -512,7 +562,7 @@ export class Gatekeeper {
               baselineCheckPassed: true,
             },
           },
-        };
+        } };
       }
     }
     preFlightCheck.checks.circuitBreaker.passed = true;
@@ -526,7 +576,7 @@ export class Gatekeeper {
       preFlightCheck.blocked = true;
       preFlightCheck.blockReason = 'Frame validation failed';
 
-      return {
+      return { done: {
         success: false,
         allowed: false,
         error: `Frame validation failed: ${(validation.structural ?? []).concat(validation.semantic ?? [], validation.chain ?? [])
@@ -543,7 +593,7 @@ export class Gatekeeper {
           timestamp,
           auditId,
         },
-      };
+      } };
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -617,7 +667,7 @@ export class Gatekeeper {
         preFlightCheck.held = true;
         preFlightCheck.holdRequest = holdRequest;
 
-        return {
+        return { done: {
           success: false,
           allowed: false,
           held: true,
@@ -640,7 +690,7 @@ export class Gatekeeper {
               predictedDriftScore,
             },
           },
-        };
+        } };
       }
 
       // Legal domain hold check (◇ frames)
@@ -667,7 +717,7 @@ export class Gatekeeper {
           preFlightCheck.held = true;
           preFlightCheck.holdRequest = legalHoldRequest;
 
-          return {
+          return { done: {
             success: false,
             allowed: false,
             held: true,
@@ -690,7 +740,7 @@ export class Gatekeeper {
                 predictedDriftScore,
               },
             },
-          };
+          } };
         }
       }
     }
@@ -710,7 +760,7 @@ export class Gatekeeper {
       // Record operation as blocked in drift engine
       driftEngine.recordOperation(agentId, frame, tool, false);
 
-      return {
+      return { done: {
         success: false,
         allowed: false,
         error: decision.reason,
@@ -724,27 +774,40 @@ export class Gatekeeper {
             predictedDriftScore,
           },
         },
-      };
+      } };
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // STEP 6: TOOL EXECUTION
-    // All pre-execution checks passed - now execute via the registered executor,
-    // falling back to simulation when none is configured (safe default).
-    // ═══════════════════════════════════════════════════════════════════════
+    // All pre-execution checks (STEP 1–5) passed; hand off to STEP 6 execution.
     preFlightCheck.passed = true;
-    let result: unknown;
-    let executionSucceeded = true;
-    let executionError: string | undefined;
-    try {
-      result = this.executor
-        ? this.executor(tool, effectiveArgs, { agentId, frame: effectiveFrame })
-        : this.simulateToolExecution(tool, effectiveArgs);
-    } catch (err) {
-      executionSucceeded = false;
-      executionError = err instanceof Error ? err.message : String(err);
-      result = { tool, executed: false, error: executionError };
-    }
+    return {
+      proceed: {
+        agentId,
+        frame,
+        tool,
+        config,
+        resolved,
+        decision,
+        effectiveFrame,
+        effectiveArgs,
+        predictedDriftScore,
+        preFlightCheck,
+      },
+    };
+  }
+
+  /**
+   * STEP 7–9: post-audit, immediate drift action, record & return.
+   * Shared by both the sync and async execution paths — the only difference
+   * between them is how STEP 6 produced `result`.
+   */
+  private finalizeExecution(
+    request: ExecuteRequest,
+    prep: PreparedExecution,
+    result: unknown,
+    executionSucceeded: boolean,
+    executionError: string | undefined
+  ): ExecuteResult {
+    const { agentId, frame, tool, config, resolved, decision, effectiveArgs, predictedDriftScore, preFlightCheck } = prep;
 
     // Record operation in drift engine with behavioral context (args + result),
     // so drift detection reacts to actual behavior, not just frame composition.
@@ -753,7 +816,7 @@ export class Gatekeeper {
       result,
     });
 
-    // A real executor that threw is a failed execution, not a pipeline crash.
+    // A real executor that threw/rejected is a failed execution, not a crash.
     if (!executionSucceeded) {
       this.recordExecution(agentId, request, decision, result);
       this.activeFrames.set(agentId, resolved);
@@ -820,6 +883,69 @@ export class Gatekeeper {
       },
       postAudit,
     };
+  }
+
+  /**
+   * Execute a directive under frame governance (synchronous).
+   *
+   * Pipeline: circuit breaker → validation → drift prediction → hold →
+   * interceptor → execution → post-audit → immediate drift action → record.
+   * STEP 6 runs the sync executor when registered, otherwise simulation.
+   */
+  execute(request: ExecuteRequest): ExecuteResult {
+    const prep = this.prepareExecution(request);
+    if ('done' in prep) return prep.done;
+    const ctx = prep.proceed;
+
+    // STEP 6: TOOL EXECUTION (sync executor, else simulation)
+    let result: unknown;
+    let executionSucceeded = true;
+    let executionError: string | undefined;
+    try {
+      result = this.executor
+        ? this.executor(ctx.tool, ctx.effectiveArgs, { agentId: ctx.agentId, frame: ctx.effectiveFrame })
+        : this.simulateToolExecution(ctx.tool, ctx.effectiveArgs);
+    } catch (err) {
+      executionSucceeded = false;
+      executionError = err instanceof Error ? err.message : String(err);
+      result = { tool: ctx.tool, executed: false, error: executionError };
+    }
+
+    return this.finalizeExecution(request, ctx, result, executionSucceeded, executionError);
+  }
+
+  /**
+   * Execute a directive under frame governance (asynchronous).
+   *
+   * Identical governance pipeline to execute(); STEP 6 awaits the registered
+   * async executor. Falls back to the sync executor, then simulation, when no
+   * async executor is registered — so callers can always `await` this path.
+   * A rejected/thrown executor is recorded as a failed execution.
+   */
+  async executeAsync(request: ExecuteRequest): Promise<ExecuteResult> {
+    const prep = this.prepareExecution(request);
+    if ('done' in prep) return prep.done;
+    const ctx = prep.proceed;
+
+    // STEP 6: TOOL EXECUTION (async executor, else sync executor, else simulation)
+    let result: unknown;
+    let executionSucceeded = true;
+    let executionError: string | undefined;
+    try {
+      if (this.asyncExecutor) {
+        result = await this.asyncExecutor(ctx.tool, ctx.effectiveArgs, { agentId: ctx.agentId, frame: ctx.effectiveFrame });
+      } else if (this.executor) {
+        result = this.executor(ctx.tool, ctx.effectiveArgs, { agentId: ctx.agentId, frame: ctx.effectiveFrame });
+      } else {
+        result = this.simulateToolExecution(ctx.tool, ctx.effectiveArgs);
+      }
+    } catch (err) {
+      executionSucceeded = false;
+      executionError = err instanceof Error ? err.message : String(err);
+      result = { tool: ctx.tool, executed: false, error: executionError };
+    }
+
+    return this.finalizeExecution(request, ctx, result, executionSucceeded, executionError);
   }
 
   /**
