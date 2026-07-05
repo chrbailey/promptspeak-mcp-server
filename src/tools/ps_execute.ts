@@ -109,8 +109,10 @@ export async function ps_execute(request: PSExecuteRequest): Promise<PSExecuteRe
       agentId: request.agentId,
     };
 
-    // Step 3: Execute through gatekeeper
-    const executeResult = await gatekeeper.execute(executeRequest);
+    // Step 3: Execute through gatekeeper. Use the async path so a registered
+    // async executor is honored; it falls back to the sync executor, then
+    // simulation, producing identical results when no executor is set.
+    const executeResult = await gatekeeper.executeAsync(executeRequest);
 
     // Step 4: Record drift metrics with behavioral context (args + result)
     const driftAlert = driftEngine.recordOperation(

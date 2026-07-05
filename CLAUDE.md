@@ -4,9 +4,9 @@
 
 Pre-execution governance layer for AI agents. Intercepts MCP tool calls, validates against deterministic rules, blocks or holds risky operations for human approval. Validation latency: 0.164ms avg (P95: 0.368ms).
 
-**v0.4.1** — 879 tests, 56 MCP tools, MIT licensed, published as `@chrbailey/promptspeak-mcp-server`.
+**v0.4.1** — 886 tests, 56 MCP tools, MIT licensed, published as `@chrbailey/promptspeak-mcp-server`.
 
-> **Execution model:** STEP 6 of the pipeline runs a pluggable `ToolExecutor` when registered (`gatekeeper.setExecutor`), otherwise it simulates (safe default — unchanged behavior). Drift embeddings are content-aware via the `EmbeddingProvider` seam (deterministic-local by default; inject a real model with `setEmbeddingProvider`). The handshake supports HMAC-SHA256 challenge–response (`PROMPTSPEAK_HANDSHAKE_SECRET`).
+> **Execution model:** STEP 6 of the pipeline runs a pluggable `ToolExecutor` when registered (`gatekeeper.setExecutor`), otherwise it simulates (safe default — unchanged behavior). For async tools, `gatekeeper.executeAsync()` awaits an `AsyncToolExecutor` (`setAsyncExecutor`) through the same pipeline; `ps_execute` uses it. Pre-checks (STEP 1–5) and post-audit (STEP 7–9) are shared via `prepareExecution`/`finalizeExecution` so the sync and async paths stay identical. Drift embeddings are content-aware via the `EmbeddingProvider` seam (deterministic-local by default; inject a real model with `setEmbeddingProvider`). The handshake supports HMAC-SHA256 challenge–response (`PROMPTSPEAK_HANDSHAKE_SECRET`).
 
 HTTPS live at `https://promptspeak.admin-as-a-service.com/mcp` (Cloudflare Tunnel → Mac Mini).
 Safety annotations on all 56 tools. Streamable HTTP transport. Connectors submission: all requirements met, form submitted 2026-03-21.
