@@ -1,0 +1,11 @@
+# Netlify config for the FDE onboarding portal.
+# This is a single static HTML file — no build step required.
+[build]
+  publish = "."
+  command = ""
+
+# Don't index this internal page in search engines.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

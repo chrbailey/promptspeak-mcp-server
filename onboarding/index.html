@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Welcome to ERP Access · Forward Deployed Engineer Onboarding</title>
+<meta name="description" content="Onboarding & program overview for the Anthropic Academy Forward Deployed Engineer track at ERP Access." />
+<style>
+  :root {
+    --cream: #f4f1ea;
+    --paper: #fbf9f4;
+    --ink: #20232a;
+    --ink-soft: #4a4f59;
+    --muted: #767c88;
+    --clay: #cc785c;
+    --clay-deep: #b35f44;
+    --teal: #1f6f6b;
+    --teal-soft: #2f8e89;
+    --navy: #1d2a3a;
+    --line: #e4ded2;
+    --ok: #2f8e89;
+    --warn: #c9952a;
+    --crit: #c1493b;
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(29,42,58,.08), 0 2px 8px rgba(29,42,58,.05);
+    --shadow-sm: 0 4px 14px rgba(29,42,58,.07);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--cream);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -.01em; }
+  a { color: var(--clay-deep); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: .18em; font-size: 12px;
+    font-weight: 700; color: var(--clay-deep);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(1.2) blur(8px);
+    background: rgba(251,249,244,.82);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap { display: flex; align-items: center; gap: 16px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; }
+  .brand small { font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .nav { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .nav a {
+    text-decoration: none; color: var(--ink-soft); font-size: 14px; font-weight: 600;
+    padding: 7px 12px; border-radius: 999px;
+  }
+  .nav a:hover { background: var(--line); color: var(--ink); }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(1100px 500px at 80% -10%, rgba(204,120,92,.18), transparent 60%),
+      radial-gradient(900px 500px at -10% 20%, rgba(31,111,107,.14), transparent 55%),
+      linear-gradient(180deg, var(--paper), var(--cream));
+    border-bottom: 1px solid var(--line);
+  }
+  .hero .wrap { padding: 64px 24px 56px; display: grid; grid-template-columns: 1.25fr .9fr; gap: 40px; align-items: center; }
+  .hero h1 { font-size: clamp(34px, 5vw, 54px); margin: 14px 0 10px; }
+  .hero h1 .accent { color: var(--clay-deep); }
+  .hero p.lead { font-size: 19px; color: var(--ink-soft); max-width: 40ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip {
+    font-size: 13px; font-weight: 700; padding: 7px 13px; border-radius: 999px;
+    background: #fff; border: 1px solid var(--line); color: var(--ink-soft);
+    box-shadow: var(--shadow-sm);
+  }
+  .chip.dot::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-right: 8px; vertical-align: middle; }
+
+  .badge-card {
+    background: linear-gradient(160deg, #fff, #f7f3ec);
+    border: 1px solid var(--line); border-radius: 22px; padding: 26px;
+    box-shadow: var(--shadow); text-align: center;
+  }
+  .avatar {
+    width: 96px; height: 96px; margin: 0 auto 14px; border-radius: 50%;
+    background: conic-gradient(from 220deg, var(--clay), var(--teal-soft), var(--clay));
+    display: grid; place-items: center; color: #fff; font-size: 38px; font-weight: 800;
+    box-shadow: inset 0 0 0 4px rgba(255,255,255,.6);
+  }
+  .badge-card h3 { margin: 4px 0; font-size: 22px; }
+  .badge-card .role { color: var(--clay-deep); font-weight: 700; }
+  .badge-card .org { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .badge-meta { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 14px; display: grid; gap: 8px; font-size: 13.5px; text-align: left; }
+  .badge-meta div { display: flex; justify-content: space-between; gap: 12px; }
+  .badge-meta span:first-child { color: var(--muted); }
+  .badge-meta span:last-child { font-weight: 600; }
+
+  /* ---------- Sections ---------- */
+  section { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  section h2 { font-size: clamp(26px, 3.4vw, 34px); margin: 8px 0 8px; }
+  section .sub { color: var(--ink-soft); max-width: 62ch; font-size: 17px; }
+
+  .grid { display: grid; gap: 18px; margin-top: 30px; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+
+  .card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px; box-shadow: var(--shadow-sm);
+  }
+  .card h3 { font-size: 18px; margin: 12px 0 6px; }
+  .card p { color: var(--ink-soft); font-size: 15px; margin: 0; }
+  .ico {
+    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+    background: rgba(204,120,92,.12); color: var(--clay-deep);
+  }
+  .ico.teal { background: rgba(31,111,107,.12); color: var(--teal); }
+
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-top: 28px; }
+  .stat { background: var(--navy); color: #fff; border-radius: var(--radius); padding: 20px; }
+  .stat .n { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+  .stat .l { font-size: 13px; color: #c7d0db; margin-top: 2px; }
+
+  /* ---------- Pipeline diagram ---------- */
+  .diagram { margin-top: 26px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-sm); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  .lg-crit::before { background: var(--crit); }
+  .lg-hold::before { background: var(--warn); }
+  .lg-ok::before { background: var(--ok); }
+
+  /* ---------- Timeline ---------- */
+  .timeline { margin-top: 30px; display: grid; gap: 0; position: relative; }
+  .tl-item { display: grid; grid-template-columns: 130px 1fr; gap: 20px; padding: 18px 0; border-top: 1px solid var(--line); }
+  .tl-item:first-child { border-top: 0; }
+  .tl-phase { font-weight: 800; color: var(--clay-deep); }
+  .tl-phase small { display: block; font-weight: 600; color: var(--muted); }
+  .tl-body h4 { margin: 0 0 6px; font-size: 17px; }
+  .tl-body ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 15px; }
+  .tl-body li { margin: 3px 0; }
+
+  /* ---------- Checklist ---------- */
+  .checklist { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 26px; }
+  .check { display: flex; gap: 12px; align-items: flex-start; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .check .box { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--teal); flex: 0 0 auto; margin-top: 1px; }
+  .check b { display: block; font-size: 15px; }
+  .check span { font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- Contacts ---------- */
+  .contacts { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 28px; }
+  .contact { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .contact .pic { width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(150deg, var(--teal-soft), var(--clay)); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 20px; }
+  .contact h4 { margin: 12px 0 2px; }
+  .contact .t { color: var(--clay-deep); font-weight: 600; font-size: 14px; }
+  .contact .d { font-size: 14px; color: var(--ink-soft); margin-top: 8px; word-break: break-word; }
+  .placeholder { border-style: dashed; background: repeating-linear-gradient(45deg, #fbf9f4, #fbf9f4 10px, #f4f1ea 10px, #f4f1ea 20px); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--warn); background: rgba(201,149,42,.12); padding: 3px 8px; border-radius: 999px; }
+
+  /* ---------- Callout ---------- */
+  .callout { display: flex; gap: 14px; background: rgba(31,111,107,.07); border: 1px solid rgba(31,111,107,.25); border-radius: var(--radius); padding: 18px 20px; margin-top: 26px; }
+  .callout .ico { background: rgba(31,111,107,.15); }
+
+  footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  @media (max-width: 860px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .g3, .g2, .stats, .contacts, .checklist { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .tl-item { grid-template-columns: 1fr; gap: 6px; }
+    .nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================== TOP BAR ====================== -->
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="2" y="2" width="28" height="28" rx="8" fill="#1d2a3a"/>
+        <path d="M9 21V11l7 5 7-5v10" fill="none" stroke="#cc785c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      ERP Access <small>× Anthropic Academy</small>
+    </div>
+    <nav class="nav">
+      <a href="#welcome">Welcome</a>
+      <a href="#company">Who we are</a>
+      <a href="#role">Your role</a>
+      <a href="#product">PromptSpeak</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#checklist">First week</a>
+      <a href="#contacts">Contacts</a>
+    </nav>
+  </div>
+</div>
+
+<!-- ====================== HERO ====================== -->
+<header class="hero" id="welcome">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">Forward Deployed Engineer · Onboarding Portal</span>
+      <h1>Welcome aboard, <span class="accent">Chanel</span> 👋</h1>
+      <p class="lead">You're joining ERP Access as our first <strong>Anthropic Academy Forward Deployed Engineer</strong> — bridging deep ERP know-how with safe, governed AI agents in the field.</p>
+      <div class="chips">
+        <span class="chip dot">First FDE cohort</span>
+        <span class="chip">Mentored track</span>
+        <span class="chip">NetSuite + AI governance</span>
+        <span class="chip">Customer-facing</span>
+      </div>
+    </div>
+    <aside class="badge-card">
+      <div class="avatar">C</div>
+      <h3>Chanel</h3>
+      <div class="role">Forward Deployed Engineer</div>
+      <div class="org">ERP Access · Admin-as-a-Service</div>
+      <div class="badge-meta">
+        <div><span>Program</span><span>Anthropic Academy</span></div>
+        <div><span>Cohort</span><span>FDE — Class of 2026</span></div>
+        <div><span>Mentor</span><span>Chris Bailey</span></div>
+        <div><span>Status</span><span style="color:var(--teal)">● Onboarding</span></div>
+      </div>
+    </aside>
+  </div>
+</header>
+
+<!-- ====================== WHO WE ARE ====================== -->
+<section id="company">
+  <div class="wrap">
+    <span class="eyebrow">Who we are</span>
+    <h2>ERP Access — Enterprise Agile for NetSuite</h2>
+    <p class="sub">Since 2001, ERP Access has helped companies — from pre-IPO startups to the largest public enterprises — manage NetSuite and cloud software through <strong>Enterprise Agile</strong>, turning business change requests into completed projects. Our <strong>Admin-as-a-Service</strong> practice runs clients' NetSuite environments day to day; our newest frontier is governed AI agents.</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <div class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+        </div>
+        <h3>Meet · Teach · Coach</h3>
+        <p>We meet clients in person, teach their teams Enterprise Agile, then coach their people on when to change the business vs. change the software.</p>
+      </div>
+      <div class="card">
+        <div class="ico teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>
+        </div>
+        <h3>Admin-as-a-Service</h3>
+        <p>We own scope, SLAs, ticketing, UAT/production approvals, backlog and scrum reviews — keeping clients compliant and continuously improving.</p>
+      </div>
+      <div class="card">
+        <div class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3>PromptSpeak</h3>
+        <p>Our governance layer for AI agents — blocking dangerous tool calls before they execute. This is the product you'll deploy with customers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== YOUR ROLE ====================== -->
+<section id="role">
+  <div class="wrap">
+    <span class="eyebrow">Your role</span>
+    <h2>What a Forward Deployed Engineer does</h2>
+    <p class="sub">An FDE is the bridge between our product and the customer's reality. You sit with clients, understand their NetSuite and operational workflows, and stand up safe AI agent automations — adapting PromptSpeak governance to each environment.</p>
+
+    <div class="grid g2">
+      <div class="card">
+        <div class="ico teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>On the front line with customers</h3>
+        <p>Run discovery, map workflows, and translate business change requests into governed agent automations — the Enterprise Agile way.</p>
+      </div>
+      <div class="card">
+        <div class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3>Build &amp; configure</h3>
+        <p>Author PromptSpeak policies and symbol frames, wire up MCP tool governance, and ship integrations against NetSuite and client systems.</p>
+      </div>
+      <div class="card">
+        <div class="ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3>Govern &amp; de-risk</h3>
+        <p>Make sure every agent action is validated, drift-checked, and held for human approval where the stakes are high. Safety is the product.</p>
+      </div>
+      <div class="card">
+        <div class="ico teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>Feed the loop</h3>
+        <p>Bring field learnings back into the product — what works, what doesn't, where we improve. Retrospectives drive the roadmap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== PRODUCT: PROMPTSPEAK ====================== -->
+<section id="product">
+  <div class="wrap">
+    <span class="eyebrow">The product you'll deploy</span>
+    <h2>PromptSpeak — pre-execution governance for AI agents</h2>
+    <p class="sub">AI agents call tools — file writes, API requests, shell commands — with nothing between intent and execution. PromptSpeak intercepts every MCP tool call, validates it against deterministic rules, and blocks or holds risky operations for human approval, in a fraction of a millisecond, before anything runs.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="n">56</div><div class="l">governance MCP tools</div></div>
+      <div class="stat"><div class="n">0.164ms</div><div class="l">avg validation latency</div></div>
+      <div class="stat"><div class="n">834</div><div class="l">tests passing</div></div>
+      <div class="stat"><div class="n">6</div><div class="l">stage safety pipeline</div></div>
+    </div>
+
+    <!-- Pipeline diagram -->
+    <div class="diagram">
+      <strong>The 6-stage governance pipeline</strong>
+      <p style="color:var(--ink-soft); font-size:14px; margin:4px 0 8px;">Every request flows left to right. The circuit breaker runs <em>first</em> — halted agents are stopped before any validation.</p>
+      <svg viewBox="0 0 960 230" width="100%" role="img" aria-label="PromptSpeak six stage pipeline diagram">
+        <defs>
+          <marker id="arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L7,3 L0,6 Z" fill="#9aa3af"/>
+          </marker>
+          <style>
+            .stg { fill:#fff; stroke:#e4ded2; stroke-width:1.5; }
+            .lbl { font: 700 13px -apple-system,Segoe UI,Roboto,sans-serif; fill:#20232a; }
+            .num { font: 800 12px -apple-system,Segoe UI,Roboto,sans-serif; }
+            .q { font: 600 11px -apple-system,Segoe UI,Roboto,sans-serif; fill:#767c88; }
+            .flow { stroke:#9aa3af; stroke-width:2; fill:none; }
+          </style>
+        </defs>
+        <!-- stages -->
+        <g>
+          <!-- 1 Circuit breaker -->
+          <rect class="stg" x="8"   y="70" width="135" height="64" rx="12" stroke="#c1493b"/>
+          <circle cx="28" cy="90" r="9" fill="#c1493b"/><text class="num" x="28" y="94" text-anchor="middle" fill="#fff">1</text>
+          <text class="lbl" x="44" y="94">Circuit</text><text class="lbl" x="44" y="110">Breaker</text>
+          <text class="q" x="20" y="128">halted? → block</text>
+
+          <rect class="stg" x="163" y="70" width="120" height="64" rx="12"/>
+          <circle cx="183" cy="90" r="9" fill="#1f6f6b"/><text class="num" x="183" y="94" text-anchor="middle" fill="#fff">2</text>
+          <text class="lbl" x="199" y="94">Validation</text>
+          <text class="q" x="175" y="128">valid frame?</text>
+
+          <rect class="stg" x="303" y="70" width="120" height="64" rx="12"/>
+          <circle cx="323" cy="90" r="9" fill="#1f6f6b"/><text class="num" x="323" y="94" text-anchor="middle" fill="#fff">3</text>
+          <text class="lbl" x="339" y="94">Drift Check</text>
+          <text class="q" x="315" y="128">drifting?</text>
+
+          <rect class="stg" x="443" y="70" width="120" height="64" rx="12"/>
+          <circle cx="463" cy="90" r="9" fill="#c9952a"/><text class="num" x="463" y="94" text-anchor="middle" fill="#fff">4</text>
+          <text class="lbl" x="479" y="94">Hold Check</text>
+          <text class="q" x="455" y="128">needs human?</text>
+
+          <rect class="stg" x="583" y="70" width="135" height="64" rx="12"/>
+          <circle cx="603" cy="90" r="9" fill="#c9952a"/><text class="num" x="603" y="94" text-anchor="middle" fill="#fff">5</text>
+          <text class="lbl" x="619" y="94">Security</text><text class="lbl" x="619" y="110">Scan</text>
+          <text class="q" x="595" y="128">vuln found?</text>
+
+          <rect class="stg" x="738" y="70" width="120" height="64" rx="12" stroke="#2f8e89"/>
+          <circle cx="758" cy="90" r="9" fill="#2f8e89"/><text class="num" x="758" y="94" text-anchor="middle" fill="#fff">6</text>
+          <text class="lbl" x="774" y="94">Execute</text>
+          <text class="q" x="750" y="128">action runs</text>
+        </g>
+        <!-- request label -->
+        <text class="q" x="8" y="40" style="font-size:12px; fill:#cc785c; font-weight:700;">REQUEST →</text>
+        <!-- flow arrows -->
+        <line class="flow" x1="143" y1="102" x2="161" y2="102" marker-end="url(#arr)"/>
+        <line class="flow" x1="283" y1="102" x2="301" y2="102" marker-end="url(#arr)"/>
+        <line class="flow" x1="423" y1="102" x2="441" y2="102" marker-end="url(#arr)"/>
+        <line class="flow" x1="563" y1="102" x2="581" y2="102" marker-end="url(#arr)"/>
+        <line class="flow" x1="718" y1="102" x2="736" y2="102" marker-end="url(#arr)"/>
+        <!-- block drops -->
+        <line class="flow" x1="75"  y1="134" x2="75"  y2="172" stroke="#c1493b" marker-end="url(#arr)"/>
+        <text class="q" x="58" y="190" fill="#c1493b">blocked</text>
+        <line class="flow" x1="503" y1="134" x2="503" y2="172" stroke="#c9952a" marker-end="url(#arr)"/>
+        <text class="q" x="486" y="190" fill="#c9952a">held for human</text>
+      </svg>
+      <div class="legend">
+        <span class="lg-crit">CRITICAL → Block (SQL injection, hardcoded secrets)</span>
+        <span class="lg-hold">HIGH → Hold for approval</span>
+        <span class="lg-ok">Cleared → Execute</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="ico">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </div>
+      <div>
+        <strong>Symbol frames in 30 seconds.</strong> Governance is expressed as 2–12 symbol frames, <em>mode first</em>: <code>[Mode][Domain][Constraint?][Action][Entity?]</code>. Example — <code>⊕◊▶β</code> = "strict · financial · execute · secondary-agent." You'll learn to author and validate these in week one.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== ROADMAP ====================== -->
+<section id="roadmap">
+  <div class="wrap">
+    <span class="eyebrow">Your Anthropic Academy track</span>
+    <h2>Onboarding roadmap</h2>
+    <p class="sub">Adapted from the ERP Access internship &amp; consulting program: a mentored path from orientation to live customer deployment. Pace flexes to your progress — your mentor checks in throughout.</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-phase">Phase 1<small>Weeks 1–2</small></div>
+        <div class="tl-body">
+          <h4>Orientation &amp; foundations</h4>
+          <ul>
+            <li>Welcome session, team intros, and the ERP Access mission, culture &amp; values</li>
+            <li>Policies: code of conduct, confidentiality, security protocols, communication channels</li>
+            <li>Accounts &amp; access provisioned (see the First-Week Checklist below)</li>
+            <li>NetSuite basics: navigation, CRM, order management, financials, reporting</li>
+            <li>Anthropic Academy fundamentals: agents, MCP, tool use, and AI safety</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-phase">Phase 2<small>Weeks 3–6</small></div>
+        <div class="tl-body">
+          <h4>PromptSpeak &amp; governed agents</h4>
+          <ul>
+            <li>The 6-stage pipeline end to end; authoring and validating symbol frames</li>
+            <li>Hands-on with the 56 MCP governance tools (validate, security scan, hold/approve)</li>
+            <li>Build a sandbox automation against a NetSuite test instance</li>
+            <li>Shadow your mentor on a live Admin-as-a-Service engagement</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-phase">Phase 3<small>Weeks 7–10</small></div>
+        <div class="tl-body">
+          <h4>Forward deployment</h4>
+          <ul>
+            <li>Run discovery with a real client: map workflows &amp; change requests</li>
+            <li>Draft a specification doc and a governance policy for the engagement</li>
+            <li>Configure and deploy a governed agent with human-in-the-loop approvals</li>
+            <li>Own UAT → production sign-off with your mentor as backstop</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-phase">Phase 4<small>Weeks 11–12</small></div>
+        <div class="tl-body">
+          <h4>Review &amp; retrospective</h4>
+          <ul>
+            <li>Present your deployment to the team: what worked, what to improve</li>
+            <li>Feed learnings back into the PromptSpeak roadmap</li>
+            <li>Evaluation, feedback, and your ongoing FDE development plan</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== FIRST WEEK CHECKLIST ====================== -->
+<section id="checklist">
+  <div class="wrap">
+    <span class="eyebrow">Day one</span>
+    <h2>First-week checklist</h2>
+    <p class="sub">Get these set up with your mentor so you're ready to build.</p>
+    <div class="checklist">
+      <div class="check"><div class="box"></div><div><b>Email &amp; calendar</b><span>ERP Access Google Workspace account</span></div></div>
+      <div class="check"><div class="box"></div><div><b>Slack</b><span>Join the team workspace &amp; #onboarding</span></div></div>
+      <div class="check"><div class="box"></div><div><b>GitHub access</b><span>promptspeak-mcp-server repository</span></div></div>
+      <div class="check"><div class="box"></div><div><b>NetSuite sandbox</b><span>Training instance &amp; role assigned</span></div></div>
+      <div class="check"><div class="box"></div><div><b>Dev environment</b><span>Node.js, clone repo, <code>npm install &amp;&amp; npm run build</code></span></div></div>
+      <div class="check"><div class="box"></div><div><b>PromptSpeak running</b><span>Local MCP server &amp; all 56 tools available</span></div></div>
+      <div class="check"><div class="box"></div><div><b>Read CLAUDE.md</b><span>Architecture, pipeline rules &amp; the "Don't" list</span></div></div>
+      <div class="check"><div class="box"></div><div><b>Meet your mentor</b><span>Book recurring 1:1s for the program</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== CONTACTS ====================== -->
+<section id="contacts">
+  <div class="wrap">
+    <span class="eyebrow">Who to reach</span>
+    <h2>Key contacts</h2>
+    <p class="sub">Your people for your first weeks. Reach out early and often — questions are welcome.</p>
+    <div class="contacts">
+      <div class="contact">
+        <div class="pic">CB</div>
+        <h4>Chris Bailey</h4>
+        <div class="t">Founder &amp; Mentor · ERP Access</div>
+        <div class="d">
+          ✉️ <a href="mailto:Chris.Bailey@ERP-Access.com">Chris.Bailey@ERP-Access.com</a><br>
+          📞 <a href="tel:+16502811369">650-281-1369</a>
+        </div>
+      </div>
+      <div class="contact">
+        <div class="pic">C</div>
+        <h4>Chanel <span class="tag">that's you</span></h4>
+        <div class="t">Forward Deployed Engineer · ERP Access</div>
+        <div class="d">
+          ✉️ <a href="mailto:chanel@erp-access.com">chanel@erp-access.com</a>
+        </div>
+      </div>
+      <div class="contact">
+        <div class="pic">⛑️</div>
+        <h4>IT &amp; Access</h4>
+        <div class="t">Accounts · Tooling · Security</div>
+        <div class="d">For account provisioning, repo access, and NetSuite roles, ask your mentor to route the request.</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="ico teal">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <strong>A note on privacy.</strong> This page intentionally omits Chanel's personal phone and email. Personal contact details shouldn't live on a shareable URL — they'll be kept in the internal HR/contacts system instead.
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>© <span id="yr"></span> ERP Access · Admin-as-a-Service · Enterprise Agile for NetSuite</div>
+    <div>Forward Deployed Engineer Onboarding · Anthropic Academy track · Internal</div>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>
