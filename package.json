@@ -76,7 +76,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.11",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "better-sqlite3": "^12.5.0",
+    "better-sqlite3": "^13.0.3",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
     "hono": "^4.12.8",
